@@ -16,6 +16,8 @@
 #   NP_BINARY_URL  自定义 agent 二进制 tar 包地址（覆盖默认 release 下载）
 
 set -e
+# 任何命令失败都打印出来，避免静默退出（“又没了”）
+trap 'echo -e "\033[31m[install-agent] 失败，退出位置(行 $LINENO): $BASH_COMMAND\033[0m" >&2' ERR
 
 # ---------- 颜色 ----------
 red()    { echo -e "\033[31m$1\033[0m"; }
@@ -173,21 +175,39 @@ install_agent() {
   prompt_config
   mkdir -p "$CONFIG_DIR"
   write_service
-  systemctl daemon-reload
-  systemctl enable "$SERVICE_NAME"
-  systemctl restart "$SERVICE_NAME"
-  sleep 2
-  if systemctl is-active --quiet "$SERVICE_NAME"; then
-    green "NodePilot Agent 安装并启动成功！"
-    blue "管理端: $NP_SERVER  节点ID: $NP_NODE_ID  监听: $ADDR"
-    yellow "查看状态: systemctl status $SERVICE_NAME"
-    yellow "查看日志: journalctl -u $SERVICE_NAME -f"
-    exit 0
-  else
-    red "Agent 启动失败，请查看日志: journalctl -u $SERVICE_NAME -n 50"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || { red "systemctl daemon-reload 失败（可能非 systemd 环境）"; }
+    systemctl enable "$SERVICE_NAME" || { red "systemctl enable 失败"; }
+    systemctl restart "$SERVICE_NAME" || { red "systemctl restart 失败"; }
+    sleep 2
+    if systemctl is-active --quiet "$SERVICE_NAME"; then
+      green "NodePilot Agent 安装并启动成功！"
+      blue "管理端: $NP_SERVER  节点ID: $NP_NODE_ID  监听: $ADDR"
+      yellow "查看状态: systemctl status $SERVICE_NAME"
+      yellow "查看日志: journalctl -u $SERVICE_NAME -f"
+      exit 0
+    fi
+    red "Agent 启动失败，最近日志:"
     journalctl -u "$SERVICE_NAME" -n 50 --no-pager 2>/dev/null || true
     exit 1
   fi
+  # 无 systemd 兜底：直接用 nohup 后台启动
+  red "未检测到 systemd，改用 nohup 后台启动 agent（重启机器不会自启）"
+  nohup "$INSTALL_DIR/bin/$BINARY_NAME" \
+    --token "$NP_TOKEN" --node-id "$NP_NODE_ID" --server "$NP_SERVER" \
+    --addr "$ADDR" --config-dir "$CONFIG_DIR" --xray "$XRAY_BIN" \
+    >/var/log/nodepilot-agent.log 2>&1 &
+  echo $! > /var/run/nodepilot-agent.pid
+  sleep 2
+  if kill -0 "$(cat /var/run/nodepilot-agent.pid 2>/dev/null)" 2>/dev/null; then
+    green "NodePilot Agent 已后台启动（nohup）！PID=$(cat /var/run/nodepilot-agent.pid)"
+    blue "管理端: $NP_SERVER  节点ID: $NP_NODE_ID  监听: $ADDR"
+    yellow "查看日志: tail -f /var/log/nodepilot-agent.log"
+    yellow "停止: kill \$(cat /var/run/nodepilot-agent.pid)"
+    exit 0
+  fi
+  red "Agent 启动失败，请查看日志: tail -n 50 /var/log/nodepilot-agent.log"
+  exit 1
 }
 
 uninstall_agent() {
@@ -214,9 +234,9 @@ show_config() {
   fi
 }
 
-restart_agent() { systemctl restart "$SERVICE_NAME" && green "已重启"; }
-stop_agent()    { systemctl stop "$SERVICE_NAME" && green "已停止"; }
-start_agent()   { systemctl start "$SERVICE_NAME" && green "已启动"; }
+restart_agent() { if systemctl restart "$SERVICE_NAME"; then green "已重启"; else red "重启失败"; fi; }
+stop_agent()    { if systemctl stop "$SERVICE_NAME"; then green "已停止"; else red "停止失败"; fi; }
+start_agent()   { if systemctl start "$SERVICE_NAME"; then green "已启动"; else red "启动失败"; fi; }
 
 # ---------- 菜单 ----------
 menu() {
