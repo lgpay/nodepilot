@@ -93,14 +93,13 @@ func ListNodes(c *gin.Context) {
 func GetNode(c *gin.Context) {
 	id := c.Param("id")
 	var node model.Node
-	if err := store.DB.Select("id,name,address,region,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,created_at").
-		First(&node, id).Error; err != nil {
+	if err := store.DB.First(&node, id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "node not found"})
 		return
 	}
 	var versions []model.ConfigVersion
 	store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions)
-	c.JSON(200, gin.H{"node": node, "config_versions": versions})
+	c.JSON(200, gin.H{"node": node, "token": node.Token, "config_versions": versions})
 }
 
 func UpdateNode(c *gin.Context) {

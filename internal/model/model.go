@@ -17,7 +17,7 @@ type Node struct {
 	Address       string    `gorm:"size:128" json:"address"` // agent 监听地址，如 127.0.0.1:54321
 	Region        string    `gorm:"size:64" json:"region"`
 	Tags          string    `gorm:"size:512" json:"tags"` // 逗号分隔
-	Token         string    `gorm:"size:128" json:"-"` // 节点 token 明文（仅下发/校验用，列表接口不返回）
+	Token         string    `gorm:"size:128" json:"-"` // 节点 token 明文（不随节点序列化；仅 GetNode 详情以顶层 token 字段返回）
 	Enabled       bool      `gorm:"default:true" json:"enabled"`
 	Status        string    `gorm:"size:16;default:'offline'" json:"status"` // online|offline
 	Connectivity  string    `gorm:"size:16;default:'ok'" json:"connectivity"` // ok|degraded|offline

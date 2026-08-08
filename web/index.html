@@ -163,18 +163,33 @@ async function loadNodes() {
   const nodes = await api('GET', '/nodes');
   if (!nodes) return;
   const t = document.getElementById('nodeTable');
-  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>地址</th><th>状态</th><th>连通</th><th>端口范围</th><th></th></tr>';
+  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>地址</th><th>状态</th><th>连通</th><th>端口范围</th><th>操作</th></tr>';
   nodes.forEach(n => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${n.id}</td><td>${n.name}</td><td>${n.address}</td>
       <td class="${n.status==='online'?'ok':'off'}">${n.status}</td>
       <td class="${n.connectivity==='ok'?'ok':(n.connectivity==='offline'?'off':'warn')}">${n.connectivity}</td>
       <td>${n.port_range||'-'}</td>
-      <td><button class="secondary small" onclick="selectNode(${n.id},'${n.name}')">选</button></td>`;
+      <td><button class="secondary small" onclick="selectNode(${n.id},'${n.name}')">选</button>
+          <button class="secondary small" onclick="showToken(${n.id})">token</button>
+          <button class="secondary small" onclick="delNode(${n.id})">删</button></td>`;
     t.appendChild(tr);
   });
 }
 function selectNode(id, name) { curNode = id; curInbound = null; document.getElementById('curNode').textContent = name + '(#' + id + ')'; loadInbounds(); }
+
+async function delNode(id) {
+  if (!confirm('确认删除节点 #' + id + '？')) return;
+  const d = await api('DELETE', '/nodes/' + id);
+  if (d) loadNodes();
+}
+async function showToken(id) {
+  const d = await api('GET', '/nodes/' + id);
+  if (!d) return;
+  const t = d.token;
+  if (!t) return alert('该节点没有 token');
+  prompt('节点 token（Ctrl+C 复制，部署 agent 用）:', t);
+}
 
 async function createInbound() {
   if (!curNode) return alert('先选择节点');
