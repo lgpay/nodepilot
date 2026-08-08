@@ -18,6 +18,7 @@ func main() {
 	}
 
 	r := server.NewRouter()
+	server.StartProbeScheduler()
 	log.Println("[server] NodePilot control plane listening on :8080")
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("server run: %v", err)

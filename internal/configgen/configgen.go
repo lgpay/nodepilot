@@ -41,12 +41,34 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		if network == "" {
 			network = "tcp"
 		}
+		// 解析入站保存的 stream_settings（前端传 {"wsPath":"/x"} 或 xray 风格 {"wsSettings":{"path":"/x"}}）
+		var ss struct {
+			WsPath     string `json:"wsPath"`
+			WsSettings struct {
+				Path string `json:"path"`
+			} `json:"wsSettings"`
+			GrpcSettings struct {
+				ServiceName string `json:"serviceName"`
+			} `json:"grpcSettings"`
+		}
+		_ = json.Unmarshal([]byte(in.StreamSettings), &ss)
+		wsPath := ss.WsSettings.Path
+		if wsPath == "" {
+			wsPath = ss.WsPath
+		}
+		if wsPath == "" {
+			wsPath = "/v2ray"
+		}
+		grpcSvc := ss.GrpcSettings.ServiceName
+		if grpcSvc == "" {
+			grpcSvc = "xray"
+		}
 		stream := map[string]interface{}{"network": network}
 		switch network {
 		case "ws":
-			stream["wsSettings"] = map[string]interface{}{"path": "/v2ray"}
+			stream["wsSettings"] = map[string]interface{}{"path": wsPath}
 		case "grpc":
-			stream["grpcSettings"] = map[string]interface{}{"serviceName": "xray"}
+			stream["grpcSettings"] = map[string]interface{}{"serviceName": grpcSvc}
 		}
 		if in.TLSEnabled {
 			stream["security"] = "tls"

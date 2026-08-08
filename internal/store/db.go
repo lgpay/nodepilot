@@ -21,13 +21,44 @@ func Init(dbPath string) error {
 		return err
 	}
 	DB = db
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&model.Admin{},
 		&model.Node{},
 		&model.Inbound{},
 		&model.Client{},
 		&model.ConfigVersion{},
-	)
+		&model.SubscriptionGroup{},
+		&model.Setting{},
+	); err != nil {
+		return err
+	}
+	// 默认端口范围
+	if _, err := GetSetting("default_port_range"); err != nil {
+		_ = SetSetting("default_port_range", "10000-65535")
+	}
+	return nil
+}
+
+// GetSetting 读取配置项，未找到返回错误
+func GetSetting(key string) (string, error) {
+	var s model.Setting
+	if err := DB.First(&s, "key = ?", key).Error; err != nil {
+		return "", err
+	}
+	return s.Value, nil
+}
+
+// SetSetting 写入/更新配置项
+func SetSetting(key, value string) error {
+	var s model.Setting
+	err := DB.First(&s, "key = ?", key).Error
+	if err != nil {
+		s.Key = key
+		s.Value = value
+		return DB.Create(&s).Error
+	}
+	s.Value = value
+	return DB.Model(&s).Update("value", value).Error
 }
 
 // InitAdmin 首次启动初始化管理员（表为空时写入默认账号）

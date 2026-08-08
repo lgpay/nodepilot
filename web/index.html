@@ -15,15 +15,17 @@
   input, select { width: 100%; padding: 7px 9px; border: 1px solid #ccd1d9; border-radius: 5px; box-sizing: border-box; }
   button { background: #2f6fed; color: #fff; border: 0; padding: 8px 14px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
   button.secondary { background: #6b7785; }
+  button.small { padding: 4px 9px; font-size: 12px; margin-top: 0; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
   .row { display: flex; gap: 10px; }
   .row > div { flex: 1; }
-  pre { background: #0f1722; color: #9fe6a0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+  pre { background: #0f1722; color: #9fe6a0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
   .tag { display: inline-block; background: #eef2f7; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-  .ok { color: #1a9d54; } .off { color: #c0392b; }
+  .ok { color: #1a9d54; } .off { color: #c0392b; } .warn { color: #d68910; }
   .hidden { display: none; }
   .muted { color: #888; font-size: 12px; }
+  .link { color: #2f6fed; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -90,6 +92,25 @@
     <table id="clientTable" style="margin-top:12px"></table>
   </div>
 
+  <!-- 订阅 -->
+  <div class="card">
+    <h2>订阅分组与订阅链接</h2>
+    <div class="row">
+      <div><label>分组名</label><input id="s_name" placeholder="my-sub"></div>
+      <div><label>格式</label>
+        <select id="s_fmt"><option value="vmess">vmess</option><option value="clash">clash</option><option value="sip008">sip008</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>节点ID(逗号,空=全部)</label><input id="s_nodes" placeholder="1,2"></div>
+      <div><label>协议(逗号,空=全部)</label><input id="s_proto" placeholder="vmess"></div>
+    </div>
+    <button onclick="createSub()">创建订阅组</button>
+    <button class="secondary" onclick="loadSubs()">刷新列表</button>
+    <table id="subTable" style="margin-top:12px"></table>
+    <pre id="subPreview" style="display:none"></pre>
+  </div>
+
   <!-- 下发 -->
   <div class="card">
     <h2>配置下发</h2>
@@ -122,7 +143,7 @@ async function login() {
     document.getElementById('login').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     document.getElementById('who').textContent = 'admin';
-    loadNodes();
+    loadNodes(); loadSubs();
   } else {
     document.getElementById('loginMsg').textContent = '登录失败';
   }
@@ -142,12 +163,14 @@ async function loadNodes() {
   const nodes = await api('GET', '/nodes');
   if (!nodes) return;
   const t = document.getElementById('nodeTable');
-  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>地址</th><th>状态</th><th>端口范围</th><th></th></tr>';
+  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>地址</th><th>状态</th><th>连通</th><th>端口范围</th><th></th></tr>';
   nodes.forEach(n => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${n.id}</td><td>${n.name}</td><td>${n.address}</td>
-      <td class="${n.status==='online'?'ok':'off'}">${n.status}</td><td>${n.port_range||'-'}</td>
-      <td><button class="secondary" onclick="selectNode(${n.id},'${n.name}')">选</button></td>`;
+      <td class="${n.status==='online'?'ok':'off'}">${n.status}</td>
+      <td class="${n.connectivity==='ok'?'ok':(n.connectivity==='offline'?'off':'warn')}">${n.connectivity}</td>
+      <td>${n.port_range||'-'}</td>
+      <td><button class="secondary small" onclick="selectNode(${n.id},'${n.name}')">选</button></td>`;
     t.appendChild(tr);
   });
 }
@@ -164,12 +187,12 @@ async function loadInbounds() {
   if (!curNode) return;
   const ins = await api('GET', '/nodes/' + curNode + '/inbounds');
   const t = document.getElementById('inboundTable');
-  t.innerHTML = '<tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th></th></tr>';
+  t.innerHTML = '<tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th></th></tr>';
   ins.forEach(inb => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${inb.id}</td><td>${inb.protocol}</td><td>${inb.port}</td><td>${inb.transport}</td>
-      <td>${inb.tls_enabled?'yes':'no'}</td>
-      <td><button class="secondary" onclick="selectInbound(${inb.id})">选</button></td>`;
+      <td>${inb.tls_enabled?'yes':'no'}</td><td>${inb.port_auto_fixed?'yes':''}</td>
+      <td><button class="secondary small" onclick="selectInbound(${inb.id})">选</button></td>`;
     t.appendChild(tr);
   });
 }
@@ -194,6 +217,48 @@ async function loadClients() {
   });
 }
 
+// 订阅
+function buildFilters() {
+  const f = {};
+  const nodes = s_nodes.value.trim();
+  const proto = s_proto.value.trim();
+  if (nodes) f.node_ids = nodes.split(',').map(s => +s.trim()).filter(x => !isNaN(x));
+  if (proto) f.protocol = proto.split(',').map(s => s.trim()).filter(x => x);
+  return f;
+}
+async function createSub() {
+  const d = await api('POST', '/subscriptions', { name: s_name.value, format: s_fmt.value, filters: buildFilters() });
+  if (d) { alert('订阅 token: ' + d.token); loadSubs(); }
+}
+async function loadSubs() {
+  const subs = await api('GET', '/subscriptions');
+  if (!subs) return;
+  const t = document.getElementById('subTable');
+  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>格式</th><th>订阅链接</th><th></th></tr>';
+  subs.forEach(s => {
+    const url = location.origin + API + '/sub/' + s.token;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${s.id}</td><td>${s.name}</td><td>${s.format}</td>
+      <td class="link">${url}</td>
+      <td><button class="secondary small" onclick="previewSub(${s.id})">预览</button>
+          <button class="secondary small" onclick="copyText('${url}')">复制</button>
+          <button class="secondary small" onclick="delSub(${s.id})">删</button></td>`;
+    t.appendChild(tr);
+  });
+}
+async function previewSub(id) {
+  const d = await api('GET', '/subscriptions/' + id);
+  const pre = document.getElementById('subPreview');
+  pre.style.display = 'block';
+  pre.textContent = JSON.stringify(d && d.members ? d.members : d, null, 2);
+}
+async function delSub(id) {
+  if (!confirm('删除订阅组?')) return;
+  await api('DELETE', '/subscriptions/' + id);
+  loadSubs();
+}
+function copyText(t) { navigator.clipboard.writeText(t).then(() => alert('已复制链接')); }
+
 async function syncNode() {
   if (!curNode) return alert('先选择节点');
   const d = await api('POST', '/nodes/' + curNode + '/config/sync');
@@ -201,7 +266,7 @@ async function syncNode() {
 }
 
 // 已有 token 自动进入
-if (token) { document.getElementById('login').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); loadNodes(); }
+if (token) { document.getElementById('login').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); loadNodes(); loadSubs(); }
 </script>
 </body>
 </html>

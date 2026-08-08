@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -26,7 +27,16 @@ func SyncNode(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "node disabled"})
 		return
 	}
+	version, err := syncNode(node)
+	if err != nil {
+		c.JSON(502, gin.H{"error": "dispatch failed: " + err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "version": version})
+}
 
+// syncNode 生成配置并下发到节点 agent，返回新配置版本号（handler 与探测调度器共用）
+func syncNode(node model.Node) (int, error) {
 	var inbounds []model.Inbound
 	store.DB.Where("node_id = ?", node.ID).Find(&inbounds)
 	clientsByInbound := map[uint][]model.Client{}
@@ -38,28 +48,24 @@ func SyncNode(c *gin.Context) {
 
 	jsonStr, err := configgen.BuildXrayConfig(node, inbounds, clientsByInbound)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+		return 0, err
 	}
 
-	// 计算下一版本号
 	var maxVer int
 	store.DB.Model(&model.ConfigVersion{}).
 		Where("node_id = ?", node.ID).
 		Select("COALESCE(MAX(version),0)").Scan(&maxVer)
 	version := maxVer + 1
 
-	// 构造下发请求体
 	payload, _ := json.Marshal(map[string]interface{}{
-		"version":    version,
+		"version":     version,
 		"xray_config": json.RawMessage(jsonStr),
 	})
 
 	url := agentURL(node.Address) + "/agent/v1/config"
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
+		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+node.Token)
@@ -81,8 +87,7 @@ func SyncNode(c *gin.Context) {
 		cv.Status = "failed"
 		cv.Error = err.Error()
 		store.DB.Create(&cv)
-		c.JSON(502, gin.H{"error": "dispatch failed: " + err.Error(), "version": version})
-		return
+		return 0, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -90,12 +95,11 @@ func SyncNode(c *gin.Context) {
 		cv.Status = "failed"
 		cv.Error = string(b)
 		store.DB.Create(&cv)
-		c.JSON(resp.StatusCode, gin.H{"error": "agent rejected", "detail": string(b), "version": version})
-		return
+		return 0, fmt.Errorf("agent rejected: %s", string(b))
 	}
 	cv.Status = "applied"
 	store.DB.Create(&cv)
-	c.JSON(200, gin.H{"ok": true, "version": version})
+	return version, nil
 }
 
 // ListConfigVersions 查看节点的配置下发历史

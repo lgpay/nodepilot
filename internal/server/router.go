@@ -38,6 +38,12 @@ func NewRouter() *gin.Engine {
 
 		authed.POST("/nodes/:id/config/sync", SyncNode)
 		authed.GET("/nodes/:id/config/versions", ListConfigVersions)
+
+		authed.GET("/subscriptions", ListSubscriptions)
+		authed.POST("/subscriptions", CreateSubscription)
+		authed.GET("/subscriptions/:id", GetSubscriptionDetail)
+		authed.PATCH("/subscriptions/:id", UpdateSubscription)
+		authed.DELETE("/subscriptions/:id", DeleteSubscription)
 	}
 
 	// 节点 token 受保护接口（agent 上报）
@@ -47,6 +53,9 @@ func NewRouter() *gin.Engine {
 		nodeAuth.POST("/nodes/:id/heartbeat", Heartbeat)
 		nodeAuth.POST("/nodes/:id/traffic", Traffic) // MVP 占位
 	}
+
+	// 对外订阅端点（token 校验，非 JWT）
+	v1.GET("/sub/:token", GetSubscription)
 
 	return r
 }
