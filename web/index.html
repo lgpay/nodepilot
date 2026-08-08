@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NodePilot 控制台</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #222; }
+  header { background: #1f2d3d; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { padding: 20px; max-width: 1000px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  label { display: block; font-size: 13px; margin: 6px 0 2px; color: #555; }
+  input, select { width: 100%; padding: 7px 9px; border: 1px solid #ccd1d9; border-radius: 5px; box-sizing: border-box; }
+  button { background: #2f6fed; color: #fff; border: 0; padding: 8px 14px; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+  button.secondary { background: #6b7785; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+  .row { display: flex; gap: 10px; }
+  .row > div { flex: 1; }
+  pre { background: #0f1722; color: #9fe6a0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; }
+  .tag { display: inline-block; background: #eef2f7; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+  .ok { color: #1a9d54; } .off { color: #c0392b; }
+  .hidden { display: none; }
+  .muted { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NodePilot 控制台</h1>
+  <span id="who" class="muted"></span>
+</header>
+<main>
+
+<div id="login" class="card">
+  <h2>管理员登录</h2>
+  <label>用户名</label><input id="user" value="admin">
+  <label>密码</label><input id="pass" type="password" value="admin123">
+  <button onclick="login()">登录</button>
+  <span id="loginMsg" class="muted"></span>
+</div>
+
+<div id="app" class="hidden">
+  <!-- 节点 -->
+  <div class="card">
+    <h2>节点（数据面）</h2>
+    <div class="row">
+      <div><label>名称</label><input id="n_name" placeholder="hk-01"></div>
+      <div><label>地址 ip:port</label><input id="n_addr" placeholder="127.0.0.1:54321"></div>
+    </div>
+    <div class="row">
+      <div><label>地域</label><input id="n_region"></div>
+      <div><label>端口范围</label><input id="n_portrange" placeholder="10000-65535"></div>
+    </div>
+    <label>标签(逗号)</label><input id="n_tags">
+    <button onclick="createNode()">注册节点</button>
+    <span id="n_token" class="muted"></span>
+    <table id="nodeTable" style="margin-top:12px"></table>
+  </div>
+
+  <!-- 入站 -->
+  <div class="card">
+    <h2>入站（选中节点后操作）</h2>
+    <p class="muted">当前节点: <b id="curNode">未选择</b></p>
+    <div class="row">
+      <div><label>协议</label>
+        <select id="i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select>
+      </div>
+      <div><label>端口</label><input id="i_port" type="number" placeholder="10086"></div>
+      <div><label>传输</label>
+        <select id="i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select>
+      </div>
+      <div><label>TLS</label><input id="i_tls" type="checkbox"></div>
+    </div>
+    <button onclick="createInbound()">新建入站</button>
+    <table id="inboundTable" style="margin-top:12px"></table>
+  </div>
+
+  <!-- 用户 -->
+  <div class="card">
+    <h2>用户/客户端（选中入站）</h2>
+    <p class="muted">当前入站: <b id="curInbound">未选择</b></p>
+    <div class="row">
+      <div><label>邮箱</label><input id="c_email" placeholder="user1@hk01"></div>
+      <div><label>流量上限(字节,-1不限)</label><input id="c_traffic" value="-1"></div>
+      <div><label>到期(RFC3339,空不限)</label><input id="c_expire"></div>
+    </div>
+    <button onclick="createClient()">新建用户</button>
+    <table id="clientTable" style="margin-top:12px"></table>
+  </div>
+
+  <!-- 下发 -->
+  <div class="card">
+    <h2>配置下发</h2>
+    <button onclick="syncNode()">向当前节点下发配置</button>
+    <button class="secondary" onclick="loadNodes()">刷新</button>
+    <pre id="syncOut">—</pre>
+  </div>
+</div>
+</main>
+
+<script>
+const API = '/api/v1';
+let token = localStorage.getItem('np_token') || '';
+let curNode = null, curInbound = null;
+
+function authH() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+async function api(method, path, body) {
+  const r = await fetch(API + path, { method, headers: authH(), body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401) { document.getElementById('loginMsg').textContent = '登录失效'; return null; }
+  return r.json().catch(() => ({}));
+}
+
+async function login() {
+  const r = await fetch(API + '/auth/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user.value, password: pass.value })
+  });
+  if (r.ok) {
+    const d = await r.json(); token = d.token; localStorage.setItem('np_token', token);
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('who').textContent = 'admin';
+    loadNodes();
+  } else {
+    document.getElementById('loginMsg').textContent = '登录失败';
+  }
+}
+
+async function createNode() {
+  const d = await api('POST', '/nodes', {
+    name: n_name.value, address: n_addr.value, region: n_region.value,
+    tags: n_tags.value, port_range: n_portrange.value
+  });
+  if (d) {
+    document.getElementById('n_token').textContent = '节点 token(部署 agent 用): ' + d.token;
+    loadNodes();
+  }
+}
+async function loadNodes() {
+  const nodes = await api('GET', '/nodes');
+  if (!nodes) return;
+  const t = document.getElementById('nodeTable');
+  t.innerHTML = '<tr><th>ID</th><th>名称</th><th>地址</th><th>状态</th><th>端口范围</th><th></th></tr>';
+  nodes.forEach(n => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${n.id}</td><td>${n.name}</td><td>${n.address}</td>
+      <td class="${n.status==='online'?'ok':'off'}">${n.status}</td><td>${n.port_range||'-'}</td>
+      <td><button class="secondary" onclick="selectNode(${n.id},'${n.name}')">选</button></td>`;
+    t.appendChild(tr);
+  });
+}
+function selectNode(id, name) { curNode = id; curInbound = null; document.getElementById('curNode').textContent = name + '(#' + id + ')'; loadInbounds(); }
+
+async function createInbound() {
+  if (!curNode) return alert('先选择节点');
+  const d = await api('POST', '/nodes/' + curNode + '/inbounds', {
+    protocol: i_proto.value, port: +i_port.value, transport: i_trans.value, tls_enabled: i_tls.checked
+  });
+  if (d) { loadInbounds(); }
+}
+async function loadInbounds() {
+  if (!curNode) return;
+  const ins = await api('GET', '/nodes/' + curNode + '/inbounds');
+  const t = document.getElementById('inboundTable');
+  t.innerHTML = '<tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th></th></tr>';
+  ins.forEach(inb => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${inb.id}</td><td>${inb.protocol}</td><td>${inb.port}</td><td>${inb.transport}</td>
+      <td>${inb.tls_enabled?'yes':'no'}</td>
+      <td><button class="secondary" onclick="selectInbound(${inb.id})">选</button></td>`;
+    t.appendChild(tr);
+  });
+}
+function selectInbound(id) { curInbound = id; document.getElementById('curInbound').textContent = '#' + id; loadClients(); }
+
+async function createClient() {
+  if (!curInbound) return alert('先选择入站');
+  const d = await api('POST', '/inbounds/' + curInbound + '/clients', {
+    email: c_email.value, traffic_limit_bytes: +c_traffic.value, expire_time: c_expire.value
+  });
+  if (d) { document.getElementById('curInbound').textContent = '#' + curInbound + ' uuid=' + d.uuid; loadClients(); }
+}
+async function loadClients() {
+  if (!curInbound) return;
+  const cls = await api('GET', '/inbounds/' + curInbound + '/clients');
+  const t = document.getElementById('clientTable');
+  t.innerHTML = '<tr><th>ID</th><th>UUID</th><th>邮箱</th><th>启用</th></tr>';
+  cls.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.id}</td><td>${c.uuid}</td><td>${c.email}</td><td>${c.enabled?'yes':'no'}</td>`;
+    t.appendChild(tr);
+  });
+}
+
+async function syncNode() {
+  if (!curNode) return alert('先选择节点');
+  const d = await api('POST', '/nodes/' + curNode + '/config/sync');
+  document.getElementById('syncOut').textContent = JSON.stringify(d, null, 2);
+}
+
+// 已有 token 自动进入
+if (token) { document.getElementById('login').classList.add('hidden'); document.getElementById('app').classList.remove('hidden'); loadNodes(); }
+</script>
+</body>
+</html>

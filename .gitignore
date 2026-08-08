@@ -1,0 +1,13 @@
+# 运行时数据
+nodepilot.db
+*.db
+
+# 构建产物（二进制不入库）
+/bin/
+
+# 本地日志
+*.log
+
+# OS / 编辑器
+.DS_Store
+*.swp
