@@ -182,8 +182,10 @@ install_agent() {
     blue "管理端: $NP_SERVER  节点ID: $NP_NODE_ID  监听: $ADDR"
     yellow "查看状态: systemctl status $SERVICE_NAME"
     yellow "查看日志: journalctl -u $SERVICE_NAME -f"
+    exit 0
   else
     red "Agent 启动失败，请查看日志: journalctl -u $SERVICE_NAME -n 50"
+    journalctl -u "$SERVICE_NAME" -n 50 --no-pager 2>/dev/null || true
     exit 1
   fi
 }
