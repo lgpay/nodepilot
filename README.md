@@ -83,6 +83,62 @@ go build -o bin/agent  ./cmd/agent
 
 agent 会周期上报心跳；在管理端对节点点击「下发配置」即可把入站 / 用户推送并热重载。
 
+## 一键部署
+
+### 管理端（控制面）部署
+
+建议用 systemd 托管，运行目录与项目目录隔离（数据库 / 日志不污染源码）：
+
+```bash
+# 1) 准备运行目录并放入二进制
+mkdir -p /opt/nodepilot/{bin,data,logs}
+cp bin/server /opt/nodepilot/bin/server
+cp -r web /opt/nodepilot/web
+
+# 2) 写 systemd 单元
+cat > /etc/systemd/system/nodepilot.service <<'EOF'
+[Unit]
+Description=NodePilot Control Plane
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/nodepilot/data
+ExecStart=/bin/sh -c '/opt/nodepilot/bin/server --web-dir /opt/nodepilot/web >> /opt/nodepilot/logs/server.log 2>&1'
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 3) 启动
+systemctl daemon-reload
+systemctl enable --now nodepilot
+```
+
+启动后访问 `http://<管理端IP>:8080`（控制台）与 `/api/v1/*`（API）。
+可选参数：`--db <路径>` 指定数据库位置、`--addr :9000` 改监听端口。
+
+### 节点 agent 一键安装
+
+提供 x-ui 风格的一键脚本 `scripts/install-agent.sh`，自动完成：检测架构 → 安装 xray-core → 获取 agent 二进制 → 注册为 systemd 服务。
+
+```bash
+# 交互式（按提示填管理端地址 / 节点 token / 节点 id）
+bash <(curl -L https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh)
+
+# 非交互式 / 批量
+NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
+  bash install-agent.sh
+```
+
+环境变量可覆盖：`NP_ADDR`（默认 `:8081`，须与注册节点时 `address` 端口一致）、`NP_XRAY`、`NP_CONFIG_DIR`、`NP_INSTALL_DIR`、`NP_BINARY_URL`。
+管理菜单：`bash install-agent.sh` 可选 安装 / 启动 / 停止 / 重启 / 状态 / 配置 / 卸载；`bash install-agent.sh uninstall` 卸载。
+
+> agent 二进制从 Gitee Release `v0.1.0` 下载（当前仓库为 public）。私有化部署可设置 `NP_BINARY_URL` 指向自托管地址。
+
 ## API 概览（基址 `/api/v1`）
 
 | 方法 | 路径 | 说明 |
@@ -105,13 +161,19 @@ agent 会周期上报心跳；在管理端对节点点击「下发配置」即�
 - 管理端与 agent 间 MVP 使用 HTTP + `InsecureSkipVerify`，生产应启用 HTTPS 并校验证书
 - 默认管理员密码与 JWT secret 为开发占位，需改为环境变量 / 配置
 - 节点 agent 热重载采用重启 xray 进程（秒级中断），后续可升级为 xray api reload
-- 需在各节点预置 `xray` 二进制（`/usr/local/bin/xray`）
-- 尚未实现：订阅分组、监控统计报表、预警通知、节点连通性自愈换端口、证书自动申请续签、2FA
+- 节点 agent 一键脚本会自动安装 xray-core（官方 XTLS 脚本）
+- 尚未实现：监控统计报表、预警通知、证书自动申请续签、2FA
 
-## 路线图（P1 / P2）
+## 路线图
+
+**P1（已完成）**
 
 - 订阅分组与订阅链接（vmess / clash / sip008）
 - 节点连通性自检与端口自愈（端口范围内换端口，多次失败下线）
+- agent 一键部署脚本
+
+**P2（待做）**
+
 - 监控统计、预警通知（邮件 / Telegram）
 - 证书管理（Let's Encrypt + Cloudflare DNS-01）
 - 安全强化：HTTPS、密码修改、2FA
