@@ -1,6 +1,8 @@
 package server
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -8,7 +10,8 @@ import (
 )
 
 // NewRouter 构建管理端 HTTP 路由（/api/v1）
-func NewRouter() *gin.Engine {
+// webDir 非空时在该目录下提供 index.html 作为 Web 管理界面（运行目录与项目目录隔离）
+func NewRouter(webDir string) *gin.Engine {
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 
@@ -57,7 +60,19 @@ func NewRouter() *gin.Engine {
 	// 对外订阅端点（token 校验，非 JWT）
 	v1.GET("/sub/:token", GetSubscription)
 
+	// Web 管理界面（单页 index.html）
+	if webDir != "" {
+		if idx := filepath.Join(webDir, "index.html"); fileExists(idx) {
+			r.StaticFile("/", idx)
+		}
+	}
+
 	return r
+}
+
+func fileExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && !info.IsDir()
 }
 
 // AuthMiddleware 校验管理员 JWT

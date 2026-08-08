@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"nodepilot/internal/server"
@@ -8,8 +9,12 @@ import (
 )
 
 func main() {
-	dbPath := "nodepilot.db"
-	if err := store.Init(dbPath); err != nil {
+	dbPath := flag.String("db", "nodepilot.db", "sqlite db file path (relative to working dir)")
+	webDir := flag.String("web-dir", "web", "directory containing web/index.html to serve at /")
+	addr := flag.String("addr", ":8080", "listen address")
+	flag.Parse()
+
+	if err := store.Init(*dbPath); err != nil {
 		log.Fatalf("init db: %v", err)
 	}
 	// 首次启动初始化默认管理员 admin / admin123（生产务必修改）
@@ -17,10 +22,10 @@ func main() {
 		log.Fatalf("init admin: %v", err)
 	}
 
-	r := server.NewRouter()
+	r := server.NewRouter(*webDir)
 	server.StartProbeScheduler()
-	log.Println("[server] NodePilot control plane listening on :8080")
-	if err := r.Run(":8080"); err != nil {
+	log.Println("[server] NodePilot control plane listening on", *addr)
+	if err := r.Run(*addr); err != nil {
 		log.Fatalf("server run: %v", err)
 	}
 }
