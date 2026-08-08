@@ -87,7 +87,13 @@ agent 会周期上报心跳；在管理端对节点点击「下发配置」即�
 
 ### 管理端（控制面）部署
 
-建议用 systemd 托管，运行目录与项目目录隔离（数据库 / 日志不污染源码）：
+也可使用一键脚本（自动下载二进制 + 注册 systemd 服务，运行目录隔离）：
+
+```bash
+bash <(curl -L https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-server.sh)
+```
+
+手动部署步骤（与一键脚本等价）：
 
 ```bash
 # 1) 准备运行目录并放入二进制
