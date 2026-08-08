@@ -34,7 +34,11 @@ SERVICE_NAME="nodepilot"
 BINARY_NAME="nodepilot-server"
 
 # ---------- 工具 ----------
-need_root() { [ "$(id -u)" -ne 0 ] && { red "请使用 root 运行本脚本"; exit 1; }; }
+need_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    red "请使用 root 运行本脚本"; exit 1
+  fi
+}
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 detect_arch() {
