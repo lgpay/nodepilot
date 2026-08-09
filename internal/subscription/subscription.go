@@ -352,7 +352,8 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 	return string(b), nil
 }
 
-// BuildLoon 生成 Loon 配置（.conf）。Loon 兼容 Surge 语法，代理行采用位置风格（协议, server, port, key=value...），
+// BuildLoon 生成 Loon 配置（.conf）。代理行采用 Loon 官方原生语法（参考 LoonExampleConfig/example.conf）：
+// vmess 用 `vmess, server, port, cipher, "uuid", transport=, path=, host=, over-tls=, tls-name=` 等，
 // 支持 vmess/vless/trojan/ss/socks5/http（Loon 支持 vless，与 Surfboard 不同；但不支持 gRPC 传输）。
 // subURL 非空时首行写入 #!MANAGED-CONFIG 指令，使客户端可自动更新。
 // rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则：
@@ -409,20 +410,21 @@ func surfboardGeneralBlock() string {
 		"enhanced-mode-by-rule=true\n\n"
 }
 
-// loonGeneralBlock 返回 Loon 的 [General] 基础设置（DNS、局域网绕过、geoip 库等）。
+// loonGeneralBlock 返回 Loon 的 [General] 基础设置（字段与风格对齐官方模板 LoonExampleConfig/example.conf）。
 func loonGeneralBlock() string {
 	return "[General]\n" +
-		"ipv6=false\n" +
-		"dns-server=119.29.29.29, 223.5.5.5\n" +
-		"doh-server=https://223.5.5.5/resolve, https://sm2.doh.pub/dns-query\n" +
-		"proxy-test-url=http://connectivitycheck.gstatic.com\n" +
-		"geoip-url=https://gitlab.com/Masaiki/GeoIP2-CN/-/raw/release/Country.mmdb\n" +
-		"bypass-tun=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 127.0.0.0/8\n" +
-		"skip-proxy=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local\n" +
-		"sni-sniffing=true\n" +
-		"disconnect-on-policy-change=true\n" +
-		"switch-node-after-failure-times=3\n" +
-		"test-timeout=2\n\n"
+		"skip-proxy = 192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local\n" +
+		"bypass-tun = 10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.0.0.0/24,192.0.2.0/24,192.88.99.0/24,192.168.0.0/16,198.18.0.0/15,198.51.100.0/24,203.0.113.0/24,224.0.0.0/4,255.255.255.255/32\n" +
+		"dns-server = system,119.29.29.29,223.5.5.5\n" +
+		"doh-server = https://223.5.5.5/resolve, https://sm2.doh.pub/dns-query\n" +
+		"allow-wifi-access = true\n" +
+		"wifi-access-http-port = 7222\n" +
+		"wifi-access-socket5-port = 7221\n" +
+		"proxy-test-url = http://www.gstatic.com/generate_204\n" +
+		"test-timeout = 2\n" +
+		"real-ip = *.apple.com, *apple.com\n" +
+		"geoip-url = https://gitlab.com/Masaiki/GeoIP2-CN/-/raw/release/Country.mmdb\n" +
+		"ipv6 = false\n\n"
 }
 
 // buildSurgeBuiltinRules 输出 ACL4SSR 模板中的内置规则（GEOIP/FINAL），用于 Loon 的 [Rule] 段。
@@ -450,8 +452,14 @@ func buildLoonRemoteRules(rulesBaseURL string) string {
 	return sb.String()
 }
 
-// buildLoonProxyLine 生成单条 Loon 风格代理定义行（Loon 兼容 Surge 语法，采用位置风格：
-// 协议, server, port, key=value...，ws-headers 用无引号 Host:x 形式）。ok=false 表示该协议/传输不被 Loon 支持。
+// buildLoonProxyLine 生成单条 Loon 原生风格代理定义行（参考官方模板 LoonExampleConfig/example.conf）。
+// Loon 原生语法与 Surge 兼容风格不同：
+//   - vmess:  vmess, server, port, cipher, "uuid", transport=, path=, host=, over-tls=, tls-name=
+//   - vless:  VLESS, server, port, "uuid", , transport=, path=, host=, over-tls=, tls-name=（第 5 位为空）
+//   - trojan: trojan, server, port, "password", tls-name=
+//   - ss:     Shadowsocks, server, port, method, "password"
+//
+// ok=false 表示该协议/传输不被 Loon 支持（如 gRPC）。
 func buildLoonProxyLine(it ExportItem) (string, bool) {
 	name := proxyName(it)
 	path := it.WsPath
@@ -462,66 +470,67 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 	if it.Transport == "grpc" {
 		return "", false // Loon 不支持 gRPC 传输
 	}
-	wsPart := func() []string {
-		// Loon 与 Surfboard 一致：ws-headers 用无引号 Host:x 形式
-		if it.Transport == "ws" {
-			if it.TLSEnabled && it.SNI != "" {
-				return []string{"ws=true", "ws-path=" + path, "ws-headers=Host:" + it.SNI}
-			}
-			return []string{"ws=true", "ws-path=" + path}
+	transport := "tcp"
+	if it.Transport == "ws" {
+		transport = "ws"
+	}
+	// over-tls / tls-name：Loon 原生 TLS 字段（对应 Surge 风格的 tls=/sni=）
+	tlsParts := func() []string {
+		if it.TLSEnabled {
+			return []string{"over-tls=true", "tls-name=" + it.SNI}
 		}
-		return nil
+		return []string{"over-tls=false"}
 	}
 	switch it.Protocol {
 	case "vmess":
-		// vmess, server, port, username=uuid, vmess-aead=true[, tls=true, sni=host][, ws...]
-		// 注意：与 Surfboard 保持一致，使用 vmess-aead=true（Loon 同样支持），并省略 vmess-aid（默认 0）。
+		// cipher 用 aes-128-gcm：xray 服务端 vmess 客户端未指定 security（默认 auto 协商），兼容 aes-128-gcm；
+		// 与官方模板示例一致。
 		parts := []string{
-			fmt.Sprintf("%s = vmess, %s, %d", name, host, it.Port),
-			"username=" + it.UUID,
-			"vmess-aead=true",
+			fmt.Sprintf("%s = vmess, %s, %d, aes-128-gcm, \"%s\"", name, host, it.Port, it.UUID),
+			"transport=" + transport,
+			"path=" + path,
 		}
-		if it.TLSEnabled {
-			parts = append(parts, "tls=true", "sni="+it.SNI)
+		if transport == "ws" && it.SNI != "" {
+			parts = append(parts, "host="+it.SNI)
 		}
-		parts = append(parts, wsPart()...)
+		parts = append(parts, tlsParts()...)
 		return strings.Join(parts, ", "), true
 	case "vless":
-		// Loon 支持 vless（与 Surfboard 不同）；flow 视服务端而定，此处不强制写入
+		// VLESS 无 encryption 字段，故 uuid 后留一个空位（第 5 位）。
 		parts := []string{
-			fmt.Sprintf("%s = vless, %s, %d", name, host, it.Port),
-			"username=" + it.UUID,
+			fmt.Sprintf("%s = VLESS, %s, %d, \"%s\", ", name, host, it.Port, it.UUID),
+			"transport=" + transport,
+			"path=" + path,
 		}
-		if it.TLSEnabled {
-			parts = append(parts, "tls=true", "sni="+it.SNI)
+		if transport == "ws" && it.SNI != "" {
+			parts = append(parts, "host="+it.SNI)
 		}
-		parts = append(parts, wsPart()...)
+		parts = append(parts, tlsParts()...)
 		return strings.Join(parts, ", "), true
 	case "trojan":
 		parts := []string{
-			fmt.Sprintf("%s = trojan, %s, %d", name, host, it.Port),
-			"password=" + it.UUID,
+			fmt.Sprintf("%s = trojan, %s, %d, \"%s\"", name, host, it.Port, it.UUID),
 		}
 		if it.TLSEnabled {
-			parts = append(parts, "sni="+it.SNI)
+			parts = append(parts, "tls-name="+it.SNI)
 		}
-		parts = append(parts, wsPart()...)
 		return strings.Join(parts, ", "), true
 	case "ss":
-		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=aes-256-gcm, password=%s", name, host, it.Port, it.UUID), true
+		return fmt.Sprintf("%s = Shadowsocks, %s, %d, aes-256-gcm, \"%s\", udp=true", name, host, it.Port, it.UUID), true
 	case "socks", "http":
 		pType := it.Protocol
 		if it.Protocol == "socks" {
 			pType = "socks5"
 		}
 		if it.TLSEnabled {
-			pType = "https" // Loon/ Surge: https 类型即走 TLS
+			pType = "https" // Loon: https 类型即走 TLS
 		}
 		parts := []string{
 			fmt.Sprintf("%s = %s, %s, %d", name, pType, host, it.Port),
 		}
 		if it.UUID != "" {
-			parts = append(parts, "password="+it.UUID)
+			// socks5/http(s) 认证：第 4 位空用户名，第 5 位 "password"
+			parts = append(parts, "\"\", \""+it.UUID+"\"")
 		}
 		return strings.Join(parts, ", "), true
 	}
