@@ -398,16 +398,19 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 	return sb.String(), nil
 }
 
-// surfboardGeneralBlock 返回 Surfboard 的 [General] 基础设置（对齐参考订阅样式）。
+// surfboardGeneralBlock 返回 Surfboard 的 [General] 基础设置（字段与风格对齐官方文档
+// getsurfboard.com/zh-Hans/docs/profile-format/overview：key = value 间距、dns-server 含 system、
+// skip-proxy、proxy-test-url、internet-test-url、test-timeout、always-real-ip、ipv6 等）。
 func surfboardGeneralBlock() string {
 	return "[General]\n" +
-		"loglevel=notify\n" +
-		"interface=127.0.0.1\n" +
-		"ipv6=false\n" +
-		"dns-server=system, 223.5.5.5\n" +
-		"skip-proxy=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local\n" +
-		"exclude-simple-hostnames=true\n" +
-		"enhanced-mode-by-rule=true\n\n"
+		"dns-server = system, 119.29.29.29, 223.5.5.5\n" +
+		"doh-server = https://223.5.5.5/resolve, https://sm2.doh.pub/dns-query\n" +
+		"skip-proxy = 127.0.0.1, 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 100.64.0.0/10, localhost, *.local\n" +
+		"proxy-test-url = http://www.gstatic.com/generate_204\n" +
+		"internet-test-url = http://www.gstatic.cn/generate_204\n" +
+		"test-timeout = 5\n" +
+		"always-real-ip = *.srv.nintendo.net, *.stun.playstation.net, xbox.*.microsoft.com, *.xboxlive.com\n" +
+		"ipv6 = false\n\n"
 }
 
 // loonGeneralBlock 返回 Loon 的 [General] 基础设置（字段与风格对齐官方模板 LoonExampleConfig/example.conf）。
