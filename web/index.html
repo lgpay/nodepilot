@@ -5,105 +5,175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NodePilot 控制台</title>
 <style>
+  :root {
+    --bg: #f3f5f9; --card: #ffffff; --border: #e3e7ee; --text: #1f2733; --muted: #8a93a3;
+    --primary: #2f6fed; --primary-strong: #2457c9; --danger: #d64545; --danger-strong: #b33535;
+    --ok: #1a9d54; --warn: #d68910;
+    --header-bg: #1f2d3d; --header-fg: #ffffff;
+    --sidebar-bg: #243447; --sidebar-fg: #cfd8e3; --sidebar-hover: #2f3f54; --sidebar-act: #2f6fed;
+    --input-bg: #fff; --input-border: #ccd1d9; --input-dis: #f0f1f3;
+    --code-bg: #0f1722; --code-fg: #9fe6a0;
+    --shadow: 0 1px 3px rgba(16,24,40,.06), 0 1px 2px rgba(16,24,40,.04);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,.18);
+    --radius: 10px; --radius-sm: 6px;
+  }
+  [data-theme="dark"] {
+    --bg: #10141b; --card: #1a202a; --border: #2a3341; --text: #e4e9f0; --muted: #8792a3;
+    --primary: #3b82f6; --primary-strong: #2f6fed; --danger: #e05555; --danger-strong: #c74040;
+    --ok: #22c55e; --warn: #e5a53d;
+    --header-bg: #0d1117; --header-fg: #e4e9f0;
+    --sidebar-bg: #151b24; --sidebar-fg: #a9b4c2; --sidebar-hover: #212a37; --sidebar-act: #2f6fed;
+    --input-bg: #131922; --input-border: #333e4c; --input-dis: #20272f;
+    --code-bg: #0d1117; --code-fg: #7ee787;
+    --shadow: 0 1px 3px rgba(0,0,0,.3); --shadow-lg: 0 8px 30px rgba(0,0,0,.5);
+  }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; margin: 0; background: #f5f6f8; color: #222; height: 100vh; display: flex; flex-direction: column; }
-  header { background: #1f2d3d; color: #fff; padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; }
-  header h1 { font-size: 17px; margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; font-size: 14px; }
+  a { color: var(--primary); }
+
+  header { background: var(--header-bg); color: var(--header-fg); padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; box-shadow: var(--shadow); z-index: 5; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .3px; }
   header .right { display: flex; align-items: center; gap: 10px; }
-  .card { background: #fff; border: 1px solid #e3e6ea; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  header .right .chk { color: var(--header-fg); }
+  .burger { display: none; background: transparent; color: var(--header-fg); border: 0; font-size: 20px; cursor: pointer; padding: 0 6px; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
   .card h2 { font-size: 15px; margin: 0 0 12px; }
-  .card h3 { font-size: 13px; margin: 14px 0 8px; color: #555; }
-  label { display: block; font-size: 13px; margin: 6px 0 2px; color: #555; }
-  input, select { width: 100%; padding: 7px 9px; border: 1px solid #ccd1d9; border-radius: 5px; }
-  input:disabled { background: #f0f1f3; color: #888; }
-  button { background: #2f6fed; color: #fff; border: 0; padding: 8px 14px; border-radius: 5px; cursor: pointer; margin-top: 10px; font-size: 13px; }
-  button:hover { filter: brightness(1.05); }
-  button.secondary { background: #6b7785; }
-  button.danger { background: #c0392b; }
-  button.small { padding: 4px 9px; font-size: 12px; margin-top: 0; }
-  button.sm { background: #2f6fed; padding: 2px 8px; font-size: 11px; margin: 0 0 0 6px; }
-  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .card h3 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); }
+  label { display: block; font-size: 13px; margin: 8px 0 3px; color: var(--muted); }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font-size: 13px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary); }
+  input:disabled { background: var(--input-dis); color: var(--muted); }
+  button { background: var(--primary); color: #fff; border: 0; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 10px; font-size: 13px; font-weight: 500; transition: background .15s, filter .15s, opacity .15s; }
+  button:hover { background: var(--primary-strong); }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  button.secondary { background: #6b7785; } button.secondary:hover { background: #58636f; }
+  [data-theme="dark"] button.secondary { background: #3a4553; } [data-theme="dark"] button.secondary:hover { background: #465260; }
+  button.danger { background: var(--danger); } button.danger:hover { background: var(--danger-strong); }
+  button.small { padding: 4px 10px; font-size: 12px; margin-top: 0; }
+  button.sm { padding: 2px 8px; font-size: 11px; margin: 0 0 0 6px; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
   .btnrow button { margin-top: 0; }
-  .chk { font-size: 13px; color: #555; display: flex; align-items: center; gap: 4px; margin: 0; }
+  .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
   .chk input { width: auto; margin: 0; }
-  .inblist { max-height: 220px; overflow: auto; border: 1px solid #e3e3e3; border-radius: 8px; padding: 8px 10px; background: #fafafa; display: flex; flex-direction: column; gap: 4px; }
-  .subgrp { font-size: 12px; font-weight: 600; color: #888; margin-top: 6px; }
+  .inblist { max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 5px; }
+  .subgrp { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 8px; }
   .subgrp:first-child { margin-top: 0; }
-  .qr { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-  .qr img { border: 1px solid #ddd; border-radius: 8px; background: #fff; }
-  .row { display: flex; gap: 10px; }
-  .row > div { flex: 1; }
-  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
-  .tbl th, .tbl td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
-  .tbl th { color: #777; font-weight: 600; }
-  pre { background: #0f1722; color: #9fe6a0; padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
-  .tag { display: inline-block; background: #eef2f7; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-  .ok { color: #1a9d54; } .off { color: #c0392b; } .warn { color: #d68910; }
-  .hidden { display: none; }
-  .muted { color: #888; font-size: 12px; }
-  .link { color: #2f6fed; word-break: break-all; }
+  .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; min-width: 0; }
 
-  /* 布局 */
+  .tblwrap { overflow: auto; max-height: 440px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th, .tbl td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tbl th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr:hover { background: rgba(47,111,237,.05); }
+  .search { margin-bottom: 10px; max-width: 260px; }
+
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 12px; border-radius: var(--radius-sm); overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
+  .badge { display: inline-block; background: #eef2f7; color: #4b5563; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  [data-theme="dark"] .badge { background: #263041; color: #b6c2d4; }
+  .badge.blue { background: #e7efff; color: #2457c9; }
+  [data-theme="dark"] .badge.blue { background: #1d2d4f; color: #7aa8ff; }
+  .ok { color: var(--ok); } .off { color: var(--danger); } .warn { color: var(--warn); }
+  .hidden { display: none !important; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .link { color: var(--primary); word-break: break-all; }
+
   #app { flex: 1 1 auto; display: flex; min-height: 0; }
-  .sidebar { width: 268px; flex: 0 0 auto; background: #243447; color: #cfd8e3; overflow-y: auto; padding: 10px 8px; }
+  .sidebar { width: 272px; flex: 0 0 auto; background: var(--sidebar-bg); color: var(--sidebar-fg); overflow-y: auto; padding: 10px 8px 20px; }
   .main { flex: 1 1 auto; overflow-y: auto; padding: 18px 22px; }
-  .login-card { max-width: 360px; margin: 60px auto; }
+  .login-card { max-width: 380px; margin: 70px auto; }
 
-  /* 侧边栏树 */
-  .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #9fb0c3; margin: 12px 4px 6px; text-transform: uppercase; letter-spacing: .5px; }
+  .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #9fb0c3; margin: 14px 4px 6px; text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
   .sb-head:first-child { margin-top: 2px; }
-  .ti { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: 5px; cursor: pointer; font-size: 13px; color: #dbe3ec; }
-  .ti:hover { background: #2f3f54; }
-  .ti.active { background: #2f6fed; color: #fff; }
+  .ti { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: #dbe3ec; }
+  .ti:hover { background: var(--sidebar-hover); }
+  .ti.active { background: var(--sidebar-act); color: #fff; }
   .ti.active .muted { color: #dce6ff; }
   .ti .caret { width: 14px; text-align: center; color: #8aa0b8; user-select: none; flex: 0 0 auto; }
+  .ti.active .caret { color: #fff; }
   .ti .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ti.indent { padding-left: 26px; }
-  .ti.indent2 { padding-left: 44px; }
-  .ti.leaf { padding-left: 26px; cursor: default; }
-  .ti.leaf2 { padding-left: 44px; cursor: default; }
+  .ti.indent { padding-left: 28px; }
+  .ti.indent2 { padding-left: 48px; }
+  .ti.leaf { padding-left: 28px; cursor: default; }
+  .ti.leaf2 { padding-left: 48px; cursor: default; }
   .ti.leaf:hover { background: transparent; }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
-  .dot.on { background: #1a9d54; } .dot.off { background: #c0392b; } .dot.warn { background: #d68910; }
+  .dot.on { background: var(--ok); } .dot.off { background: var(--danger); } .dot.warn { background: var(--warn); }
 
-  .crumb { font-size: 14px; margin-bottom: 12px; color: #555; }
-  .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow: auto; }
+  .crumb { font-size: 14px; margin-bottom: 14px; color: var(--muted); }
+  .crumb b { color: var(--text); }
+
+  .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow: auto; }
   .modal.hidden { display: none; }
-  .modalcard { width: 400px; max-width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; margin: 0; box-shadow: 0 8px 30px rgba(0,0,0,.35); }
-  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%); background: #1f2d3d; color: #fff; padding: 8px 16px; border-radius: 6px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 99; font-size: 13px; max-width: 80vw; }
-  .toast.show { opacity: 1; }
+  .modalcard { width: 440px; max-width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; margin: 0; box-shadow: var(--shadow-lg); }
 
-  /* 统计页 */
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(8px); background: var(--header-bg); color: var(--header-fg); padding: 9px 18px; border-radius: 8px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 99; font-size: 13px; max-width: 80vw; box-shadow: var(--shadow-lg); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.ok { background: var(--ok); }
+  .toast.err { background: var(--danger); }
+  .toast.warn { background: var(--warn); }
+
   .kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
-  .kpi { flex: 1; min-width: 120px; background: #f5f8fc; border: 1px solid #e3e6ea; border-radius: 8px; padding: 14px 16px; }
-  .kv { font-size: 22px; font-weight: 600; color: #1f2d3d; }
-  .kl { font-size: 12px; color: #888; margin-top: 4px; }
-  .bar { display: inline-block; width: 90px; height: 8px; background: #e9edf2; border-radius: 5px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
-  .bar span { display: block; height: 100%; background: #2f6fed; }
+  .kpi { flex: 1; min-width: 130px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .kv { font-size: 24px; font-weight: 700; color: var(--text); }
+  .kl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .bar { display: inline-block; width: 90px; height: 8px; background: var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+  .bar span { display: block; height: 100%; background: var(--primary); }
   .trend { margin-top: 8px; }
   .trow { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12px; }
-  .tdate { width: 46px; color: #888; flex: 0 0 auto; }
-  .tbar { flex: 1; height: 10px; background: #eef2f7; border-radius: 5px; overflow: hidden; }
-  .tbar span { display: block; height: 100%; background: linear-gradient(90deg,#2f6fed,#5ea0ff); }
-  .tval { width: 84px; text-align: right; color: #555; flex: 0 0 auto; }
+  .tdate { width: 46px; color: var(--muted); flex: 0 0 auto; }
+  .tbar { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+  .tbar span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #5ea0ff); }
+  .tval { width: 84px; text-align: right; color: var(--text); flex: 0 0 auto; }
+
+  .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .qcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); transition: transform .12s, border-color .12s, box-shadow .12s; }
+  .qcard:hover { transform: translateY(-2px); border-color: var(--primary); box-shadow: var(--shadow-lg); }
+  .qcard .ic { font-size: 26px; }
+  .qcard .tt { font-weight: 600; margin-top: 8px; }
+  .qcard .ds { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  details.adv { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 10px; background: var(--bg); }
+  details.adv summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  details.adv[open] summary { margin-bottom: 8px; }
+  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 30px 0; }
+  .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 900px) {
+    .sidebar { position: fixed; left: 0; top: 52px; bottom: 0; z-index: 50; transform: translateX(-100%); transition: transform .2s; width: 260px; }
+    .sidebar.open { transform: translateX(0); }
+    .burger { display: block; }
+    .main { padding: 12px; }
+    .row { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>NodePilot 控制台</h1>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <button class="burger" id="burgerBtn" onclick="toggleSidebar()">☰</button>
+    <h1>NodePilot 控制台</h1>
+  </div>
   <div id="headerRight" class="right hidden">
-    <span id="who" class="muted"></span>
+    <label class="chk"><input type="checkbox" id="autoSyncChk" onchange="setAutoSync(this.checked)"> 自动下发</label>
+    <button class="secondary small" id="darkBtn" onclick="toggleDark()">🌙 暗色</button>
+    <span id="who" class="muted" style="color:#9fb0c3"></span>
     <button class="secondary small" onclick="showChangePw()">修改密码</button>
     <button class="secondary small" onclick="logout()">退出</button>
   </div>
 </header>
 
-<div id="login" class="card login-card">
+<div id="login" class="card login-card hidden">
   <h2>管理员登录</h2>
   <label>用户名</label><input id="user" value="admin">
-  <label>密码</label><input id="pass" type="password" value="admin123">
-  <button onclick="login()">登录</button>
+  <label>密码</label><input id="pass" type="password" placeholder="请输入密码">
+  <button onclick="login()" style="width:100%">登录</button>
   <span id="loginMsg" class="muted"></span>
 </div>
 
@@ -130,103 +200,159 @@ let currentNotifType = 'email';
 let expandedNodes = new Set();
 let expandedInbounds = new Set();
 let autoSync = localStorage.getItem('np_autosync') === '1';
+let dark = localStorage.getItem('np_dark') === '1';
 let refreshTimer = null;
+let confirmRes = null;
+let statsData = null;
+
+// ---- 主题 ----
+function applyTheme() {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  const b = document.getElementById('darkBtn'); if (b) b.textContent = dark ? '☀️ 浅色' : '🌙 暗色';
+}
+function toggleDark() { dark = !dark; localStorage.setItem('np_dark', dark ? '1' : ''); applyTheme(); }
+applyTheme();
 
 function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function val(id) { const e = document.getElementById(id); return e ? e.value : ''; }
+function chk(id) { const e = document.getElementById(id); return e ? e.checked : false; }
 function authH() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+
+// api：非 2xx 统一 toast 服务端 error 并返回 null，避免"失败却提示成功"
 async function api(method, path, body) {
-  const r = await fetch(API + path, { method, headers: authH(), body: body ? JSON.stringify(body) : undefined });
-  if (r.status === 401) { showToast('登录失效，请重新登录'); forceLogin(); return null; }
-  return r.json().catch(() => ({}));
+  let r;
+  try { r = await fetch(API + path, { method, headers: authH(), body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { showToast('网络错误，请检查连接', 'err'); return null; }
+  if (r.status === 401 && path !== '/auth/login') {
+    showToast('登录已失效，请重新登录');
+    forceLogin(); return null;
+  }
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) { showToast(data.error || ('请求失败 HTTP ' + r.status), 'err'); return null; }
+  return data;
 }
 
 let toastTimer = null;
-function showToast(msg) {
+function showToast(msg, type) {
   const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
+  el.textContent = msg;
+  el.className = 'toast' + (type ? ' ' + type : '');
+  void el.offsetWidth;
+  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1700);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 async function copyText(t) {
   try {
     if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(t);
     else { const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.focus(); ta.select(); const ok = document.execCommand('copy'); document.body.removeChild(ta); if (!ok) throw new Error('copy'); }
-    showToast('已复制');
+    showToast('已复制', 'ok');
   } catch (e) { prompt('复制失败，请手动复制：', t); }
 }
 async function copySubContent(stoken) {
-  try { const r = await fetch(API + '/sub/' + stoken); if (!r.ok) return showToast('获取订阅失败'); copyText(await r.text()); }
-  catch (e) { showToast('复制失败'); }
+  try { const r = await fetch(API + '/sub/' + stoken); if (!r.ok) return showToast('获取订阅失败', 'err'); copyText(await r.text()); }
+  catch (e) { showToast('复制失败', 'err'); }
 }
+// 防重复提交：禁用按钮 + "处理中…"，finally 恢复
+async function withBusy(btn, fn) {
+  if (!btn) return fn();
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = '处理中…';
+  try { return await fn(); } finally { btn.disabled = false; btn.textContent = old; }
+}
+// 自定义确认弹窗（Promise<boolean>）
+function confirmModal(msg) {
+  return new Promise(res => {
+    confirmRes = res;
+    setModal('<h2>确认操作</h2><p style="margin:6px 0">' + esc(msg) + '</p>' +
+      '<div class="btnrow"><button onclick="confirmOk()">确认</button><button class="secondary" onclick="closeModal()">取消</button></div>');
+  });
+}
+function confirmOk() { closeModal(); if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } }
+function setModal(html) { document.getElementById('modalBody').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
+function closeModal() { document.getElementById('modal').classList.add('hidden'); if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } }
 
 // ---- 认证 ----
 async function login() {
   const d = await api('POST', '/auth/login', { username: val('user'), password: val('pass') });
   if (d && d.token) { token = d.token; localStorage.setItem('np_token', token); enterApp(); }
-  else showToast('登录失败');
+  else showToast('登录失败', 'err');
 }
 function logout() { localStorage.removeItem('np_token'); token = ''; location.reload(); }
 function forceLogin() {
-  // 401 时清空失效 token 并回到登录页，避免“带旧 token 反复 enterApp→401→reload”的死循环
   token = '';
   localStorage.removeItem('np_token');
   const a = document.getElementById('app'); if (a) a.classList.add('hidden');
   const l = document.getElementById('login'); if (l) l.classList.remove('hidden');
 }
 function showChangePw() {
-  setModal(`<h2>修改管理员密码</h2>
-    <label>旧密码</label><input id="m_old" type="password">
-    <label>新密码</label><input id="m_new" type="password">
-    <div class="btnrow"><button onclick="doChangePw()">保存</button><button class="secondary" onclick="closeModal()">取消</button></div>`);
+  setModal('<h2>修改管理员密码</h2>' +
+    '<label>旧密码</label><input id="m_old" type="password">' +
+    '<label>新密码</label><input id="m_new" type="password">' +
+    '<div class="btnrow"><button onclick="withBusy(this, doChangePw)">保存</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doChangePw() {
   const d = await api('POST', '/auth/change-password', { old_password: val('m_old'), new_password: val('m_new') });
-  if (d && d.ok) { closeModal(); showToast('密码已修改，请重新登录'); setTimeout(() => location.reload(), 900); }
-  else if (d) showToast(d.error || '修改失败');
+  if (d && d.ok) { closeModal(); showToast('密码已修改，请重新登录', 'ok'); setTimeout(() => location.reload(), 900); }
 }
+// 弹窗内回车触发第一个主按钮
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const m = document.getElementById('modal');
+    if (m && !m.classList.contains('hidden')) {
+      const btn = m.querySelector('.btnrow button:not(.secondary)');
+      if (btn) btn.click();
+    }
+  }
+});
 
 // ---- 侧边栏 ----
+function dotOf(n) { return n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn'))); }
+function inboundLabel(inb) { return inb.name || ((inb.protocol || '?') + ':' + (inb.port || '?')); }
+
 function renderSidebar() {
   const sb = document.getElementById('sidebar');
-  let h = '<div class="sb-head">节点<button class="sm" onclick="loadNodes()">刷新</button><button class="sm" onclick="showCreateNode()">+ 注册</button></div>';
+  let h = '<div class="sb-head">节点<span><button class="sm" onclick="loadNodes()">刷新</button><button class="sm" onclick="syncAllNodes()">全部下发</button><button class="sm" onclick="showCreateNode()">+ 注册</button></span></div>';
   nodesData.forEach(n => {
-    const dot = n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn')));
+    const dot = dotOf(n);
     const open = expandedNodes.has(n.id);
-    h += `<div class="ti ${sel.type === 'node' && sel.id === n.id ? 'active' : ''}" onclick="selectNode(${n.id})">
-      <span class="caret" onclick="event.stopPropagation();toggleNode(${n.id})">${open ? '▾' : '▸'}</span>
-      <span class="dot ${dot}"></span>
-      <span class="lbl">${esc(n.name)} <span class="muted">#${n.id}</span></span></div>`;
+    h += '<div class="ti ' + (sel.type === 'node' && sel.id === n.id ? 'active' : '') + '" onclick="selectNode(' + n.id + ')">' +
+      '<span class="caret" onclick="event.stopPropagation();toggleNode(' + n.id + ')">' + (open ? '▾' : '▸') + '</span>' +
+      '<span class="dot ' + dot + '"></span>' +
+      '<span class="lbl">' + esc(n.name) + ' <span class="muted">#' + n.id + '</span></span></div>';
     if (open) {
       const ins = inboundsCache[n.id] || [];
       if (!ins.length) h += '<div class="ti leaf muted">（无入站）</div>';
       ins.forEach(inb => {
         const iopen = expandedInbounds.has(inb.id);
-        h += `<div class="ti indent ${sel.type === 'inbound' && sel.id === inb.id ? 'active' : ''}" onclick="selectInbound(${inb.id},${n.id})">
-          <span class="caret" onclick="event.stopPropagation();toggleInbound(${inb.id})">${iopen ? '▾' : '▸'}</span>
-          <span class="lbl">${esc(inboundLabel(inb))}${inb.tls_enabled ? ' 🔒' : ''}${inb.port_auto_fixed ? ' *' : ''}</span></div>`;
+        h += '<div class="ti indent ' + (sel.type === 'inbound' && sel.id === inb.id ? 'active' : '') + '" onclick="selectInbound(' + inb.id + ',' + n.id + ')">' +
+          '<span class="caret" onclick="event.stopPropagation();toggleInbound(' + inb.id + ')">' + (iopen ? '▾' : '▸') + '</span>' +
+          '<span class="lbl">' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + (inb.port_auto_fixed ? ' *' : '') + '</span></div>';
         if (iopen) {
           const cls = clientsCache[inb.id] || [];
           if (!cls.length) h += '<div class="ti leaf2 muted">（无客户端）</div>';
-          cls.forEach(c => { h += `<div class="ti indent2 ${sel.type === 'client' && sel.id === c.id ? 'active' : ''}" onclick="selectClient(${c.id},${inb.id})"><span class="lbl">${esc(c.alias || c.uuid)}</span></div>`; });
+          cls.forEach(c => { h += '<div class="ti indent2 ' + (sel.type === 'client' && sel.id === c.id ? 'active' : '') + '" onclick="selectClient(' + c.id + ',' + inb.id + ')"><span class="lbl">' + esc(c.alias || c.uuid) + '</span></div>'; });
         }
       });
     }
   });
   h += '<div class="sb-head">订阅<button class="sm" onclick="showCreateSub()">+ 新建</button></div>';
   if (!subsData.length) h += '<div class="ti leaf muted">（无订阅）</div>';
-  subsData.forEach(s => { const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '·ACL4SSR' : ''; h += `<div class="ti ${sel.type === 'sub' && sel.id === s.id ? 'active' : ''}" onclick="selectSub(${s.id})"><span class="lbl">${esc(s.name)} <span class="muted">${s.format}${mod}</span></span></div>`; });
+  subsData.forEach(s => {
+    const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '<span class="badge blue">ACL4SSR</span>' : '<span class="badge">裸订阅</span>';
+    h += '<div class="ti ' + (sel.type === 'sub' && sel.id === s.id ? 'active' : '') + '" onclick="selectSub(' + s.id + ')">' +
+      '<span class="lbl">' + esc(s.name) + ' <span class="muted">' + s.format + '</span> ' + mod + '</span>' +
+      '<button class="sm" title="复制订阅链接" onclick="event.stopPropagation();copyText(location.origin+\'/api/v1/sub/' + s.token + '\')">⧉</button></div>';
+  });
   h += '<div class="sb-head">证书<button class="sm" onclick="showCreateCert()">+ 申请</button></div>';
   if (!certsData.length) h += '<div class="ti leaf muted">（未申请）</div>';
-  certsData.forEach(c => { h += `<div class="ti ${sel.type === 'cert' && sel.id === c.id ? 'active' : ''}" onclick="selectCert(${c.id})"><span class="lbl">${esc(c.domain)} <span class="muted">${c.status}</span></span></div>`; });
+  certsData.forEach(c => { h += '<div class="ti ' + (sel.type === 'cert' && sel.id === c.id ? 'active' : '') + '" onclick="selectCert(' + c.id + ')"><span class="lbl">' + esc(c.domain) + ' <span class="muted">' + c.status + '</span></span></div>'; });
   h += '<div class="sb-head">通知<button class="sm" onclick="showCreateNotifier()">+ 新建</button></div>';
   if (!notifData.length) h += '<div class="ti leaf muted">（无渠道）</div>';
-  notifData.forEach(n => { h += `<div class="ti ${sel.type === 'notifier' && sel.id === n.id ? 'active' : ''}" onclick="selectNotifier(${n.id})"><span class="lbl">${esc(n.name)} <span class="muted">${n.type}</span></span></div>`; });
-  h += `<div class="ti ${sel.type === 'stats' ? 'active' : ''}" onclick="selectStats()"><span class="dot on"></span><span class="lbl">📊 统计</span></div>`;
+  notifData.forEach(n => { h += '<div class="ti ' + (sel.type === 'notifier' && sel.id === n.id ? 'active' : '') + '" onclick="selectNotifier(' + n.id + ')"><span class="lbl">' + esc(n.name) + ' <span class="muted">' + n.type + '</span></span></div>'; });
+  h += '<div class="ti ' + (sel.type === 'stats' ? 'active' : '') + '" onclick="selectStats()"><span class="dot on"></span><span class="lbl">📊 统计</span></div>';
   sb.innerHTML = h;
 }
-
-function dotOf(n) { return n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn'))); }
 
 // ---- 选中 ----
 async function selectNode(id) {
@@ -246,14 +372,15 @@ function toggleInbound(id) { if (expandedInbounds.has(id)) expandedInbounds.dele
 function selectClient(id, inboundId) { sel = { type: 'client', id, parentId: inboundId }; renderSidebar(); renderMain(); }
 function selectSub(id) { sel = { type: 'sub', id, parentId: null }; renderSidebar(); renderMain(); }
 function selectCert(id) { sel = { type: 'cert', id, parentId: null }; renderSidebar(); renderMain(); }
-function selectStats() { sel = { type: 'stats', parentId: null }; renderSidebar(); renderStats(); }
-function selectNotifier(id) { sel = { type: 'notifier', id, parentId: null }; renderSidebar(); renderNotifierDetail(id); }
-function toggleCertRow() { const r = document.getElementById('ib_cert_row'); if (r) r.style.display = document.getElementById('ib_tls').checked ? '' : 'none'; }
+function selectStats() { sel = { type: 'stats', parentId: null }; renderSidebar(); renderMain(); }
+function selectNotifier(id) { sel = { type: 'notifier', id, parentId: null }; renderSidebar(); renderMain(); }
+function toggleCertRow() { const r = document.getElementById('ib_cert_row'); if (r) r.style.display = chk('ib_tls') ? '' : 'none'; }
 function certOptions(selId) {
   let h = '<option value="">（默认占位证书）</option>';
-  certsData.forEach(c => { h += `<option value="${c.id}" ${selId === c.id ? 'selected' : ''}>${esc(c.domain)} (${esc(c.status)})</option>`; });
+  certsData.forEach(c => { h += '<option value="' + c.id + '" ' + (selId === c.id ? 'selected' : '') + '>' + esc(c.domain) + ' (' + esc(c.status) + ')</option>'; });
   return h;
 }
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
 function renderMain() {
   if (!sel.type) return renderWelcome();
@@ -264,13 +391,23 @@ function renderMain() {
   else if (sel.type === 'cert') renderCertDetail();
   else if (sel.type === 'notifier') renderNotifierDetail(sel.id);
   else if (sel.type === 'stats') renderStats();
-  else if (sel.type === 'client') renderClientDetail(sel.id);
-  else if (sel.type === 'sub') renderSubDetail(sel.id);
 }
+function setLoading(tip) { document.getElementById('main').innerHTML = '<div class="loading"><span class="spinner"></span><span>' + (tip || '加载中…') + '</span></div>'; }
 function renderWelcome() {
-  document.getElementById('main').innerHTML = `<div class="card"><h2>欢迎使用 NodePilot</h2>
-    <p class="muted">左侧选择节点 / 入站 / 客户端进行管理；或新建订阅分组，生成 clients 的配置链接。</p>
-    <p class="muted">提示：在节点详情点击「下发配置」让改动生效；勾选「自动下发」可在增删改后自动触发。</p></div>`;
+  document.getElementById('main').innerHTML =
+    '<div class="card"><h2>欢迎使用 NodePilot</h2>' +
+    '<p class="muted">左侧管理节点 / 入站 / 客户端；或配置订阅分组，生成各客户端（Clash / Surfboard / Loon / V2Ray / SIP008）的订阅链接。</p>' +
+    '<p class="muted">提示：改动入站 / 客户端后，在节点详情点击「下发配置」（或开启 header 的「自动下发」）让配置在节点上生效。</p></div>' +
+    '<div class="qgrid">' +
+    quickCard('📊', '流量统计', '查看各节点与客户端用量、30 天趋势', 'selectStats()') +
+    quickCard('🖥', '注册节点', '添加节点并生成 agent 一键安装命令', 'showCreateNode()') +
+    quickCard('🔗', '新建订阅', '创建订阅分组并生成二维码 / 链接', 'showCreateSub()') +
+    quickCard('🔐', '申请证书', "Let's Encrypt 泛域名证书托管", 'showCreateCert()') +
+    quickCard('📢', '新建通知', '邮件 / 企业微信 / Telegram 告警', 'showCreateNotifier()') +
+    '</div>';
+}
+function quickCard(ic, tt, ds, fn) {
+  return '<div class="qcard" onclick="' + fn + '"><div class="ic">' + ic + '</div><div class="tt">' + tt + '</div><div class="ds">' + esc(ds) + '</div></div>';
 }
 
 function fmtBytes(b) {
@@ -281,69 +418,74 @@ function fmtBytes(b) {
   return (i === 0 ? b : b.toFixed(2)) + ' ' + u[i];
 }
 
+// ---- 统计 ----
 async function renderStats() {
-  document.getElementById('main').innerHTML = '<div class="card"><p class="muted">加载中…</p></div>';
+  setLoading('加载统计中…');
   const d = await api('GET', '/stats/overview');
   if (!d) return;
+  statsData = d;
+  renderStatsView();
+}
+function renderStatsView() {
+  const d = statsData; if (!d) return;
   const today = d.today || { up: 0, down: 0 };
+  let h = '<div class="card"><h2>📊 流量统计</h2><div class="kpis">' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.up) + '</div><div class="kl">今日上行</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div></div></div>';
 
-  // 今日卡片
-  let h = `<div class="card"><h2>📊 流量统计</h2>
-    <div class="kpis">
-      <div class="kpi"><div class="kv">${fmtBytes(today.up)}</div><div class="kl">今日上行</div></div>
-      <div class="kpi"><div class="kv">${fmtBytes(today.down)}</div><div class="kl">今日下行</div></div>
-      <div class="kpi"><div class="kv">${fmtBytes(today.up + today.down)}</div><div class="kl">今日合计</div></div>
-    </div></div>`;
-
-  // 节点流量表
-  h += `<div class="card"><h3>按节点</h3>`;
+  h += '<div class="card"><h3>按节点</h3>';
   if (!d.nodes || !d.nodes.length) h += '<p class="muted">暂无数据</p>';
   else {
-    h += '<table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th></tr></thead><tbody>';
-    d.nodes.forEach(n => { h += `<tr><td>${esc(n.name || ('#'+n.node_id))}</td><td>${fmtBytes(n.up)}</td><td>${fmtBytes(n.down)}</td><td>${fmtBytes(n.up+n.down)}</td></tr>`; });
-    h += '</tbody></table>';
+    h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th></tr></thead><tbody>';
+    d.nodes.forEach(n => { h += '<tr><td>' + esc(n.name || ('#' + n.node_id)) + '</td><td>' + fmtBytes(n.up) + '</td><td>' + fmtBytes(n.down) + '</td><td>' + fmtBytes(n.up + n.down) + '</td></tr>'; });
+    h += '</tbody></table></div>';
   }
   h += '</div>';
 
-  // 客户端流量表
-  h += `<div class="card"><h3>按客户端</h3>`;
+  h += '<div class="card"><h3>按客户端</h3>';
   if (!d.clients || !d.clients.length) h += '<p class="muted">暂无数据</p>';
   else {
-    h += '<table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody>';
+    h += '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'stats_clients_tb\', this.value)">';
+    h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody id="stats_clients_tb">';
     d.clients.forEach(c => {
-      const total = (Number(c.up)||0) + (Number(c.down)||0);
+      const total = (Number(c.up) || 0) + (Number(c.down) || 0);
       let usage = '—';
       if (c.traffic_limit_bytes && c.traffic_limit_bytes > 0) {
         const pct = Math.min(100, (total / c.traffic_limit_bytes) * 100);
-        usage = `<div class="bar"><span style="width:${pct.toFixed(1)}%"></span></div>${pct.toFixed(1)}%`;
+        usage = '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' + pct.toFixed(1) + '%';
       }
-      h += `<tr><td>${esc(c.alias || ('#'+c.client_id))}</td><td>${fmtBytes(c.up)}</td><td>${fmtBytes(c.down)}</td><td>${fmtBytes(total)}</td><td>${usage}</td></tr>`;
+      h += '<tr><td>' + esc(c.alias || ('#' + c.client_id)) + '</td><td>' + fmtBytes(c.up) + '</td><td>' + fmtBytes(c.down) + '</td><td>' + fmtBytes(total) + '</td><td>' + usage + '</td></tr>';
     });
-    h += '</tbody></table>';
+    h += '</tbody></table></div>';
   }
   h += '</div>';
 
-  // 30 天趋势
-  h += `<div class="card"><h3>近 30 天趋势</h3>`;
+  h += '<div class="card"><h3>近 30 天趋势</h3>';
   if (!d.daily || !d.daily.length) h += '<p class="muted">暂无数据</p>';
   else {
     let max = 1;
-    d.daily.forEach(x => { const t = (Number(x.up)||0)+(Number(x.down)||0); if (t > max) max = t; });
+    d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
     h += '<div class="trend">';
     d.daily.forEach(x => {
-      const t = (Number(x.up)||0)+(Number(x.down)||0);
+      const t = (Number(x.up) || 0) + (Number(x.down) || 0);
       const w = Math.max(2, (t / max) * 100);
-      h += `<div class="trow"><span class="tdate">${x.date.slice(5)}</span><div class="tbar"><span style="width:${w}%"></span></div><span class="tval">${fmtBytes(t)}</span></div>`;
+      h += '<div class="trow"><span class="tdate">' + x.date.slice(5) + '</span><div class="tbar"><span style="width:' + w + '%"></span></div><span class="tval">' + fmtBytes(t) + '</span></div>';
     });
     h += '</div>';
   }
   h += '</div>';
-
   document.getElementById('main').innerHTML = h;
+}
+function filterRows(tbId, q) {
+  const tb = document.getElementById(tbId); if (!tb) return;
+  q = (q || '').toLowerCase();
+  tb.querySelectorAll('tr').forEach(tr => { tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none'; });
 }
 
 // ---- 节点详情 ----
 async function renderNodeDetail(id) {
+  setLoading('加载节点中…');
   const d = await api('GET', '/nodes/' + id);
   if (!d) return;
   const n = d.node, main = document.getElementById('main');
@@ -351,173 +493,185 @@ async function renderNodeDetail(id) {
   let cmd = '';
   const inst = await api('GET', '/nodes/' + id + '/install');
   if (inst) cmd = inst.command || '';
-  main.innerHTML = `
-    <div class="crumb">节点 / <b>${esc(n.name)}</b> <span class="muted">#${n.id}</span></div>
-    <div class="card">
-      <div class="row">
-        <div><label>名称</label><input id="n_name" value="${esc(n.name)}"></div>
-        <div><label>地址 ip:port</label><input id="n_addr" value="${esc(n.address)}" disabled></div>
-        <div><label>地域</label><input id="n_region" value="${esc(n.region || '')}"></div>
-      </div>
-      <div class="row">
-        <div><label>标签(逗号)</label><input id="n_tags" value="${esc(n.tags || '')}"></div>
-        <div><label>端口范围</label><input id="n_portrange" value="${esc(n.port_range || '')}"></div>
-        <div><label>状态 / 连通</label><input value="${esc(n.status)} / ${esc(n.connectivity)}" disabled></div>
-      </div>
-      <div class="row">
-        <div><label>Agent 版本</label><input value="${esc(n.agent_version || '-')}" disabled></div>
-        <div><label>最近心跳</label><input value="${esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19))}" disabled></div>
-        <div></div>
-      </div>
-      <div class="btnrow">
-        <button onclick="saveNode(${n.id})">保存节点</button>
-        <button onclick="syncNode(${n.id})">下发配置</button>
-        <button class="secondary" onclick="showNodeToken(${n.id})">显示 token</button>
-        <button class="danger" onclick="delNode(${n.id})">删除节点</button>
-        <label class="chk"><input type="checkbox" ${autoSync ? 'checked' : ''} onchange="setAutoSync(this.checked)"> 自动下发</label>
-      </div>
-    </div>
-      <div class="card">
-        <h2>Agent 一键安装</h2>
-        <p class="muted">在节点服务器上执行以下命令，自动安装 xray + agent 并接入本管理端：</p>
-        <textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">${esc(cmd)}</textarea>
-        <div class="btnrow"><button onclick="copyInstall()">复制安装命令</button></div>
-      </div>
-      <div class="card">
-        <h2>入站（${ins.length}）</h2>
-      <table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th></th></tr></thead>
-      <tbody>${(ins).map(inb => `<tr><td>${inb.id}</td><td>${esc(inb.protocol)}</td><td>${inb.port}</td><td>${esc(inb.transport || 'tcp')}</td><td>${inb.tls_enabled ? '🔒' : ''}</td><td>${inb.port_auto_fixed ? '是' : ''}</td><td>${inb.enabled ? 'yes' : 'no'}</td><td><button class="secondary small" onclick="selectInbound(${inb.id},${n.id})">查看</button> <button class="danger small" onclick="delInbound(${inb.id},${n.id})">删</button></td></tr>`).join('')}</tbody></table>
-      <h3>新建入站</h3>
-      <label>名称/别名（可选，用于订阅分组选择）</label><input id="i_name" placeholder="如 hk-tg-ws">
-      <div class="row">
-        <div><label>协议</label><select id="i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select></div>
-        <div><label>端口</label><input id="i_port" type="number" placeholder="10086"></div>
-        <div><label>传输</label><select id="i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select></div>
-        <div><label>TLS</label><input id="i_tls" type="checkbox"></div>
-      </div>
-      <button onclick="createInbound(${n.id})">新建入站</button>
-    </div>
-    <div class="card">
-      <h2>配置版本</h2>
-      <table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>应用时间</th><th>错误</th></tr></thead>
-      <tbody>${(d.config_versions || []).map(v => `<tr><td>${v.version}</td><td class="${v.status === 'applied' ? 'ok' : 'off'}">${esc(v.status)}</td><td>${esc((v.applied_at || '').replace('T', ' ').slice(0, 19))}</td><td class="muted">${esc(v.error || '')}</td></tr>`).join('')}</tbody></table>
-    </div>`;
+  main.innerHTML =
+    '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span> <span class="badge">' + esc(n.status || '-') + ' / ' + esc(n.connectivity || '-') + '</span></div>' +
+    '<div class="card">' +
+    '<div class="row">' +
+    '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
+    '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
+    '<div><label>地域</label><input id="n_region" value="' + esc(n.region || '') + '"></div></div>' +
+    '<div class="row">' +
+    '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
+    '<div><label>端口范围</label><input id="n_portrange" value="' + esc(n.port_range || '') + '"></div>' +
+    '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div></div>' +
+    '<div class="row">' +
+    '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
+    '<div></div><div></div></div>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
+    '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
+    '<button class="secondary" onclick="showNodeToken(' + n.id + ')">显示 token</button>' +
+    '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
+    '<div class="card"><h2>Agent 一键安装</h2>' +
+    '<p class="muted">在节点服务器上执行以下命令，自动安装 xray + agent 并接入本管理端：</p>' +
+    '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
+    '<div class="btnrow"><button onclick="copyInstall()">复制安装命令</button></div></div>' +
+    '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th></th></tr></thead><tbody>' +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '是' : '') + '</td><td>' + (inb.enabled ? 'yes' : 'no') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    '</tbody></table></div>' +
+    '<h3>新建入站</h3>' +
+    '<label>名称/别名（可选，用于订阅分组选择）</label><input id="i_name" placeholder="如 hk-tg-ws">' +
+    '<div class="row">' +
+    '<div><label>协议</label><select id="i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select></div>' +
+    '<div><label>端口</label><input id="i_port" type="number" placeholder="10086"></div>' +
+    '<div><label>传输</label><select id="i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select></div>' +
+    '<div><label>TLS</label><input id="i_tls" type="checkbox"></div></div>' +
+    '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + n.id + '))">新建入站</button></div></div>' +
+    '<div class="card"><h2>配置版本</h2>' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>应用时间</th><th>错误</th></tr></thead><tbody>' +
+    (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td class="' + (v.status === 'applied' ? 'ok' : 'off') + '">' + esc(v.status) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
+    '</tbody></table></div></div>';
 }
 async function saveNode(id) {
   const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: val('n_portrange') });
-  if (d) { const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: val('n_portrange') }; showToast('节点已保存'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id); }
+  if (d) {
+    const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: val('n_portrange') };
+    showToast('节点已保存', 'ok'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id);
+  }
 }
-async function syncNode(id) { const d = await api('POST', '/nodes/' + id + '/config/sync'); showToast(d ? '已下发配置' : '下发失败'); return d; }
-async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id); if (d && d.token) { copyText(d.token); showToast('节点 token 已复制'); } }
-async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); showToast('安装命令已复制'); } }
+async function syncNode(id) {
+  const d = await api('POST', '/nodes/' + id + '/config/sync');
+  if (d) { showToast('已下发配置', 'ok'); renderNodeDetail(id); }
+  return d;
+}
+async function syncAllNodes() {
+  if (!nodesData.length) return showToast('暂无节点', 'warn');
+  if (!await confirmModal('确认向全部 ' + nodesData.length + ' 个节点下发最新配置？')) return;
+  let ok = 0, fail = 0;
+  showToast('开始下发…');
+  for (const n of nodesData) { const d = await api('POST', '/nodes/' + n.id + '/config/sync'); if (d) ok++; else fail++; }
+  showToast('下发完成：' + ok + ' 成功' + (fail ? '，' + fail + ' 失败' : ''), fail ? (ok ? 'warn' : 'err') : 'ok');
+  loadNodes();
+}
+async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id); if (d && d.token) { copyText(d.token); } }
+async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); } }
 async function delNode(id) {
-  if (!confirm('确认删除节点 #' + id + '？其入站/客户端也会失效')) return;
-  if (await api('DELETE', '/nodes/' + id)) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); expandedNodes.delete(id); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
+  if (!await confirmModal('确认删除节点 #' + id + '？其入站/客户端也会失效')) return;
+  const d = await api('DELETE', '/nodes/' + id);
+  if (d) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); expandedNodes.delete(id); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 async function createInbound(nodeId) {
-  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('i_name'), protocol: val('i_proto'), port: +val('i_port'), transport: val('i_trans'), tls_enabled: document.getElementById('i_tls').checked });
-  if (d) { inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; showToast('入站已创建'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId); }
+  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('i_name'), protocol: val('i_proto'), port: +val('i_port'), transport: val('i_trans'), tls_enabled: chk('i_tls') });
+  if (d) { inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; showToast('入站已创建', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId); }
 }
 async function delInbound(id, nodeId) {
-  if (!confirm('删除入站 #' + id + '？')) return;
-  if (await api('DELETE', '/inbounds/' + id)) { delete clientsCache[id]; expandedInbounds.delete(id); inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
+  if (!await confirmModal('删除入站 #' + id + '？')) return;
+  const d = await api('DELETE', '/inbounds/' + id);
+  if (d) { delete clientsCache[id]; expandedInbounds.delete(id); inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
 }
 
-// ---- 入站详情 ----
-function inboundLabel(inb) {
-  if (inb.name) return inb.name;
-  return (inb.protocol || '?') + ':' + (inb.port || '?');
+// ---- 到期时间转换 ----
+function toDTLocal(s) {
+  if (!s) return '';
+  const d = new Date(s); if (isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
+function fromDTLocal(s) { if (!s) return ''; const d = new Date(s); if (isNaN(d)) return ''; return d.toISOString(); }
+
+// ---- 入站详情 ----
 async function renderInboundDetail(id) {
+  setLoading('加载入站中…');
   const nodeId = sel.parentId;
   const inb = (inboundsCache[nodeId] || []).find(x => x.id === id);
   if (!inb) { renderNodeDetail(nodeId); return; }
   const cls = clientsCache[id] || [];
   const node = nodesData.find(x => x.id === nodeId);
-  document.getElementById('main').innerHTML = `
-    <div class="crumb">节点 / <b>${esc(node ? node.name : '#' + nodeId)}</b> › 入站 / <b>${esc(inboundLabel(inb))}</b></div>
-    <div class="card">
-      <label>名称/别名（用于订阅分组精确选择）</label><input id="ib_name" value="${esc(inb.name || '')}" placeholder="如 hk-tg-ws">
-      <div class="row">
-        <div><label>协议</label><select id="ib_proto"><option ${inb.protocol === 'vmess' ? 'selected' : ''}>vmess</option><option ${inb.protocol === 'vless' ? 'selected' : ''}>vless</option><option ${inb.protocol === 'trojan' ? 'selected' : ''}>trojan</option><option ${inb.protocol === 'ss' ? 'selected' : ''}>ss</option><option ${inb.protocol === 'socks' ? 'selected' : ''}>socks</option><option ${inb.protocol === 'http' ? 'selected' : ''}>http</option></select></div>
-        <div><label>端口</label><input id="ib_port" type="number" value="${inb.port}"></div>
-        <div><label>传输</label><select id="ib_trans"><option ${inb.transport === 'tcp' || !inb.transport ? 'selected' : ''}>tcp</option><option ${inb.transport === 'ws' ? 'selected' : ''}>ws</option><option ${inb.transport === 'grpc' ? 'selected' : ''}>grpc</option></select></div>
-        <div><label>TLS</label><input id="ib_tls" type="checkbox" ${inb.tls_enabled ? 'checked' : ''} onchange="toggleCertRow()"></div>
-      </div>
-      <div id="ib_cert_row" style="${inb.tls_enabled ? '' : 'display:none;'}">
-        <label>TLS 证书（从全局证书选择；留空则用占位证书）</label>
-        <select id="ib_cert">${certOptions(inb.tls_cert_id)}</select>
-      </div>
-      <div class="row">
-        <div><label>启用</label><input id="ib_enabled" type="checkbox" ${inb.enabled ? 'checked' : ''}></div>
-        <div><label>自动修复端口</label><input value="${inb.port_auto_fixed ? '是' : '否'}" disabled></div>
-        <div></div>
-      </div>
-      <div class="btnrow">
-        <button onclick="saveInbound(${id})">保存入站</button>
-        <button onclick="syncNode(${nodeId})">下发配置</button>
-        <button class="danger" onclick="delInbound(${id},${nodeId})">删除入站</button>
-      </div>
-    </div>
-    <div class="card">
-      <h2>客户端（${cls.length}）</h2>
-      <table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead>
-      <tbody>${cls.map(c => `<tr><td>${c.id}</td><td class="link">${esc(c.uuid)}</td><td>${esc(c.alias || '')}</td><td>${c.enabled ? 'yes' : 'no'}</td><td><button class="secondary small" onclick="selectClient(${c.id},${id})">查看</button> <button class="danger small" onclick="delClient(${c.id},${id})">删</button></td></tr>`).join('')}</tbody></table>
-      <h3>新建客户端</h3>
-      <div class="row">
-        <div><label>别名/备注(ps)</label><input id="c_alias" placeholder="如 hk01-iphone"></div>
-        <div><label>流量上限(字节,-1不限)</label><input id="c_traffic" value="-1"></div>
-        <div><label>到期(RFC3339,空不限)</label><input id="c_expire" placeholder="2026-12-31T00:00:00Z"></div>
-      </div>
-      <button onclick="createClient(${id})">新建客户端</button>
-    </div>`;
+  document.getElementById('main').innerHTML =
+    '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
+    '<div class="card">' +
+    '<label>名称/别名（用于订阅分组精确选择）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws">' +
+    '<div class="row">' +
+    '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
+    '<div><label>端口</label><input id="ib_port" type="number" value="' + inb.port + '"></div>' +
+    '<div><label>传输</label><select id="ib_trans"><option ' + (inb.transport === 'tcp' || !inb.transport ? 'selected' : '') + '>tcp</option><option ' + (inb.transport === 'ws' ? 'selected' : '') + '>ws</option><option ' + (inb.transport === 'grpc' ? 'selected' : '') + '>grpc</option></select></div>' +
+    '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div></div>' +
+    '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '">' +
+    '<label>TLS 证书（从全局证书选择；留空则用占位证书）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
+    '<div class="row">' +
+    '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
+    '<div><label>自动修复端口</label><input value="' + (inb.port_auto_fixed ? '是' : '否') + '" disabled></div>' +
+    '<div></div></div>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
+    '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
+    '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div></div>' +
+    '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
+    '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
+    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? 'yes' : 'no') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
+    '</tbody></table></div>' +
+    '<h3>新建客户端</h3>' +
+    '<div class="row">' +
+    '<div><label>别名/备注(ps)</label><input id="c_alias" placeholder="如 hk01-iphone"></div>' +
+    '<div><label>流量上限(字节,-1不限)</label><input id="c_traffic" value="-1" type="number"></div>' +
+    '<div><label>到期时间</label><input id="c_expire" type="datetime-local"></div></div>' +
+    '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + id + '))">新建客户端</button></div></div>';
 }
 async function saveInbound(id) {
   const nodeId = sel.parentId;
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: document.getElementById('ib_tls').checked, enabled: document.getElementById('ib_enabled').checked, cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
-  if (d) { const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: document.getElementById('ib_tls').checked, enabled: document.getElementById('ib_enabled').checked, tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) }; showToast('入站已保存'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderInboundDetail(id); }
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  if (d) {
+    const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderInboundDetail(id);
+  }
 }
 async function createClient(inboundId) {
-  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || -1), expire_time: val('c_expire') });
-  if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已建: ' + d.uuid); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
+  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || -1), expire_time: fromDTLocal(val('c_expire')) });
+  if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已建: ' + d.uuid, 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
 }
 async function delClient(id, inboundId) {
-  if (!confirm('删除客户端 #' + id + '？')) return;
-  if (await api('DELETE', '/clients/' + id)) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); renderInboundDetail(inboundId); }
+  if (!await confirmModal('删除客户端 #' + id + '？')) return;
+  const d = await api('DELETE', '/clients/' + id);
+  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); renderInboundDetail(inboundId); }
 }
 
 // ---- 客户端详情 ----
-function renderClientDetail(id) {
+async function renderClientDetail(id) {
+  setLoading('加载客户端中…');
   const inbId = sel.parentId;
   const c = (clientsCache[inbId] || []).find(x => x.id === id);
   if (!c) { renderInboundDetail(inbId); return; }
-  document.getElementById('main').innerHTML = `
-    <div class="crumb">客户端 / <b>${esc(c.alias || c.uuid)}</b></div>
-    <div class="card">
-      <label>UUID</label><input value="${esc(c.uuid)}" disabled>
-      <div class="row">
-        <div><label>别名/备注(ps)</label><input id="c_alias2" value="${esc(c.alias || '')}"></div>
-        <div><label>流量上限(字节,-1不限)</label><input id="c_traffic2" value="${c.traffic_limit_bytes != null ? c.traffic_limit_bytes : -1}"></div>
-        <div><label>到期(RFC3339,空不限)</label><input id="c_expire2" value="${esc((c.expire_time ? (new Date(c.expire_time).toISOString().slice(0, 19) + 'Z') : ''))}"></div>
-      </div>
-      <div class="row">
-        <div><label>启用</label><input id="c_enabled2" type="checkbox" ${c.enabled ? 'checked' : ''}></div>
-        <div></div><div></div>
-      </div>
-      <div class="btnrow">
-        <button onclick="saveClient(${id})">保存客户端</button>
-        <button class="danger" onclick="delClient(${id},${inbId})">删除客户端</button>
-      </div>
-    </div>`;
+  document.getElementById('main').innerHTML =
+    '<div class="crumb">客户端 / <b>' + esc(c.alias || c.uuid) + '</b></div>' +
+    '<div class="card">' +
+    '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
+    '<div class="row">' +
+    '<div><label>别名/备注(ps)</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
+    '<div><label>流量上限(字节,-1不限)</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes != null ? c.traffic_limit_bytes : -1) + '" type="number"></div>' +
+    '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
+    '<div class="row">' +
+    '<div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div>' +
+    '<div></div><div></div></div>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveClient(' + id + '))">保存客户端</button>' +
+    '<button class="danger" onclick="delClient(' + id + ',' + inbId + ')">删除客户端</button></div></div>';
 }
 async function saveClient(id) {
   const inbId = sel.parentId;
-  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: document.getElementById('c_enabled2').checked, expire_time: val('c_expire2') });
-  if (d) { const arr = clientsCache[inbId] || []; const i = arr.findIndex(x => x.id === id); if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: document.getElementById('c_enabled2').checked }; showToast('客户端已保存'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderClientDetail(id); }
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
+  if (d) {
+    const arr = clientsCache[inbId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: chk('c_enabled2') };
+    showToast('客户端已保存', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderClientDetail(id);
+  }
 }
 
 // ---- 订阅 ----
 async function renderSubDetail(id) {
+  setLoading('加载订阅中…');
   const d = await api('GET', '/subscriptions/' + id);
   if (!d) return;
   if (!inboundCatalog.length) await loadAllInbounds();
@@ -525,44 +679,61 @@ async function renderSubDetail(id) {
   let cur = {};
   try { cur = JSON.parse(g.filters || '{}'); } catch (e) {}
   const selectedIds = cur.inbound_ids || [];
-  document.getElementById('main').innerHTML = `
-    <div class="crumb">订阅 / <b>${esc(g.name)}</b></div>
-    <div class="card">
-      <div class="row">
-        <div><label>名称</label><input id="s_name2" value="${esc(g.name)}"></div>
-        <div><label>格式</label><select id="s_fmt2">${subFmtOptions(g.format)}</select></div>
-        <div><label>规则</label><select id="s_mode2">${subModeOptions(g.mode)}</select></div>
-        <div><label>启用</label><input id="s_en2" type="checkbox" ${g.enabled ? 'checked' : ''}></div>
-      </div>
-      <label>纳入的入站（按别名精确选择，可多选；不选则按下方高级筛选，默认全部）</label>
-      <div class="inblist">${subInboundChecklist(selectedIds)}</div>
-      <label>高级筛选 JSON（可选：node_ids / protocol / tags）</label>
-      <input id="s_adv2" value="${esc(g.filters)}">
-      <p class="muted">裸订阅 = 仅节点列表；ACL4SSR = Clash/Loon 附带分流规则（V2Ray 格式下退化为裸链接）。</p>
-      <div class="btnrow">
-        <button onclick="saveSub(${g.id})">保存</button>
-        <button onclick="copyText('${url}')">复制链接</button>
-        <button class="secondary" onclick="copySubContent('${g.token}')">复制配置</button>
-        <button class="danger" onclick="delSub(${g.id})">删除</button>
-      </div>
-      <div class="qr">
-        <div>订阅二维码（手机客户端扫码导入）</div>
-        <img src="${API}/qr/${g.token}" width="160" height="160" alt="订阅二维码">
-        <div class="muted">${esc(url)}</div>
-      </div>
-    </div>
-    <div class="card">
-      <h2>成员预览（${ (d.members || []).length }）</h2>
-      <pre>${esc(JSON.stringify(d.members || [], null, 2))}</pre>
-    </div>`;
+  const selectedNodes = cur.node_ids || [];
+  const selectedProtos = cur.protocol || [];
+  const tagsStr = (cur.tags || []).join(', ');
+  document.getElementById('main').innerHTML =
+    '<div class="crumb">订阅 / <b>' + esc(g.name) + '</b></div>' +
+    '<div class="card">' +
+    '<div class="row">' +
+    '<div><label>名称</label><input id="s_name2" value="' + esc(g.name) + '"></div>' +
+    '<div><label>格式</label><select id="s_fmt2">' + subFmtOptions(g.format) + '</select></div>' +
+    '<div><label>规则</label><select id="s_mode2">' + subModeOptions(g.mode) + '</select></div>' +
+    '<div><label>启用</label><input id="s_en2" type="checkbox" ' + (g.enabled ? 'checked' : '') + '></div></div>' +
+    '<label>纳入的入站（按别名精确选择；不选则默认全部）</label>' +
+    '<div class="inblist">' + subInboundChecklist(selectedIds) + '</div>' +
+    '<div class="row">' +
+    '<div><label>节点（可选）</label><div class="inblist">' + subNodeChecklist(selectedNodes) + '</div></div>' +
+    '<div><label>协议（可选）</label><div class="inblist">' + subProtoChecklist(selectedProtos) + '</div></div>' +
+    '<div><label>标签（可选，逗号分隔）</label><input id="s_tags2" value="' + esc(tagsStr) + '" placeholder="如 hk, ws"></div></div>' +
+    '<details class="adv"><summary>高级筛选 JSON（可选，需熟练使用）</summary>' +
+    '<p class="muted">inbound_ids / node_ids / protocol / tags 由上方勾选与输入覆盖，此处的其他字段会合并进 filters。</p>' +
+    '<input id="s_adv2" value="' + esc(g.filters) + '"></details>' +
+    '<p class="muted">裸订阅 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为裸链接）。</p>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveSub(' + g.id + '))">保存</button>' +
+    '<button onclick="copyText(\'' + url + '\')">复制链接</button>' +
+    '<button class="secondary" onclick="copySubContent(\'' + g.token + '\')">复制配置</button>' +
+    '<button class="danger" onclick="delSub(' + g.id + ')">删除</button></div>' +
+    '<div class="qr">' +
+    '<div>订阅二维码（手机客户端扫码导入）</div>' +
+    '<img src="' + API + '/qr/' + g.token + '" width="160" height="160" alt="订阅二维码">' +
+    '<div class="muted link">' + esc(url) + '</div></div></div>' +
+    '<div class="card"><h2>成员预览（' + (d.members || []).length + '）</h2>' +
+    '<details class="adv"><summary>查看 JSON</summary><pre>' + esc(JSON.stringify(d.members || [], null, 2)) + '</pre></details></div>' +
+    '<div class="card"><h2>订阅内容预览</h2>' +
+    '<details class="adv" ontoggle="loadSubPreview(\'' + g.token + '\')"><summary>查看实际生成的订阅内容（各客户端格式）</summary>' +
+    '<pre id="sub_preview" class="muted">点击展开后加载…</pre></details></div>';
+}
+async function loadSubPreview(token) {
+  const pre = document.getElementById('sub_preview'); if (!pre || pre.dataset.loaded) return;
+  pre.dataset.loaded = '1';
+  try {
+    const r = await fetch(API + '/sub/' + token);
+    if (!r.ok) { pre.textContent = '获取失败 HTTP ' + r.status; return; }
+    pre.textContent = await r.text();
+    pre.classList.remove('muted');
+  } catch (e) { pre.textContent = '获取失败'; }
 }
 async function saveSub(id) {
-  const filters = buildSubFilters('s_adv2');
+  const filters = buildSubFilters('s_adv2', 's_tags2');
   if (filters === null) return;
-  const d = await api('PATCH', '/subscriptions/' + id, { name: val('s_name2'), format: val('s_fmt2'), mode: val('s_mode2'), enabled: document.getElementById('s_en2').checked, filters });
-  if (d) { const i = subsData.findIndex(x => x.id === id); if (i >= 0) subsData[i] = { ...subsData[i], name: val('s_name2'), format: val('s_fmt2'), mode: val('s_mode2'), enabled: document.getElementById('s_en2').checked, filters }; showToast('订阅已保存'); renderSidebar(); renderSubDetail(id); }
+  const d = await api('PATCH', '/subscriptions/' + id, { name: val('s_name2'), format: val('s_fmt2'), mode: val('s_mode2'), enabled: chk('s_en2'), filters });
+  if (d) {
+    const i = subsData.findIndex(x => x.id === id); if (i >= 0) subsData[i] = { ...subsData[i], name: val('s_name2'), format: val('s_fmt2'), mode: val('s_mode2'), enabled: chk('s_en2'), filters };
+    showToast('订阅已保存', 'ok'); renderSidebar(); renderSubDetail(id);
+  }
 }
-// 入站多选清单（按节点分组），selected 为已选入站 id 数组
 function subInboundChecklist(selected) {
   selected = selected || [];
   if (!inboundCatalog.length) return '<div class="muted">（暂无入站，请先在节点下创建）</div>';
@@ -571,239 +742,230 @@ function subInboundChecklist(selected) {
   let h = '';
   Object.keys(byNode).forEach(nid => {
     const n = nodesData.find(x => x.id == nid);
-    h += `<div class="subgrp">${esc(n ? n.name : '节点#' + nid)}</div>`;
+    h += '<div class="subgrp">' + esc(n ? n.name : '节点#' + nid) + '</div>';
     byNode[nid].forEach(inb => {
       const chk = selected.includes(inb.id) ? 'checked' : '';
-      h += `<label class="chk"><input type="checkbox" name="sub_inb" value="${inb.id}" ${chk}> ${esc(inboundLabel(inb))}${inb.tls_enabled ? ' 🔒' : ''}</label>`;
+      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> ' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
     });
   });
   return h;
 }
-// 合并勾选入站 + 高级筛选 JSON，返回 filters 字符串；JSON 解析失败返回 null
-function buildSubFilters(advId) {
+function subNodeChecklist(selected) {
+  selected = selected || [];
+  if (!nodesData.length) return '<div class="muted">（暂无节点）</div>';
+  return nodesData.map(n => '<label class="chk"><input type="checkbox" name="sub_node" value="' + n.id + '" ' + (selected.includes(n.id) ? 'checked' : '') + '> ' + esc(n.name) + ' <span class="muted">#' + n.id + '</span></label>').join('');
+}
+function subProtoChecklist(selected) {
+  selected = selected || [];
+  const ps = ['vmess', 'vless', 'trojan', 'ss', 'socks', 'http'];
+  return ps.map(p => '<label class="chk"><input type="checkbox" name="sub_proto" value="' + p + '" ' + (selected.includes(p) ? 'checked' : '') + '> ' + p + '</label>').join('');
+}
+function buildSubFilters(advId, tagsId) {
   const ids = Array.from(document.querySelectorAll('input[name=sub_inb]:checked')).map(e => +e.value);
+  const nids = Array.from(document.querySelectorAll('input[name=sub_node]:checked')).map(e => +e.value);
+  const protos = Array.from(document.querySelectorAll('input[name=sub_proto]:checked')).map(e => e.value);
   let adv = {};
   const txt = val(advId);
-  if (txt && txt.trim()) {
-    try { adv = JSON.parse(txt); } catch (e) { showToast('高级筛选 JSON 解析失败'); return null; }
-  }
+  if (txt && txt.trim()) { try { adv = JSON.parse(txt); } catch (e) { showToast('高级筛选 JSON 解析失败', 'err'); return null; } }
   const f = Object.assign({}, adv);
   f.inbound_ids = ids;
+  if (nids.length) f.node_ids = nids; else delete f.node_ids;
+  if (protos.length) f.protocol = protos; else delete f.protocol;
+  const tags = (val(tagsId) || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (tags.length) f.tags = tags; else delete f.tags;
   return JSON.stringify(f);
 }
 function subFmtOptions(cur) {
   const fs = [['vmess', 'V2Ray(vmess)'], ['clash', 'Clash'], ['surfboard', 'Surfboard'], ['loon', 'Loon'], ['sip008', 'SIP008']];
-  return fs.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`).join('');
+  return fs.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 function subModeOptions(cur) {
   const ms = [['none', '无规则(裸订阅)'], ['acl4ssr_online', 'ACL4SSR_Online']];
-  return ms.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`).join('');
+  return ms.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 async function delSub(id) {
-  if (!confirm('删除订阅组?')) return;
-  if (await api('DELETE', '/subscriptions/' + id)) { subsData = subsData.filter(x => x.id !== id); if (sel.type === 'sub' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
+  if (!await confirmModal('删除订阅组?')) return;
+  const d = await api('DELETE', '/subscriptions/' + id);
+  if (d) { subsData = subsData.filter(x => x.id !== id); if (sel.type === 'sub' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 
 // ---- 证书 ----
 async function renderCertDetail() {
+  setLoading('加载证书中…');
   const id = sel.id;
   const c = certsData.find(x => x.id === id);
   if (!c) { renderSidebar(); renderMain(); return; }
   const d = await api('GET', '/certs/' + id);
   const cert = (d && d.domain) ? d : c;
   const days = cert.expires_at ? Math.ceil((new Date(cert.expires_at).getTime() - Date.now()) / 86400000) : '-';
-  document.getElementById('main').innerHTML = `
-    <div class="crumb">证书 / <b>${esc(cert.domain)}</b></div>
-    <div class="card">
-      <div class="row">
-        <div><label>域名</label><input value="${esc(cert.domain)}" disabled></div>
-        <div><label>状态</label><input value="${esc(cert.status)}" disabled></div>
-        <div><label>剩余天数</label><input value="${esc(days)}" disabled></div>
-      </div>
-      <div class="row">
-        <div><label>自动续签</label><input value="${cert.auto_renew ? '是' : '否'}" disabled></div>
-        <div><label>到期时间</label><input value="${esc((cert.expires_at || '').toString().replace('T', ' ').slice(0, 19))}" disabled></div>
-        <div></div>
-      </div>
-      <div class="row">
-        <div><label>证书路径</label><input value="${esc(cert.cert_path || '')}" disabled></div>
-        <div><label>密钥路径</label><input value="${esc(cert.key_path || '')}" disabled></div>
-        <div><label>CA 路径</label><input value="${esc(cert.ca_path || '')}" disabled></div>
-      </div>
-      ${cert.last_error ? `<div class="card" style="background:#fdecea;border-color:#f5c6cb"><b class="off">最近错误</b><br><span class="muted">${esc(cert.last_error)}</span></div>` : ''}
-      <div class="btnrow">
-        <button onclick="renewCert(${cert.id})">续签</button>
-        <button onclick="distributeCert(${cert.id})">分发到所有节点</button>
-        <button class="danger" onclick="delCert(${cert.id})">删除</button>
-      </div>
-    </div>`;
+  document.getElementById('main').innerHTML =
+    '<div class="crumb">证书 / <b>' + esc(cert.domain) + '</b> <span class="badge">' + esc(cert.status) + '</span></div>' +
+    '<div class="card">' +
+    '<div class="row">' +
+    '<div><label>域名</label><input value="' + esc(cert.domain) + '" disabled></div>' +
+    '<div><label>剩余天数</label><input value="' + esc(days) + '" disabled></div>' +
+    '<div><label>自动续签</label><input value="' + (cert.auto_renew ? '是' : '否') + '" disabled></div></div>' +
+    '<div class="row">' +
+    '<div><label>到期时间</label><input value="' + esc((cert.expires_at || '').toString().replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
+    '<div><label>证书路径</label><input value="' + esc(cert.cert_path || '') + '" disabled></div>' +
+    '<div><label>密钥路径</label><input value="' + esc(cert.key_path || '') + '" disabled></div></div>' +
+    '<div class="row">' +
+    '<div><label>CA 路径</label><input value="' + esc(cert.ca_path || '') + '" disabled></div>' +
+    '<div></div><div></div></div>' +
+    (cert.last_error ? '<div class="card" style="background:#fdecea;border-color:#f5c6cb"><b class="off">最近错误</b><br><span class="muted">' + esc(cert.last_error) + '</span></div>' : '') +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => renewCert(' + cert.id + '))">续签</button>' +
+    '<button onclick="withBusy(this, () => distributeCert(' + cert.id + '))">分发到所有节点</button>' +
+    '<button class="danger" onclick="delCert(' + cert.id + ')">删除</button></div></div>';
 }
-async function renewCert(id) { const d = await api('POST', '/certs/' + id + '/renew'); showToast(d ? (d.ok ? '续签成功' : (d.error || '续签失败')) : '续签失败'); await loadCerts(); renderCertDetail(); }
-async function distributeCert(id) { const d = await api('POST', '/certs/' + id + '/distribute'); showToast(d ? '已分发到所有节点' : '分发失败'); }
+async function renewCert(id) { const d = await api('POST', '/certs/' + id + '/renew'); if (d && d.ok) { showToast('续签成功', 'ok'); await loadCerts(); renderCertDetail(); } }
+async function distributeCert(id) { const d = await api('POST', '/certs/' + id + '/distribute'); if (d) showToast('已分发到所有节点', 'ok'); }
 async function delCert(id) {
-  if (!confirm('删除证书 #' + id + '？此操作不会回收已下发到节点的证书文件')) return;
-  if (await api('DELETE', '/certs/' + id)) { certsData = certsData.filter(x => x.id !== id); if (sel.type === 'cert' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
+  if (!await confirmModal('删除证书 #' + id + '？此操作不会回收已下发到节点的证书文件')) return;
+  const d = await api('DELETE', '/certs/' + id);
+  if (d) { certsData = certsData.filter(x => x.id !== id); if (sel.type === 'cert' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 
 // ---- 通知渠道 ----
 async function renderNotifierDetail(id) {
+  setLoading('加载通知渠道中…');
   const d = await api('GET', '/notifiers/' + id);
   if (!d) return;
   currentNotifType = d.type;
   let cfg = {};
   try { cfg = JSON.parse(d.config || '{}'); } catch (e) {}
-  document.getElementById('main').innerHTML = `
-    <div class="crumb">通知 / <b>${esc(d.name)}</b></div>
-    <div class="card">
-      <div class="row">
-        <div><label>名称</label><input id="n_name2" value="${esc(d.name)}"></div>
-        <div><label>类型</label><input value="${esc(d.type)}" disabled></div>
-        <div><label>启用</label><input id="n_en2" type="checkbox" ${d.enabled ? 'checked' : ''}></div>
-      </div>
-      ${notifConfigFields(d.type, cfg)}
-      <p class="muted">保存后即时生效；触发点：节点离线 / 自愈 / 恢复在线（事件驱动），流量超额 / 客户端到期（每 15 分钟扫描）。</p>
-      <div class="btnrow">
-        <button onclick="saveNotifier(${d.id})">保存</button>
-        <button class="secondary" onclick="testNotifier(${d.id})">发送测试</button>
-        <button class="danger" onclick="delNotifier(${d.id})">删除</button>
-      </div>
-    </div>`;
+  document.getElementById('main').innerHTML =
+    '<div class="crumb">通知 / <b>' + esc(d.name) + '</b></div>' +
+    '<div class="card">' +
+    '<div class="row">' +
+    '<div><label>名称</label><input id="n_name2" value="' + esc(d.name) + '"></div>' +
+    '<div><label>类型</label><input value="' + esc(d.type) + '" disabled></div>' +
+    '<div><label>启用</label><input id="n_en2" type="checkbox" ' + (d.enabled ? 'checked' : '') + '></div></div>' +
+    notifConfigFields(d.type, cfg) +
+    '<p class="muted">保存后即时生效；触发点：节点离线 / 自愈 / 恢复在线（事件驱动），流量超额 / 客户端到期（每 15 分钟扫描）。</p>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveNotifier(' + d.id + '))">保存</button>' +
+    '<button class="secondary" onclick="withBusy(this, () => testNotifier(' + d.id + '))">发送测试</button>' +
+    '<button class="danger" onclick="delNotifier(' + d.id + ')">删除</button></div></div>';
 }
 function notifConfigFields(type, cfg) {
   cfg = cfg || {};
   if (type === 'email') {
     const to = (cfg.to || []).join(', ');
-    return `
-      <label>SMTP 主机</label><input id="n_host" value="${esc(cfg.smtp_host || '')}">
-      <label>SMTP 端口</label><input id="n_port" value="${cfg.smtp_port || 465}">
-      <label>发件人</label><input id="n_from" value="${esc(cfg.from || '')}">
-      <label>SMTP 用户名</label><input id="n_user" value="${esc(cfg.smtp_user || '')}">
-      <label>SMTP 密码</label><input id="n_pass" type="password" value="${esc(cfg.smtp_pass || '')}">
-      <label>收件人（逗号分隔）</label><input id="n_to" value="${esc(to)}">
-    `;
+    return '<label>SMTP 主机</label><input id="n_host" value="' + esc(cfg.smtp_host || '') + '">' +
+      '<label>SMTP 端口</label><input id="n_port" value="' + (cfg.smtp_port || 465) + '">' +
+      '<label>发件人</label><input id="n_from" value="' + esc(cfg.from || '') + '">' +
+      '<label>SMTP 用户名</label><input id="n_user" value="' + esc(cfg.smtp_user || '') + '">' +
+      '<label>SMTP 密码</label><input id="n_pass" type="password" value="' + esc(cfg.smtp_pass || '') + '">' +
+      '<label>收件人（逗号分隔）</label><input id="n_to" value="' + esc(to) + '">';
   } else if (type === 'wecom') {
-    return `
-      <label>CorpID</label><input id="n_corpid" value="${esc(cfg.corpid || '')}">
-      <label>CorpSecret</label><input id="n_secret" type="password" value="${esc(cfg.corpsecret || '')}">
-      <label>AgentID</label><input id="n_agentid" value="${cfg.agentid || ''}">
-      <label>接收人 touser（@all 或 UserID）</label><input id="n_touser" value="${esc(cfg.touser || '@all')}">
-      <label>部门 toparty（可选）</label><input id="n_toparty" value="${esc(cfg.toparty || '')}">
-      <label>标签 totag（可选）</label><input id="n_totag" value="${esc(cfg.totag || '')}">
-    `;
+    return '<label>CorpID</label><input id="n_corpid" value="' + esc(cfg.corpid || '') + '">' +
+      '<label>CorpSecret</label><input id="n_secret" type="password" value="' + esc(cfg.corpsecret || '') + '">' +
+      '<label>AgentID</label><input id="n_agentid" value="' + (cfg.agentid || '') + '">' +
+      '<label>接收人 touser（@all 或 UserID）</label><input id="n_touser" value="' + esc(cfg.touser || '@all') + '">' +
+      '<label>部门 toparty（可选）</label><input id="n_toparty" value="' + esc(cfg.toparty || '') + '">' +
+      '<label>标签 totag（可选）</label><input id="n_totag" value="' + esc(cfg.totag || '') + '">';
   } else if (type === 'tg') {
-    return `
-      <label>Bot Token</label><input id="n_bot" type="password" value="${esc(cfg.bot_token || '')}">
-      <label>Chat ID</label><input id="n_chat" value="${esc(cfg.chat_id || '')}">
-    `;
+    return '<label>Bot Token</label><input id="n_bot" type="password" value="' + esc(cfg.bot_token || '') + '">' +
+      '<label>Chat ID</label><input id="n_chat" value="' + esc(cfg.chat_id || '') + '">';
   }
   return '';
 }
 function notifCollectConfig(type) {
   if (type === 'email') {
     const to = val('n_to').split(',').map(s => s.trim()).filter(x => x);
-    return JSON.stringify({
-      smtp_host: val('n_host'), smtp_port: parseInt(val('n_port') || '465', 10),
-      smtp_user: val('n_user'), smtp_pass: val('n_pass'), from: val('n_from'), to
-    });
+    return JSON.stringify({ smtp_host: val('n_host'), smtp_port: parseInt(val('n_port') || '465', 10), smtp_user: val('n_user'), smtp_pass: val('n_pass'), from: val('n_from'), to });
   } else if (type === 'wecom') {
-    return JSON.stringify({
-      corpid: val('n_corpid'), corpsecret: val('n_secret'),
-      agentid: parseInt(val('n_agentid') || '0', 10), touser: val('n_touser'),
-      toparty: val('n_toparty'), totag: val('n_totag')
-    });
+    return JSON.stringify({ corpid: val('n_corpid'), corpsecret: val('n_secret'), agentid: parseInt(val('n_agentid') || '0', 10), touser: val('n_touser'), toparty: val('n_toparty'), totag: val('n_totag') });
   } else if (type === 'tg') {
     return JSON.stringify({ bot_token: val('n_bot'), chat_id: val('n_chat') });
   }
   return '{}';
 }
 async function saveNotifier(id) {
-  const d = await api('PATCH', '/notifiers/' + id, {
-    name: val('n_name2'), enabled: document.getElementById('n_en2').checked,
-    config: notifCollectConfig(currentNotifType)
-  });
-  if (d) { showToast('通知渠道已保存'); await loadNotifiers(); renderNotifierDetail(id); }
+  const d = await api('PATCH', '/notifiers/' + id, { name: val('n_name2'), enabled: chk('n_en2'), config: notifCollectConfig(currentNotifType) });
+  if (d) { showToast('通知渠道已保存', 'ok'); await loadNotifiers(); renderNotifierDetail(id); }
 }
 async function testNotifier(id) {
   const d = await api('POST', '/notifiers/' + id + '/test');
-  if (d && d.ok) showToast('测试消息已发送');
-  else showToast('发送失败：' + ((d && d.error) || '未知错误').slice(0, 140));
+  if (d && d.ok) showToast('测试消息已发送', 'ok');
 }
 async function delNotifier(id) {
-  if (!confirm('删除通知渠道 #' + id + '？')) return;
-  if (await api('DELETE', '/notifiers/' + id)) { notifData = notifData.filter(x => x.id !== id); if (sel.type === 'notifier' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
+  if (!await confirmModal('删除通知渠道 #' + id + '？')) return;
+  const d = await api('DELETE', '/notifiers/' + id);
+  if (d) { notifData = notifData.filter(x => x.id !== id); if (sel.type === 'notifier' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 function notifTypeOptions(cur) {
   const ts = [['email', '邮件 (SMTP)'], ['wecom', '企业微信 (自建应用)'], ['tg', 'Telegram Bot']];
-  return ts.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`).join('');
+  return ts.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 function onNotifTypeChange() { currentNotifType = val('n_type'); document.getElementById('n_cfg_fields').innerHTML = notifConfigFields(currentNotifType, {}); }
 function showCreateNotifier() {
   currentNotifType = 'email';
-  setModal(`<h2>新建通知渠道</h2>
-    <label>名称</label><input id="n_name" placeholder="我的告警通道">
-    <label>类型</label><select id="n_type" onchange="onNotifTypeChange()">${notifTypeOptions('email')}</select>
-    <div id="n_cfg_fields">${notifConfigFields('email', {})}</div>
-    <div class="btnrow"><button onclick="doCreateNotifier()">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>`);
+  setModal('<h2>新建通知渠道</h2>' +
+    '<label>名称</label><input id="n_name" placeholder="我的告警通道">' +
+    '<label>类型</label><select id="n_type" onchange="onNotifTypeChange()">' + notifTypeOptions('email') + '</select>' +
+    '<div id="n_cfg_fields">' + notifConfigFields('email', {}) + '</div>' +
+    '<div class="btnrow"><button onclick="withBusy(this, doCreateNotifier)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateNotifier() {
-  const d = await api('POST', '/notifiers', {
-    name: val('n_name'), type: val('n_type'), enabled: true,
-    config: notifCollectConfig(val('n_type'))
-  });
-  if (d) { closeModal(); showToast('通知渠道已建 #' + d.id); await loadNotifiers(); }
+  const d = await api('POST', '/notifiers', { name: val('n_name'), type: val('n_type'), enabled: true, config: notifCollectConfig(val('n_type')) });
+  if (d) { closeModal(); showToast('通知渠道已建 #' + d.id, 'ok'); await loadNotifiers(); }
 }
 
-// ---- 弹窗（新建节点 / 新建订阅）----
-function setModal(html) { document.getElementById('modalBody').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+// ---- 新建节点 / 新建订阅 / 新建证书 ----
 function showCreateNode() {
-  setModal(`<h2>注册节点</h2>
-    <label>名称</label><input id="m_n_name" placeholder="hk-01">
-    <label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321">
-    <label>地域</label><input id="m_n_region">
-    <label>标签(逗号)</label><input id="m_n_tags">
-    <label>端口范围</label><input id="m_n_pr" placeholder="10000-65535">
-    <div class="btnrow"><button onclick="doCreateNode()">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>`);
+  setModal('<h2>注册节点</h2>' +
+    '<label>名称</label><input id="m_n_name" placeholder="hk-01">' +
+    '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321">' +
+    '<label>地域</label><input id="m_n_region">' +
+    '<label>标签(逗号)</label><input id="m_n_tags">' +
+    '<label>端口范围</label><input id="m_n_pr" placeholder="10000-65535">' +
+    '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateNode() {
   const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: val('m_n_region'), tags: val('m_n_tags'), port_range: val('m_n_pr') });
-  if (d) { closeModal(); showToast('节点已注册，token: ' + d.token); copyText(d.token); await loadNodes(); }
+  if (d) { closeModal(); showToast('节点已注册', 'ok'); copyText(d.token); await loadNodes(); }
 }
 async function showCreateSub() {
   if (!inboundCatalog.length) await loadAllInbounds();
-  setModal(`<h2>新建订阅分组</h2>
-    <label>分组名</label><input id="m_s_name" placeholder="my-sub">
-    <label>格式</label><select id="m_s_fmt">${subFmtOptions('vmess')}</select>
-    <label>规则</label><select id="m_s_mode">${subModeOptions('acl4ssr_online')}</select>
-    <label>纳入的入站（多选精确选择；不选则默认全部）</label>
-    <div class="inblist">${subInboundChecklist([])}</div>
-    <label>高级筛选 JSON（可选：node_ids / protocol / tags）</label>
-    <input id="m_s_adv" placeholder='{"node_ids":[9]}'>
-    <p class="muted">ACL4SSR 模式对 Clash/Loon/Surfboard 附带分流规则，V2Ray 格式退化为裸链接。</p>
-    <div class="btnrow"><button onclick="doCreateSub()">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>`);
+  setModal('<h2>新建订阅分组</h2>' +
+    '<label>分组名</label><input id="m_s_name" placeholder="my-sub">' +
+    '<div class="row">' +
+    '<div><label>格式</label><select id="m_s_fmt">' + subFmtOptions('vmess') + '</select></div>' +
+    '<div><label>规则</label><select id="m_s_mode">' + subModeOptions('acl4ssr_online') + '</select></div></div>' +
+    '<label>纳入的入站（多选精确选择；不选则默认全部）</label>' +
+    '<div class="inblist">' + subInboundChecklist([]) + '</div>' +
+    '<div class="row">' +
+    '<div><label>节点（可选）</label><div class="inblist">' + subNodeChecklist([]) + '</div></div>' +
+    '<div><label>协议（可选）</label><div class="inblist">' + subProtoChecklist([]) + '</div></div>' +
+    '<div><label>标签（可选，逗号分隔）</label><input id="m_s_tags" placeholder="如 hk, ws"></div></div>' +
+    '<details class="adv"><summary>高级筛选 JSON（可选）</summary><input id="m_s_adv" placeholder=\'{"node_ids":[9]}\'></details>' +
+    '<p class="muted">ACL4SSR 模式对 Clash/Loon/Surfboard 附带分流规则，V2Ray 格式退化为裸链接。</p>' +
+    '<div class="btnrow"><button onclick="withBusy(this, doCreateSub)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateSub() {
-  const filters = buildSubFilters('m_s_adv');
+  const filters = buildSubFilters('m_s_adv', 'm_s_tags');
   if (filters === null) return;
   const d = await api('POST', '/subscriptions', { name: val('m_s_name'), format: val('m_s_fmt'), mode: val('m_s_mode'), filters });
-  if (d) { closeModal(); showToast('订阅已建，token: ' + d.token); await loadSubs(); }
+  if (d) { closeModal(); showToast('订阅已建，token: ' + d.token, 'ok'); await loadSubs(); }
 }
 function showCreateCert() {
-  setModal(`<h2>申请证书（全流程托管）</h2>
-    <label>域名（泛域名，如 *.example.com）</label><input id="m_dom" placeholder="*.example.com">
-    <label>Cloudflare 邮箱（可选，使用 API Token 方式无需填写）</label><input id="m_cfemail" placeholder="admin@example.com">
-    <label>Cloudflare API Token（需 DNS:Edit 权限）</label><input id="m_cftoken" type="password">
-    <label class="chk"><input type="checkbox" id="m_autorenew" checked> 自动续签</label>
-    <p class="muted">管理端将通过 Let's Encrypt + Cloudflare DNS-01 校验签发泛域名证书，并自动分发到所有已启用节点。</p>
-    <div class="btnrow"><button onclick="doCreateCert()">申请并分发</button><button class="secondary" onclick="closeModal()">取消</button></div>`);
+  setModal('<h2>申请证书（全流程托管）</h2>' +
+    '<label>域名（泛域名，如 *.example.com）</label><input id="m_dom" placeholder="*.example.com">' +
+    '<label>Cloudflare 邮箱（可选，使用 API Token 方式无需填写）</label><input id="m_cfemail" placeholder="admin@example.com">' +
+    '<label>Cloudflare API Token（需 DNS:Edit 权限）</label><input id="m_cftoken" type="password">' +
+    '<label class="chk"><input type="checkbox" id="m_autorenew" checked> 自动续签</label>' +
+    '<p class="muted">管理端将通过 Let\'s Encrypt + Cloudflare DNS-01 校验签发泛域名证书，并自动分发到所有已启用节点。</p>' +
+    '<div class="btnrow"><button onclick="withBusy(this, doCreateCert)">申请并分发</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateCert() {
-  const autorenew = document.getElementById('m_autorenew').checked;
+  const autorenew = chk('m_autorenew');
   const d = await api('POST', '/certs', { domain: val('m_dom'), cf_email: val('m_cfemail'), cf_api_token: val('m_cftoken'), auto_renew: autorenew });
   if (d) {
     closeModal();
-    if (d.id && d.status === 'failed') showToast('已记录（签发失败：' + (d.error || '').slice(0, 80) + '）');
-    else showToast('申请已提交');
+    if (d.id && d.status === 'failed') showToast('已记录（签发失败：' + (d.error || '').slice(0, 80) + '）', 'warn');
+    else showToast('申请已提交', 'ok');
     await loadCerts();
     if (d && d.id) selectCert(d.id);
   }
@@ -823,6 +985,7 @@ function enterApp() {
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('headerRight').classList.remove('hidden');
   document.getElementById('who').textContent = 'admin';
+  document.getElementById('autoSyncChk').checked = autoSync;
   renderSidebar(); renderWelcome();
   loadNodes(); loadSubs(); loadCerts(); loadNotifiers(); loadAllInbounds();
   if (refreshTimer) clearInterval(refreshTimer);
