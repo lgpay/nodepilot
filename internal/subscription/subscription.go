@@ -349,13 +349,16 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 // BuildLoon 生成 Loon 配置（.conf）。Loon 兼容 Surge 语法，代理行采用位置风格（协议, server, port, key=value...），
 // 支持 vmess/vless/trojan/ss/socks5/http（Loon 支持 vless，与 Surfboard 不同；但不支持 gRPC 传输）。
 // subURL 非空时首行写入 #!MANAGED-CONFIG 指令，使客户端可自动更新。
-// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则（RULE-SET 指向 ACL4SSR 规则源）；
+// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则：
+// Loon 原生用 [Rule](内置规则) + [Remote Rule](远程列表 url,组) 指向 ACL4SSR 规则源；
 // 否则退化为裸订阅（仅节点选择 + FINAL）。
 func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
 	var sb strings.Builder
 	if subURL != "" {
 		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
 	}
+	// [General]：DNS / 局域网绕过 / geoip 库等基础设置（对齐 Loon 原生订阅样式）
+	sb.WriteString(loonGeneralBlock())
 	sb.WriteString("[Proxy]\n")
 	names := []string{}
 	for _, it := range items {
@@ -372,8 +375,11 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 	if rulesBaseURL != "" {
 		sb.WriteString("\n[Proxy Group]\n")
 		sb.WriteString(buildSurgeGroups(names))
+		// Loon 原生：[Rule] 放内置规则(GEOIP/FINAL)，[Remote Rule] 直接列远程规则 URL
 		sb.WriteString("\n[Rule]\n")
-		sb.WriteString(buildSurgeRules(rulesBaseURL))
+		sb.WriteString(buildSurgeBuiltinRules())
+		sb.WriteString("\n[Remote Rule]\n")
+		sb.WriteString(buildLoonRemoteRules(rulesBaseURL))
 	} else {
 		sb.WriteString("\n[Proxy Group]\n")
 		sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
@@ -381,6 +387,47 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 		sb.WriteString("FINAL,NodePilot\n")
 	}
 	return sb.String(), nil
+}
+
+// loonGeneralBlock 返回 Loon 的 [General] 基础设置（DNS、局域网绕过、geoip 库等）。
+func loonGeneralBlock() string {
+	return "[General]\n" +
+		"ipv6=false\n" +
+		"dns-server=119.29.29.29, 223.5.5.5\n" +
+		"doh-server=https://223.5.5.5/resolve, https://sm2.doh.pub/dns-query\n" +
+		"proxy-test-url=http://connectivitycheck.gstatic.com\n" +
+		"geoip-url=https://gitlab.com/Masaiki/GeoIP2-CN/-/raw/release/Country.mmdb\n" +
+		"bypass-tun=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 127.0.0.0/8\n" +
+		"skip-proxy=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local\n" +
+		"sni-sniffing=true\n" +
+		"disconnect-on-policy-change=true\n" +
+		"switch-node-after-failure-times=3\n" +
+		"test-timeout=2\n\n"
+}
+
+// buildSurgeBuiltinRules 输出 ACL4SSR 模板中的内置规则（GEOIP/FINAL），用于 Loon 的 [Rule] 段。
+func buildSurgeBuiltinRules() string {
+	var sb strings.Builder
+	for _, r := range acl4ssrRules {
+		if r.List != "" {
+			continue
+		}
+		sb.WriteString(aclRuleLineSurge(r, "") + "\n")
+	}
+	return sb.String()
+}
+
+// buildLoonRemoteRules 输出 ACL4SSR 的远程规则列表，供 Loon 的 [Remote Rule] 段直接引用（url,组）。
+func buildLoonRemoteRules(rulesBaseURL string) string {
+	base := strings.TrimRight(rulesBaseURL, "/")
+	var sb strings.Builder
+	for _, r := range acl4ssrRules {
+		if r.List == "" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("%s/%s.list,%s\n", base, r.List, r.Group))
+	}
+	return sb.String()
 }
 
 // buildLoonProxyLine 生成单条 Loon 风格代理定义行（Loon 兼容 Surge 语法，采用位置风格：
