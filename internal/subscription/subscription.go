@@ -133,7 +133,8 @@ func buildClashProxy(it ExportItem) clashProxy {
 	default: // vmess
 		p.Type = "vmess"
 		p.UUID = it.UUID
-		p.AlterId = 0
+		alterId := 0
+		p.AlterId = &alterId
 		p.Cipher = "auto"
 		if it.TLSEnabled {
 			p.Tls = true
@@ -310,7 +311,7 @@ type clashProxy struct {
 	Port     int                    `yaml:"port"`
 	UUID     string                 `yaml:"uuid,omitempty"`
 	Password string                 `yaml:"password,omitempty"`
-	AlterId  int                    `yaml:"alterId,omitempty"`
+	AlterId  *int                   `yaml:"alterId,omitempty"`
 	Cipher   string                 `yaml:"cipher,omitempty"`
 	Network  string                 `yaml:"network,omitempty"`
 	Tls      bool                   `yaml:"tls,omitempty"`
