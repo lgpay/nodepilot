@@ -137,9 +137,9 @@ prompt_config() {
   if [ -z "$NP_NODE_ID" ]; then
     read -r -p "节点 id: " NP_NODE_ID
   fi
-  [ -z "$NP_SERVER" ] && { red "管理端地址不能为空"; exit 1; }
-  [ -z "$NP_TOKEN" ]  && { red "节点 token 不能为空"; exit 1; }
-  [ -z "$NP_NODE_ID" ] && { red "节点 id 不能为空"; exit 1; }
+  if [ -z "$NP_SERVER" ]; then red "管理端地址不能为空"; exit 1; fi
+  if [ -z "$NP_TOKEN" ];  then red "节点 token 不能为空"; exit 1; fi
+  if [ -z "$NP_NODE_ID" ]; then red "节点 id 不能为空"; exit 1; fi
 }
 
 write_service() {
