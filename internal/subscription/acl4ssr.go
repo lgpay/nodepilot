@@ -5,8 +5,9 @@ import (
 	"strings"
 )
 
-// ACL4SSRBaseURL 是 ACL4SSR 规则列表的 GitHub 源（Clash/*.list）。
-// 运行时可在服务端用 Setting(acl4ssr_base) 覆盖，指向自建镜像。
+// ACL4SSRBaseURL 是 ACL4SSR 规则列表的 GitHub 源（Clash/ 目录）。
+// 运行时可在服务端用 Setting(acl4ssr_base) 覆盖，指向兼容的镜像基址。
+// 注意：GoogleFCM / SteamCN 实际位于 Clash/Ruleset/ 子目录下（见 acl4ssrRules）。
 const ACL4SSRBaseURL = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/"
 
 // aclGroup 对应 ACL4SSR_Online.ini 的 custom_proxy_group（标准分组集）。
@@ -48,9 +49,9 @@ var acl4ssrRules = []aclRule{
 	{List: "UnBan", Group: "🎯 全球直连"},
 	{List: "BanAD", Group: "🛑 全球拦截"},
 	{List: "BanProgramAD", Group: "🍃 应用净化"},
-	{List: "GoogleFCM", Group: "📢 谷歌FCM"},
+	{List: "Ruleset/GoogleFCM", Group: "📢 谷歌FCM"},
 	{List: "GoogleCN", Group: "🎯 全球直连"},
-	{List: "SteamCN", Group: "🎯 全球直连"},
+	{List: "Ruleset/SteamCN", Group: "🎯 全球直连"},
 	{List: "Microsoft", Group: "Ⓜ️ 微软服务"},
 	{List: "Apple", Group: "🍎 苹果服务"},
 	{List: "Telegram", Group: "📲 电报信息"},
@@ -87,7 +88,7 @@ func aclRuleLineClash(r aclRule) string {
 }
 
 // aclRuleLineSurge 返回 Surge/Surfboard/Loon 的一条 rule 行；
-// list 类用 RULE-SET,<rulesBaseURL>/<list>.list，内置规则原样输出。
+// list 类用 RULE-SET,<rulesBaseURL>/<list>.list（指向 ACL4SSR 规则源），内置规则原样输出。
 func aclRuleLineSurge(r aclRule, rulesBaseURL string) string {
 	if r.Builtin != "" {
 		return r.Builtin + "," + r.Group
@@ -131,7 +132,7 @@ func buildSurgeGroups(proxyNames []string) string {
 	return sb.String()
 }
 
-// buildSurgeRules 生成 Surge/Surfboard/Loon 的 [Rule] 段（RULE-SET 指向本机自托管镜像）。
+// buildSurgeRules 生成 Surge/Surfboard/Loon 的 [Rule] 段（RULE-SET 指向 ACL4SSR 规则源）。
 func buildSurgeRules(rulesBaseURL string) string {
 	var sb strings.Builder
 	for _, r := range acl4ssrRules {

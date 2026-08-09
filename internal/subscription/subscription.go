@@ -312,7 +312,7 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 		proxyNames = append(proxyNames, pr.Name)
 	}
 
-	// rule-providers：每个 ACL4SSR 列表一个，URL 指向本机自托管镜像（classical）
+	// rule-providers：每个 ACL4SSR 列表一个，URL 指向 ACL4SSR 规则源（classical 格式，无需 yaml 包装）
 	base := strings.TrimRight(rulesBaseURL, "/")
 	rps := map[string]clashRuleProvider{}
 	for _, r := range acl4ssrRules {
@@ -322,7 +322,7 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 		rps[r.List] = clashRuleProvider{
 			Type:     "http",
 			Behavior: "classical",
-			URL:      base + "/" + r.List + ".list?fmt=yaml",
+			URL:      base + "/" + r.List + ".list",
 			Path:     "./ruleset/" + r.List + ".yaml",
 			Interval: 86400,
 		}
@@ -396,12 +396,12 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 	}
 	switch it.Protocol {
 	case "vmess":
-		// Loon vmess 关键字语法（alterId=0 即 AEAD，用 vmess-security=aes-128-gcm 表示）
+		// Loon vmess 关键字语法（alterId=0 即 AEAD，vmess-security=auto 由 Loon 自动协商）
 		parts := []string{
 			fmt.Sprintf("%s = vmess, address=%s, port=%d", name, host, it.Port),
 			"username=" + it.UUID,
 			"vmess-aid=0",
-			"vmess-security=aes-128-gcm",
+			"vmess-security=auto",
 		}
 		if it.TLSEnabled {
 			parts = append(parts, "tls=true", "sni="+it.SNI)

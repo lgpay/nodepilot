@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"strings"
 
@@ -122,6 +121,15 @@ func DeleteSubscription(c *gin.Context) {
 
 // ---- 对外订阅端点 /sub/{token} ----
 
+// schemeHost 返回请求的 scheme://host（含端口），用于构造对外可访问的绝对 URL。
+func schemeHost(c *gin.Context) string {
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + c.Request.Host
+}
+
 func GetSubscription(c *gin.Context) {
 	token := c.Param("token")
 	var g model.SubscriptionGroup
@@ -163,17 +171,16 @@ func GetSubscription(c *gin.Context) {
 		items = kept
 	}
 	// 规则预设：mode 即“规则预设”键。none/bare=无规则(裸订阅)；acl4ssr/acl4ssr_online=ACL4SSR_Online。
-	// 选中预设时，把本机自托管规则镜像基址传给各构建器，客户端据此拉取 ACL4SSR 规则列表。
+	// 选中预设时，把 ACL4SSR 规则源基址(GitHub 原版，可用 Setting acl4ssr_base 覆盖)传给各构建器，
+	// 客户端据此直接拉取 ACL4SSR 规则列表(.list 为 classical 格式，Clash/Surge 通用)。
 	useRules := g.Mode != "none" && g.Mode != "bare" && g.Mode != ""
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	host := c.Request.Host
-	subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, host, token)
+	subURL := schemeHost(c) + "/api/v1/sub/" + token
 	var rulesBaseURL string
 	if useRules {
-		rulesBaseURL = fmt.Sprintf("%s://%s/api/v1/rules", scheme, host)
+		rulesBaseURL = subscription.ACL4SSRBaseURL
+		if v, err := store.GetSetting("acl4ssr_base"); err == nil && v != "" {
+			rulesBaseURL = v
+		}
 	}
 	var content string
 	var ctype string
@@ -217,11 +224,7 @@ func GetSubscriptionQR(c *gin.Context) {
 		c.JSON(403, gin.H{"error": "subscription disabled"})
 		return
 	}
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
+	subURL := schemeHost(c) + "/api/v1/sub/" + token
 	png, err := qrcode.Encode(subURL, qrcode.Medium, 256)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
