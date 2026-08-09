@@ -74,11 +74,9 @@ func BuildClash(items []ExportItem) (string, error) {
 	}
 	groupMembers := []string{}
 	for _, it := range items {
-		if it.Protocol != "vmess" {
-			continue
-		}
-		cfg.Proxies = append(cfg.Proxies, buildClashProxy(it))
-		groupMembers = append(groupMembers, it.Alias)
+		pr := buildClashProxy(it)
+		cfg.Proxies = append(cfg.Proxies, pr)
+		groupMembers = append(groupMembers, pr.Name)
 	}
 	cfg.ProxyGroups = []map[string]interface{}{
 		{
@@ -94,28 +92,66 @@ func BuildClash(items []ExportItem) (string, error) {
 	return string(b), nil
 }
 
-// buildClashProxy 构造单个 vmess 代理（含 sni / ws headers 修正）
+// proxyName 返回代理显示名；别名空时回退为 <PROTOCOL>-<port>，避免空名导致客户端无法识别。
+func proxyName(it ExportItem) string {
+	if it.Alias != "" {
+		return it.Alias
+	}
+	return fmt.Sprintf("%s-%d", strings.ToUpper(it.Protocol), it.Port)
+}
+
+// buildClashProxy 构造单个代理（vmess/vless/trojan/ss/socks/http），含 sni / tls / ws headers。
 func buildClashProxy(it ExportItem) clashProxy {
-	path := it.WsPath
-	if path == "" {
-		path = "/v2ray"
-	}
-	wsOpts := map[string]interface{}{"path": path}
-	if it.TLSEnabled && it.SNI != "" {
-		wsOpts["headers"] = map[string]interface{}{"Host": it.SNI}
-	}
-	return clashProxy{
-		Name:    it.Alias,
-		Type:    "vmess",
+	p := clashProxy{
+		Name:    proxyName(it),
 		Server:  it.Host,
 		Port:    it.Port,
-		UUID:    it.UUID,
-		AlterId: 0,
-		Cipher:  "auto",
 		Network: it.Transport,
-		Sni:     ternary(it.TLSEnabled, it.SNI, ""),
-		WsOpts:  wsOpts,
 	}
+	switch it.Protocol {
+	case "vless":
+		p.Type = "vless"
+		p.UUID = it.UUID
+		p.Cipher = "auto"
+		if it.TLSEnabled {
+			p.Tls = true
+			p.Sni = it.SNI
+		}
+	case "trojan":
+		p.Type = "trojan"
+		p.Password = it.UUID
+		if it.TLSEnabled {
+			p.Sni = it.SNI
+		}
+	case "ss":
+		p.Type = "ss"
+		p.Cipher = "aes-256-gcm"
+		p.Password = it.UUID
+		p.Network = "tcp"
+	case "socks", "http":
+		p.Type = it.Protocol
+	default: // vmess
+		p.Type = "vmess"
+		p.UUID = it.UUID
+		p.AlterId = 0
+		p.Cipher = "auto"
+		if it.TLSEnabled {
+			p.Tls = true
+			p.Sni = it.SNI
+		}
+	}
+	if it.Transport == "ws" {
+		path := it.WsPath
+		if path == "" {
+			path = "/v2ray"
+		}
+		opts := map[string]interface{}{"path": path}
+		if it.TLSEnabled && it.SNI != "" {
+			opts["headers"] = map[string]interface{}{"Host": it.SNI}
+		}
+		p.WsOpts = opts
+	}
+	return p
 }
 
 // BuildSIP008 生成 SIP008 订阅（JSON）
@@ -178,11 +214,9 @@ func BuildClashACL4SSR(items []ExportItem) (string, error) {
 	}
 	groupMembers := []string{}
 	for _, it := range items {
-		if it.Protocol != "vmess" {
-			continue
-		}
-		cfg.Proxies = append(cfg.Proxies, buildClashProxy(it))
-		groupMembers = append(groupMembers, it.Alias)
+		pr := buildClashProxy(it)
+		cfg.Proxies = append(cfg.Proxies, pr)
+		groupMembers = append(groupMembers, pr.Name)
 	}
 
 	// rule-providers
@@ -253,10 +287,11 @@ func BuildLoon(items []ExportItem, withRules bool) (string, error) {
 			sni = it.SNI
 		}
 		// Loon vmess 关键字语法
+		name := proxyName(it)
 		line := fmt.Sprintf("%s = vmess, address=%s, port=%d, username=%s, vmess-aid=0, vmess-security=aes-128-gcm, tls=%v, sni=%s, ws=true, ws-path=%s, ws-headers=Host=%s",
-			it.Alias, it.Host, it.Port, it.UUID, it.TLSEnabled, sni, path, it.SNI)
+			name, it.Host, it.Port, it.UUID, it.TLSEnabled, sni, path, it.SNI)
 		sb.WriteString(line + "\n")
-		names = append(names, it.Alias)
+		names = append(names, name)
 	}
 	sb.WriteString("\n[Proxy Group]\n")
 	sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
@@ -273,10 +308,12 @@ type clashProxy struct {
 	Type     string                 `yaml:"type"`
 	Server   string                 `yaml:"server"`
 	Port     int                    `yaml:"port"`
-	UUID     string                 `yaml:"uuid"`
-	AlterId  int                    `yaml:"alterId"`
-	Cipher   string                 `yaml:"cipher"`
-	Network  string                 `yaml:"network"`
+	UUID     string                 `yaml:"uuid,omitempty"`
+	Password string                 `yaml:"password,omitempty"`
+	AlterId  int                    `yaml:"alterId,omitempty"`
+	Cipher   string                 `yaml:"cipher,omitempty"`
+	Network  string                 `yaml:"network,omitempty"`
+	Tls      bool                   `yaml:"tls,omitempty"`
 	Sni      string                 `yaml:"sni,omitempty"`
 	WsOpts   map[string]interface{} `yaml:"ws-opts,omitempty"`
 }
