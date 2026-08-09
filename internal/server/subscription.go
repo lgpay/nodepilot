@@ -31,7 +31,7 @@ func CreateSubscription(c *gin.Context) {
 		body.Format = "vmess"
 	}
 	if body.Mode == "" {
-		body.Mode = "bare"
+		body.Mode = "acl4ssr_online"
 	}
 	if body.Filters != "" && !json.Valid([]byte(body.Filters)) {
 		c.JSON(400, gin.H{"error": "filters 不是合法 JSON"})
@@ -162,29 +162,31 @@ func GetSubscription(c *gin.Context) {
 		}
 		items = kept
 	}
+	// 规则预设：mode 即“规则预设”键。none/bare=无规则(裸订阅)；acl4ssr/acl4ssr_online=ACL4SSR_Online。
+	// 选中预设时，把本机自托管规则镜像基址传给各构建器，客户端据此拉取 ACL4SSR 规则列表。
+	useRules := g.Mode != "none" && g.Mode != "bare" && g.Mode != ""
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	host := c.Request.Host
+	subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, host, token)
+	var rulesBaseURL string
+	if useRules {
+		rulesBaseURL = fmt.Sprintf("%s://%s/api/v1/rules", scheme, host)
+	}
 	var content string
 	var ctype string
-	acl := g.Mode == "acl4ssr"
 	switch g.Format {
 	case "surfboard":
-		scheme := "http"
-		if c.Request.TLS != nil {
-			scheme = "https"
-		}
-		subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
-		content, err = subscription.BuildSurfboard(items, subURL)
+		content, err = subscription.BuildSurfboard(items, subURL, rulesBaseURL)
 		ctype = "text/plain; charset=utf-8"
 	case "loon":
-		scheme := "http"
-		if c.Request.TLS != nil {
-			scheme = "https"
-		}
-		subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
-		content, err = subscription.BuildLoon(items, acl, subURL)
+		content, err = subscription.BuildLoon(items, subURL, rulesBaseURL)
 		ctype = "text/plain; charset=utf-8"
 	case "clash":
-		if acl {
-			content, err = subscription.BuildClashACL4SSR(items)
+		if useRules {
+			content, err = subscription.BuildClashACL4SSR(items, rulesBaseURL)
 		} else {
 			content, err = subscription.BuildClash(items)
 		}

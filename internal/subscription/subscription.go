@@ -159,7 +159,7 @@ func buildClashProxy(it ExportItem) clashProxy {
 // 关键：Surfboard 官方明确“兼容 Surge 配置”，并不解析 Clash YAML 的 proxies: 段；
 // 之前输出 Clash YAML 会导致 Surfboard 扫到 0 代理。因此 surfboard 必须输出 Surge 语法。
 // 支持的协议（官方 FAQ）：HTTP/HTTPS/SOCKS5、SS/SS-OBFS、VMess、Trojan。
-func BuildSurfboard(items []ExportItem, subURL string) (string, error) {
+func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
 	var sb strings.Builder
 	// #!MANAGED-CONFIG 是 Surge/Surfboard 的托管配置指令，必须位于配置文件首行。
 	// 它把订阅更新地址写进文件本身，这样即使客户端是“导入配置文件”（而非“从 URL 导入订阅”），
@@ -180,10 +180,19 @@ func BuildSurfboard(items []ExportItem, subURL string) (string, error) {
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Surfboard 支持的代理（仅支持 vmess/trojan/ss/socks5/http）")
 	}
-	sb.WriteString("\n[Proxy Group]\n")
-	sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
-	sb.WriteString("\n[Rule]\n")
-	sb.WriteString("FINAL,NodePilot\n")
+	// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则；
+	// 否则退化为裸订阅（仅节点选择 + FINAL）。
+	if rulesBaseURL != "" {
+		sb.WriteString("\n[Proxy Group]\n")
+		sb.WriteString(buildSurgeGroups(names))
+		sb.WriteString("\n[Rule]\n")
+		sb.WriteString(buildSurgeRules(rulesBaseURL))
+	} else {
+		sb.WriteString("\n[Proxy Group]\n")
+		sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
+		sb.WriteString("\n[Rule]\n")
+		sb.WriteString("FINAL,NodePilot\n")
+	}
 	return sb.String(), nil
 }
 
@@ -284,21 +293,10 @@ func BuildSIP008(items []ExportItem) (string, error) {
 
 // ---- 结构定义 ----
 
-// acl4ssrBase ACL4SSR 的 Clash rule-provider 原始文件基址（已验证存在）。
-// Surge/Loon 不能直接消费 Clash 格式规则集，故 ACL4SSR 规则仅用于 Clash/Surfboard。
-const acl4ssrBase = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/"
-
-// acl4ssrProviders 选用的 ACL4SSR rule-provider 名称（均已在仓库 Clash/Providers 下确认存在）。
-// behavior 统一用 classical（最稳，可容纳 DOMAIN/IP-CIDR/PROCESS 各类规则）。
-var acl4ssrProviders = []string{
-	"BanAD", "BanProgramAD", "BanEasyList", "BanEasyPrivacy", "BanEasyListChina",
-	"ProxyMedia", "ChinaMedia", "ChinaDomain", "ChinaIp", "ChinaIpV6", "ChinaCompanyIp",
-	"Apple", "LocalAreaNetwork", "ProxyGFWlist", "ProxyLite", "Download", "UnBan",
-}
-
-// BuildClashACL4SSR 生成 Clash 配置（ACL4SSR 模式）：节点 + 分组 + ACL4SSR rule-providers + 路由规则。
-// 注意：仅 Clash 客户端使用；Surfboard 是 Surge 兼容、不解析 Clash YAML，故 surfboard 走 BuildSurfboard。
-func BuildClashACL4SSR(items []ExportItem) (string, error) {
+// BuildClashACL4SSR 生成 Clash 配置（ACL4SSR_Online 模式）：节点 + 11 标准分组 +
+// rule-providers(指向 NodePilot 自托管 /api/v1/rules/<name>?fmt=yaml) + RULE-SET 路由规则。
+// rulesBaseURL 为本机规则镜像基址（如 http://host:8080/api/v1/rules）。
+func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) {
 	cfg := clashConfig{
 		Port:             7890,
 		SocksPort:        7891,
@@ -307,54 +305,39 @@ func BuildClashACL4SSR(items []ExportItem) (string, error) {
 		LogLevel:         "info",
 		ExternalController: "127.0.0.1:9090",
 	}
-	groupMembers := []string{}
+	proxyNames := []string{}
 	for _, it := range items {
 		pr := buildClashProxy(it)
 		cfg.Proxies = append(cfg.Proxies, pr)
-		groupMembers = append(groupMembers, pr.Name)
+		proxyNames = append(proxyNames, pr.Name)
 	}
 
-	// rule-providers
+	// rule-providers：每个 ACL4SSR 列表一个，URL 指向本机自托管镜像（classical）
+	base := strings.TrimRight(rulesBaseURL, "/")
 	rps := map[string]clashRuleProvider{}
-	for _, name := range acl4ssrProviders {
-		rps[name] = clashRuleProvider{
+	for _, r := range acl4ssrRules {
+		if r.List == "" {
+			continue
+		}
+		rps[r.List] = clashRuleProvider{
 			Type:     "http",
 			Behavior: "classical",
-			URL:      acl4ssrBase + name + ".yaml",
-			Path:     "./ruleset/" + name + ".yaml",
+			URL:      base + "/" + r.List + ".list?fmt=yaml",
+			Path:     "./ruleset/" + r.List + ".yaml",
 			Interval: 86400,
 		}
 	}
-
-	// 分组
 	cfg.RuleProviders = rps
-	cfg.ProxyGroups = []map[string]interface{}{
-		{"name": "🚀 节点选择", "type": "select", "proxies": groupMembers},
-		{"name": "⚠️ 故障转移", "type": "fallback", "proxies": groupMembers, "url": "https://www.gstatic.com/generate_204", "interval": 300, "timeout": 5},
-		{"name": "🐟 最低延迟", "type": "url-test", "proxies": groupMembers, "url": "https://www.gstatic.com/generate_204", "interval": 300, "tolerance": 50},
-		{"name": "📺 国外媒体", "type": "select", "proxies": append([]string{"🚀 节点选择"}, "ProxyMedia")},
-		{"name": "📺 国内媒体", "type": "select", "proxies": append([]string{"DIRECT"}, "ChinaMedia")},
-		{"name": "🚫 广告拦截", "type": "select", "proxies": append([]string{"REJECT"}, "BanAD")},
-	}
+
+	// 分组（模板生成）
+	cfg.ProxyGroups = buildClashGroups(proxyNames)
 
 	// 规则
-	cfg.Rules = []string{
-		"RULE-SET,BanAD,🚫 广告拦截",
-		"RULE-SET,BanProgramAD,🚫 广告拦截",
-		"RULE-SET,BanEasyList,🚫 广告拦截",
-		"RULE-SET,BanEasyPrivacy,🚫 广告拦截",
-		"RULE-SET,ProxyMedia,📺 国外媒体",
-		"RULE-SET,ChinaMedia,📺 国内媒体",
-		"RULE-SET,ChinaDomain,DIRECT",
-		"RULE-SET,ChinaIp,DIRECT",
-		"RULE-SET,ChinaIpV6,DIRECT",
-		"RULE-SET,ChinaCompanyIp,DIRECT",
-		"RULE-SET,Apple,DIRECT",
-		"RULE-SET,LocalAreaNetwork,DIRECT",
-		"RULE-SET,ProxyGFWlist,🚀 节点选择",
-		"GEOIP,CN,DIRECT",
-		"MATCH,🚀 节点选择",
+	rules := []string{}
+	for _, r := range acl4ssrRules {
+		rules = append(rules, aclRuleLineClash(r))
 	}
+	cfg.Rules = rules
 
 	b, err := yaml.Marshal(cfg)
 	if err != nil {
@@ -366,8 +349,9 @@ func BuildClashACL4SSR(items []ExportItem) (string, error) {
 // BuildLoon 生成 Loon 配置（.conf）。Loon 采用 address=/port= 键值风格（与 Surge 的位置风格不同），
 // 支持 vmess/vless/trojan/ss/socks5/http（Loon 支持 vless，与 Surfboard 不同；但不支持 gRPC 传输）。
 // subURL 非空时首行写入 #!MANAGED-CONFIG 指令，使客户端可自动更新。
-// withRules=true（acl4ssr 模式）时附加内置最小路由规则（ACL4SSR 规则是 Clash 格式，Loon 不能直接消费）。
-func BuildLoon(items []ExportItem, withRules bool, subURL string) (string, error) {
+// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则（RULE-SET 指向本机镜像）；
+// 否则退化为裸订阅（仅节点选择 + FINAL）。
+func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
 	var sb strings.Builder
 	if subURL != "" {
 		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
@@ -385,11 +369,15 @@ func BuildLoon(items []ExportItem, withRules bool, subURL string) (string, error
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Loon 支持的代理")
 	}
-	sb.WriteString("\n[Proxy Group]\n")
-	sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
-	if withRules {
+	if rulesBaseURL != "" {
+		sb.WriteString("\n[Proxy Group]\n")
+		sb.WriteString(buildSurgeGroups(names))
 		sb.WriteString("\n[Rule]\n")
-		sb.WriteString("GEOIP,CN,DIRECT\n")
+		sb.WriteString(buildSurgeRules(rulesBaseURL))
+	} else {
+		sb.WriteString("\n[Proxy Group]\n")
+		sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
+		sb.WriteString("\n[Rule]\n")
 		sb.WriteString("FINAL,NodePilot\n")
 	}
 	return sb.String(), nil

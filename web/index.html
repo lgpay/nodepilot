@@ -215,7 +215,7 @@ function renderSidebar() {
   });
   h += '<div class="sb-head">订阅<button class="sm" onclick="showCreateSub()">+ 新建</button></div>';
   if (!subsData.length) h += '<div class="ti leaf muted">（无订阅）</div>';
-  subsData.forEach(s => { const mod = s.mode === 'acl4ssr' ? '·acl4ssr' : ''; h += `<div class="ti ${sel.type === 'sub' && sel.id === s.id ? 'active' : ''}" onclick="selectSub(${s.id})"><span class="lbl">${esc(s.name)} <span class="muted">${s.format}${mod}</span></span></div>`; });
+  subsData.forEach(s => { const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '·ACL4SSR' : ''; h += `<div class="ti ${sel.type === 'sub' && sel.id === s.id ? 'active' : ''}" onclick="selectSub(${s.id})"><span class="lbl">${esc(s.name)} <span class="muted">${s.format}${mod}</span></span></div>`; });
   h += '<div class="sb-head">证书<button class="sm" onclick="showCreateCert()">+ 申请</button></div>';
   if (!certsData.length) h += '<div class="ti leaf muted">（未申请）</div>';
   certsData.forEach(c => { h += `<div class="ti ${sel.type === 'cert' && sel.id === c.id ? 'active' : ''}" onclick="selectCert(${c.id})"><span class="lbl">${esc(c.domain)} <span class="muted">${c.status}</span></span></div>`; });
@@ -531,7 +531,7 @@ async function renderSubDetail(id) {
       <div class="row">
         <div><label>名称</label><input id="s_name2" value="${esc(g.name)}"></div>
         <div><label>格式</label><select id="s_fmt2">${subFmtOptions(g.format)}</select></div>
-        <div><label>模式</label><select id="s_mode2">${subModeOptions(g.mode)}</select></div>
+        <div><label>规则</label><select id="s_mode2">${subModeOptions(g.mode)}</select></div>
         <div><label>启用</label><input id="s_en2" type="checkbox" ${g.enabled ? 'checked' : ''}></div>
       </div>
       <label>纳入的入站（按别名精确选择，可多选；不选则按下方高级筛选，默认全部）</label>
@@ -596,7 +596,7 @@ function subFmtOptions(cur) {
   return fs.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`).join('');
 }
 function subModeOptions(cur) {
-  const ms = [['bare', '裸订阅'], ['acl4ssr', 'ACL4SSR']];
+  const ms = [['none', '无规则(裸订阅)'], ['acl4ssr_online', 'ACL4SSR_Online']];
   return ms.map(([v, t]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t}</option>`).join('');
 }
 async function delSub(id) {
@@ -774,7 +774,7 @@ async function showCreateSub() {
   setModal(`<h2>新建订阅分组</h2>
     <label>分组名</label><input id="m_s_name" placeholder="my-sub">
     <label>格式</label><select id="m_s_fmt">${subFmtOptions('vmess')}</select>
-    <label>模式</label><select id="m_s_mode">${subModeOptions('bare')}</select>
+    <label>规则</label><select id="m_s_mode">${subModeOptions('acl4ssr_online')}</select>
     <label>纳入的入站（多选精确选择；不选则默认全部）</label>
     <div class="inblist">${subInboundChecklist([])}</div>
     <label>高级筛选 JSON（可选：node_ids / protocol / tags）</label>

@@ -83,6 +83,9 @@ func NewRouter(webDir string) *gin.Engine {
 	v1.GET("/sub/:token", GetSubscription)
 	v1.GET("/qr/:token", GetSubscriptionQR)
 
+	// 自托管 ACL4SSR 规则镜像（公开，客户端 rule-provider / RULE-SET 引用）
+	v1.GET("/rules/:name", GetRuleFile)
+
 	// Web 管理界面（单页 index.html）
 	if webDir != "" {
 		if idx := filepath.Join(webDir, "index.html"); fileExists(idx) {

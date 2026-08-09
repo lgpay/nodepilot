@@ -8,7 +8,7 @@ type SubscriptionGroup struct {
 	Name    string    `gorm:"size:128" json:"name"`
 	Token   string    `gorm:"size:128" json:"token"` // /sub/{token} 访问令牌（明文存，仅订阅用）
 	Format  string    `gorm:"size:16" json:"format"`  // vmess | clash | surfboard | loon | sip008
-	Mode    string    `gorm:"size:16;default:'bare'" json:"mode"` // bare | acl4ssr
+	Mode    string    `gorm:"size:16;default:'acl4ssr_online'" json:"mode"` // none(裸订阅) | acl4ssr_online(ACL4SSR_Online)
 	Filters string    `gorm:"type:text" json:"filters"` // JSON: {"node_ids":[],"protocol":[],"tags":[]}
 	Enabled bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt time.Time `json:"created_at"`
