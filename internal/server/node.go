@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -147,6 +148,46 @@ func GetNode(c *gin.Context) {
 	var versions []model.ConfigVersion
 	store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions)
 	c.JSON(200, gin.H{"node": node, "token": node.Token, "config_versions": versions})
+}
+
+// NodeInstall 生成该节点对应的 agent 一键安装命令：预填管理端地址、节点 token、节点 id、
+// agent 监听端口。节点注册后即可把此命令拿到节点服务器执行，自动安装 xray + agent 并接入本管理端。
+func NodeInstall(c *gin.Context) {
+	id := c.Param("id")
+	node, err := getNode(c, id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "node not found"})
+		return
+	}
+	// 管理端面地址：优先用设置的 panel_base_url；否则取管理员当前访问地址（即节点应回连的地址）。
+	panelURL, _ := store.GetSetting("panel_base_url")
+	if panelURL == "" {
+		scheme := c.GetHeader("X-Forwarded-Proto")
+		if scheme == "" {
+			if c.Request.TLS != nil {
+				scheme = "https"
+			} else {
+				scheme = "http"
+			}
+		}
+		panelURL = scheme + "://" + c.Request.Host
+	}
+	// agent 监听端口：取节点 address 的端口部分；缺省 :8081。
+	addr := ":8081"
+	if i := strings.LastIndex(node.Address, ":"); i >= 0 {
+		addr = ":" + node.Address[i+1:]
+	}
+	scriptURL := "https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh"
+	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s bash <(curl -L %s)",
+		panelURL, node.Token, node.ID, addr, scriptURL)
+	c.JSON(200, gin.H{
+		"node_id":   node.ID,
+		"token":     node.Token,
+		"panel_url": panelURL,
+		"agent_addr": addr,
+		"script_url": scriptURL,
+		"command":   command,
+	})
 }
 
 func UpdateNode(c *gin.Context) {
