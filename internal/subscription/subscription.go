@@ -346,10 +346,10 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 	return string(b), nil
 }
 
-// BuildLoon 生成 Loon 配置（.conf）。Loon 采用 address=/port= 键值风格（与 Surge 的位置风格不同），
+// BuildLoon 生成 Loon 配置（.conf）。Loon 兼容 Surge 语法，代理行采用位置风格（协议, server, port, key=value...），
 // 支持 vmess/vless/trojan/ss/socks5/http（Loon 支持 vless，与 Surfboard 不同；但不支持 gRPC 传输）。
 // subURL 非空时首行写入 #!MANAGED-CONFIG 指令，使客户端可自动更新。
-// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则（RULE-SET 指向本机镜像）；
+// rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则（RULE-SET 指向 ACL4SSR 规则源）；
 // 否则退化为裸订阅（仅节点选择 + FINAL）。
 func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
 	var sb strings.Builder
@@ -383,7 +383,8 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 	return sb.String(), nil
 }
 
-// buildLoonProxyLine 生成单条 Loon 风格代理定义行。ok=false 表示该协议/传输不被 Loon 支持。
+// buildLoonProxyLine 生成单条 Loon 风格代理定义行（Loon 兼容 Surge 语法，采用位置风格：
+// 协议, server, port, key=value...，ws-headers 用 "Host: x" 形式）。ok=false 表示该协议/传输不被 Loon 支持。
 func buildLoonProxyLine(it ExportItem) (string, bool) {
 	name := proxyName(it)
 	path := it.WsPath
@@ -394,11 +395,21 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 	if it.Transport == "grpc" {
 		return "", false // Loon 不支持 gRPC 传输
 	}
+	wsPart := func() []string {
+		// Loon 与 Surge 一致：ws-headers 用 "Host: x" 形式
+		if it.Transport == "ws" {
+			if it.TLSEnabled && it.SNI != "" {
+				return []string{"ws=true", "ws-path=" + path, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI)}
+			}
+			return []string{"ws=true", "ws-path=" + path}
+		}
+		return nil
+	}
 	switch it.Protocol {
 	case "vmess":
-		// Loon vmess 关键字语法（alterId=0 即 AEAD，vmess-security=auto 由 Loon 自动协商）
+		// vmess, server, port, username=uuid, vmess-aid=0, vmess-security=auto[, tls=true, sni=host][, ws...]
 		parts := []string{
-			fmt.Sprintf("%s = vmess, address=%s, port=%d", name, host, it.Port),
+			fmt.Sprintf("%s = vmess, %s, %d", name, host, it.Port),
 			"username=" + it.UUID,
 			"vmess-aid=0",
 			"vmess-security=auto",
@@ -406,53 +417,41 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 		if it.TLSEnabled {
 			parts = append(parts, "tls=true", "sni="+it.SNI)
 		}
-		if it.Transport == "ws" {
-			parts = append(parts, "ws=true", "ws-path="+path)
-			if it.TLSEnabled && it.SNI != "" {
-				parts = append(parts, "ws-headers=Host="+it.SNI)
-			}
-		}
+		parts = append(parts, wsPart()...)
 		return strings.Join(parts, ", "), true
 	case "vless":
 		// Loon 支持 vless（与 Surfboard 不同）；flow 视服务端而定，此处不强制写入
 		parts := []string{
-			fmt.Sprintf("%s = vless, address=%s, port=%d", name, host, it.Port),
+			fmt.Sprintf("%s = vless, %s, %d", name, host, it.Port),
 			"username=" + it.UUID,
 		}
 		if it.TLSEnabled {
 			parts = append(parts, "tls=true", "sni="+it.SNI)
 		}
-		if it.Transport == "ws" {
-			parts = append(parts, "ws=true", "ws-path="+path)
-			if it.TLSEnabled && it.SNI != "" {
-				parts = append(parts, "ws-headers=Host="+it.SNI)
-			}
-		}
+		parts = append(parts, wsPart()...)
 		return strings.Join(parts, ", "), true
 	case "trojan":
 		parts := []string{
-			fmt.Sprintf("%s = trojan, address=%s, port=%d", name, host, it.Port),
+			fmt.Sprintf("%s = trojan, %s, %d", name, host, it.Port),
 			"password=" + it.UUID,
 		}
 		if it.TLSEnabled {
 			parts = append(parts, "sni="+it.SNI)
 		}
-		if it.Transport == "ws" {
-			parts = append(parts, "ws=true", "ws-path="+path)
-			if it.TLSEnabled && it.SNI != "" {
-				parts = append(parts, "ws-headers=Host="+it.SNI)
-			}
-		}
+		parts = append(parts, wsPart()...)
 		return strings.Join(parts, ", "), true
 	case "ss":
-		return fmt.Sprintf("%s = ss, address=%s, port=%d, encrypt-method=aes-256-gcm, password=%s", name, host, it.Port, it.UUID), true
+		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=aes-256-gcm, password=%s", name, host, it.Port, it.UUID), true
 	case "socks", "http":
 		pType := it.Protocol
 		if it.Protocol == "socks" {
 			pType = "socks5"
 		}
+		if it.TLSEnabled {
+			pType = "https" // Loon/ Surge: https 类型即走 TLS
+		}
 		parts := []string{
-			fmt.Sprintf("%s = %s, address=%s, port=%d", name, pType, host, it.Port),
+			fmt.Sprintf("%s = %s, %s, %d", name, pType, host, it.Port),
 		}
 		if it.UUID != "" {
 			parts = append(parts, "password="+it.UUID)
