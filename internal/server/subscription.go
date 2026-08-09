@@ -138,6 +138,19 @@ func GetSubscription(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	// Surfboard 严格遵循 Surge 配置格式，不支持 vless / Trojan-gRPC 等协议
+	// （官方 FAQ 明确）。若订阅含这些类型，Surfboard 会整体解析失败→代理组为空。
+	// 因此在 surfboard 格式下预先剔除不被支持的协议/传输，仅保留 vmess/trojan/ss/socks/http。
+	if g.Format == "surfboard" {
+		kept := make([]subscription.ExportItem, 0, len(items))
+		for _, it := range items {
+			if it.Protocol == "vless" || it.Transport == "grpc" {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		items = kept
+	}
 	var content string
 	var ctype string
 	acl := g.Mode == "acl4ssr"
