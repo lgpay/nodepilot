@@ -8,12 +8,37 @@ import (
 	"time"
 
 	"nodepilot/internal/model"
+	"nodepilot/internal/store"
 )
+
+// xrayStatsAddr 控制面生成配置时固定的 xray stats API 监听地址；
+// agent 端流量采集器须使用同一地址（internal/agent/traffic.go 的 collectTraffic）。
+const xrayStatsAddr = "127.0.0.1:10085"
 
 // BuildXrayConfig 将节点下的入站与用户拼装为 xray config.json 字符串
 func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound map[uint][]model.Client) (string, error) {
 	cfg := map[string]interface{}{
 		"log": map[string]interface{}{"loglevel": "warning"},
+		// 流量统计：stats 启用计数；api 暴露 StatsService 供 agent 查询；
+		// policy 开启 per-user 上下行计数（计数键为 client 的 UUID）。
+		"stats": map[string]interface{}{},
+		"api": map[string]interface{}{
+			"tag":     "api",
+			"listen":  xrayStatsAddr,
+			"services": []string{"StatsService"},
+		},
+		"policy": map[string]interface{}{
+			"levels": map[string]interface{}{
+				"0": map[string]interface{}{
+					"statsUserUplink":   true,
+					"statsUserDownlink": true,
+				},
+			},
+			"system": map[string]interface{}{
+				"statsInboundUplink":   true,
+				"statsInboundDownlink": true,
+			},
+		},
 		"outbounds": []map[string]interface{}{
 			{"protocol": "freedom", "tag": "direct"},
 		},
@@ -30,11 +55,7 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 			if !c.Enabled {
 				continue
 			}
-			clientList = append(clientList, map[string]interface{}{
-				"id":    c.UUID,
-				"level": 0,
-				"email": c.Email,
-			})
+			clientList = append(clientList, buildClient(in.Protocol, c.UUID))
 		}
 
 		network := in.Transport
@@ -72,21 +93,32 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		}
 		if in.TLSEnabled {
 			stream["security"] = "tls"
-			// MVP：cert_id 解析为证书路径留待 P2 证书管理；此处占位
+			certFile, keyFile := "/root/cert/fullchain.pem", "/root/cert/privkey.pem"
+			if in.TLSCertID > 0 {
+				var cert model.Certificate
+				if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
+					certFile, keyFile = cert.CertPath, cert.KeyPath
+				}
+			}
 			stream["tlsSettings"] = map[string]interface{}{
 				"certificates": []map[string]interface{}{
-					{"certificateFile": "/root/cert/fullchain.pem", "keyFile": "/root/cert/privkey.pem"},
+					{"certificateFile": certFile, "keyFile": keyFile},
 				},
 			}
 		} else {
 			stream["security"] = "none"
 		}
 
+		// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
+		settings := map[string]interface{}{"clients": clientList}
+		if in.Protocol == "vless" {
+			settings["decryption"] = "none"
+		}
 		ib := map[string]interface{}{
 			"listen":         "0.0.0.0",
 			"port":           in.Port,
 			"protocol":       in.Protocol,
-			"settings":       map[string]interface{}{"clients": clientList},
+			"settings":       settings,
 			"streamSettings": stream,
 			"tag":            "in-" + strconv.FormatUint(uint64(in.ID), 10),
 		}
@@ -100,6 +132,22 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 	}
 	_ = node
 	return string(b), nil
+}
+
+// buildClient 按协议生成 xray 客户端条目。
+// vmess / vless 用 id（UUID）作为身份标识；trojan 用 password（复用 UUID，随机串即合法口令）。
+// email 统一取 UUID，作为 per-user 流量统计键（见 BuildXrayConfig 注释），改名 alias 不影响历史流量归属。
+func buildClient(protocol, uuid string) map[string]interface{} {
+	m := map[string]interface{}{
+		"level": 0,
+		"email": uuid,
+	}
+	if protocol == "trojan" {
+		m["password"] = uuid
+	} else {
+		m["id"] = uuid
+	}
+	return m
 }
 
 // GenUUID 生成 RFC4122 v4 UUID（用于 vmess 等客户端 id）
