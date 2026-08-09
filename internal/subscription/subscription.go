@@ -361,11 +361,13 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
 	var sb strings.Builder
 	if subURL != "" {
-		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
+		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=86400 strict=false\n", subURL))
 	}
 	// [General]：DNS / 局域网绕过 / geoip 库等基础设置（对齐 Loon 原生订阅样式）
 	sb.WriteString(loonGeneralBlock())
 	sb.WriteString("[Proxy]\n")
+	// DIRECT 是 Loon 内置策略；显式声明为 direct，与 Surfboard 订阅保持一致（分组可指向 DIRECT）。
+	sb.WriteString("DIRECT = direct\n")
 	names := []string{}
 	for _, it := range items {
 		line, ok := buildLoonProxyLine(it)
@@ -449,7 +451,7 @@ func buildLoonRemoteRules(rulesBaseURL string) string {
 }
 
 // buildLoonProxyLine 生成单条 Loon 风格代理定义行（Loon 兼容 Surge 语法，采用位置风格：
-// 协议, server, port, key=value...，ws-headers 用 "Host: x" 形式）。ok=false 表示该协议/传输不被 Loon 支持。
+// 协议, server, port, key=value...，ws-headers 用无引号 Host:x 形式）。ok=false 表示该协议/传输不被 Loon 支持。
 func buildLoonProxyLine(it ExportItem) (string, bool) {
 	name := proxyName(it)
 	path := it.WsPath
@@ -461,10 +463,10 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 		return "", false // Loon 不支持 gRPC 传输
 	}
 	wsPart := func() []string {
-		// Loon 与 Surge 一致：ws-headers 用 "Host: x" 形式
+		// Loon 与 Surfboard 一致：ws-headers 用无引号 Host:x 形式
 		if it.Transport == "ws" {
 			if it.TLSEnabled && it.SNI != "" {
-				return []string{"ws=true", "ws-path=" + path, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI)}
+				return []string{"ws=true", "ws-path=" + path, "ws-headers=Host:" + it.SNI}
 			}
 			return []string{"ws=true", "ws-path=" + path}
 		}
@@ -472,12 +474,12 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 	}
 	switch it.Protocol {
 	case "vmess":
-		// vmess, server, port, username=uuid, vmess-aid=0, vmess-security=auto[, tls=true, sni=host][, ws...]
+		// vmess, server, port, username=uuid, vmess-aead=true[, tls=true, sni=host][, ws...]
+		// 注意：与 Surfboard 保持一致，使用 vmess-aead=true（Loon 同样支持），并省略 vmess-aid（默认 0）。
 		parts := []string{
 			fmt.Sprintf("%s = vmess, %s, %d", name, host, it.Port),
 			"username=" + it.UUID,
-			"vmess-aid=0",
-			"vmess-security=auto",
+			"vmess-aead=true",
 		}
 		if it.TLSEnabled {
 			parts = append(parts, "tls=true", "sni="+it.SNI)
