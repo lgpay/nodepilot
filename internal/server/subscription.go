@@ -157,7 +157,12 @@ func GetSubscription(c *gin.Context) {
 	acl := g.Mode == "acl4ssr"
 	switch g.Format {
 	case "surfboard":
-		content, err = subscription.BuildSurfboard(items)
+		scheme := "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
+		subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
+		content, err = subscription.BuildSurfboard(items, subURL)
 		ctype = "text/plain; charset=utf-8"
 	case "clash":
 		if acl {

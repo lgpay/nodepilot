@@ -159,8 +159,14 @@ func buildClashProxy(it ExportItem) clashProxy {
 // 关键：Surfboard 官方明确“兼容 Surge 配置”，并不解析 Clash YAML 的 proxies: 段；
 // 之前输出 Clash YAML 会导致 Surfboard 扫到 0 代理。因此 surfboard 必须输出 Surge 语法。
 // 支持的协议（官方 FAQ）：HTTP/HTTPS/SOCKS5、SS/SS-OBFS、VMess、Trojan。
-func BuildSurfboard(items []ExportItem) (string, error) {
+func BuildSurfboard(items []ExportItem, subURL string) (string, error) {
 	var sb strings.Builder
+	// #!MANAGED-CONFIG 是 Surge/Surfboard 的托管配置指令，必须位于配置文件首行。
+	// 它把订阅更新地址写进文件本身，这样即使客户端是“导入配置文件”（而非“从 URL 导入订阅”），
+	// 也知道从哪里重新拉取更新，避免“扫到代理但无法更新”。
+	if subURL != "" {
+		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
+	}
 	sb.WriteString("[Proxy]\n")
 	names := []string{}
 	for _, it := range items {
