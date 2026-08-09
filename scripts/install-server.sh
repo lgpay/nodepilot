@@ -24,6 +24,7 @@ blue()   { echo -e "\033[34m$1\033[0m"; }
 REPO_OWNER="lgpay"
 REPO_NAME="nodepilot"
 RELEASE_TAG="v0.1.0"
+LEGO_VERSION="${NP_LEGO_VERSION:-v5.3.1}"
 INSTALL_DIR="${NP_INSTALL_DIR:-/opt/nodepilot}"
 WEB_DIR="${NP_WEB_DIR:-$INSTALL_DIR/web}"
 DATA_DIR="$INSTALL_DIR/data"
@@ -95,6 +96,33 @@ get_server_binary() {
   chmod +x "$INSTALL_DIR/bin/$BINARY_NAME"
 }
 
+# 安装 lego（TLS 证书签发依赖，使用 GitHub 镜像加速）
+get_lego() {
+  if [ -x "/usr/local/bin/lego" ]; then
+    green "lego 已存在于 /usr/local/bin/lego，跳过安装"
+    return
+  fi
+  local arch; arch=$(detect_arch)
+  local ver="${LEGO_VERSION#v}"
+  local fname="lego_v${ver}_linux_${arch}.tar.gz"
+  local url="https://github.com/go-acme/lego/releases/download/${LEGO_VERSION}/${fname}"
+  yellow "下载 lego (${LEGO_VERSION}) 用于证书签发: $url"
+  local tmp; tmp=$(mktemp -d)
+  if command_exists curl; then
+    curl -L "$url" -o "$tmp/lego.tgz" || true
+  elif command_exists wget; then
+    wget -O "$tmp/lego.tgz" "$url" || true
+  else
+    red "未找到 curl/wget，无法下载 lego"; return
+  fi
+  if [ -s "$tmp/lego.tgz" ]; then
+    tar -xzf "$tmp/lego.tgz" -C "$tmp" && cp "$tmp/lego" /usr/local/bin/lego && chmod +x /usr/local/bin/lego && rm -rf "$tmp"
+    green "lego 已安装到 /usr/local/bin/lego"
+  else
+    red "lego 下载失败（证书签发功能需要它）。可手动安装后重试，或继续（证书功能将不可用）。"
+  fi
+}
+
 prompt_config() {
   if [ -z "$NP_ADDR" ]; then
     read -r -p "监听地址 [默认 :8080]: " input
@@ -139,6 +167,7 @@ install_server() {
   need_root
   yellow "=== NodePilot 管理端安装 ==="
   get_server_binary
+  get_lego
   prompt_config
   write_service
   systemctl daemon-reload

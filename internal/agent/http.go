@@ -25,6 +25,7 @@ type AgentConfig struct {
 	ServerURL string
 	NodeID    string
 	ConfigDir string
+	CertDir   string
 }
 
 // SetConfig 设置 agent 配置
@@ -51,9 +52,32 @@ func RegisterRoutes(r *gin.Engine) {
 	ag.Use(TokenMiddleware())
 	{
 		ag.PUT("/config", PutConfig)
+		ag.PUT("/cert", PutCert)
 		ag.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 		ag.GET("/status", GetStatus)
 	}
+}
+
+// PutCert 接收管理端下发的证书文件内容并落盘
+func PutCert(c *gin.Context) {
+	var body struct {
+		CertPEM string `json:"cert_pem"`
+		KeyPEM  string `json:"key_pem"`
+		CAPEM   string `json:"ca_pem"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if body.CertPEM == "" || body.KeyPEM == "" {
+		c.JSON(400, gin.H{"error": "cert_pem and key_pem required"})
+		return
+	}
+	if err := ReceiveCert(body.CertPEM, body.KeyPEM, body.CAPEM); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "paths": CertPaths()})
 }
 
 // PutConfig 接收管理端下发的 xray 配置：写盘 + 重启 xray

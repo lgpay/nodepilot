@@ -12,6 +12,7 @@
 #   NP_ADDR        agent 监听地址，默认 :8081（需与注册节点时 address 端口一致）
 #   NP_XRAY        xray 二进制路径，默认 /usr/local/bin/xray
 #   NP_CONFIG_DIR  xray 配置目录，默认 /opt/nodepilot-agent/xray
+#   NP_CERT_DIR    TLS 证书存放目录，默认 /opt/nodepilot-agent/certs
 #   NP_INSTALL_DIR 安装目录，默认 /opt/nodepilot-agent
 #   NP_BINARY_URL  自定义 agent 二进制 tar 包地址（覆盖默认 release 下载）
 
@@ -31,6 +32,7 @@ REPO_NAME="nodepilot"
 RELEASE_TAG="v0.1.0"
 INSTALL_DIR="${NP_INSTALL_DIR:-/opt/nodepilot-agent}"
 CONFIG_DIR="${NP_CONFIG_DIR:-$INSTALL_DIR/xray}"
+CERT_DIR="${NP_CERT_DIR:-$INSTALL_DIR/certs}"
 ADDR="${NP_ADDR:-:8081}"
 XRAY_BIN="${NP_XRAY:-/usr/local/bin/xray}"
 SERVICE_NAME="nodepilot-agent"
@@ -158,6 +160,7 @@ ExecStart=$INSTALL_DIR/bin/$BINARY_NAME \
   --server $NP_SERVER \
   --addr $ADDR \
   --config-dir $CONFIG_DIR \
+  --cert-dir $CERT_DIR \
   --xray $XRAY_BIN
 Restart=on-failure
 RestartSec=3
@@ -195,7 +198,7 @@ install_agent() {
   red "未检测到 systemd，改用 nohup 后台启动 agent（重启机器不会自启）"
   nohup "$INSTALL_DIR/bin/$BINARY_NAME" \
     --token "$NP_TOKEN" --node-id "$NP_NODE_ID" --server "$NP_SERVER" \
-    --addr "$ADDR" --config-dir "$CONFIG_DIR" --xray "$XRAY_BIN" \
+    --addr "$ADDR" --config-dir "$CONFIG_DIR" --cert-dir "$CERT_DIR" --xray "$XRAY_BIN" \
     >/var/log/nodepilot-agent.log 2>&1 &
   echo $! > /var/run/nodepilot-agent.pid
   sleep 2

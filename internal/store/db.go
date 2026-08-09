@@ -27,8 +27,11 @@ func Init(dbPath string) error {
 		&model.Inbound{},
 		&model.Client{},
 		&model.ConfigVersion{},
+		&model.Certificate{},
 		&model.SubscriptionGroup{},
 		&model.Setting{},
+		&model.TrafficStat{},
+		&model.NotificationChannel{},
 	); err != nil {
 		return err
 	}

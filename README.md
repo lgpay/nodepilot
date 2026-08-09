@@ -168,7 +168,7 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 - 默认管理员密码与 JWT secret 为开发占位，需改为环境变量 / 配置
 - 节点 agent 热重载采用重启 xray 进程（秒级中断），后续可升级为 xray api reload
 - 节点 agent 一键脚本会自动安装 xray-core（官方 XTLS 脚本）
-- 尚未实现：监控统计报表、预警通知、证书自动申请续签、2FA
+- 尚未实现：监控统计报表、预警通知、2FA
 
 ## 路线图
 
@@ -177,12 +177,20 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 - 订阅分组与订阅链接（vmess / clash / sip008）
 - 节点连通性自检与端口自愈（端口范围内换端口，多次失败下线）
 - agent 一键部署脚本
+- 管理员密码修改（`POST /api/v1/auth/change-password`，需校验旧密码）
+
+**P2（已实现）**
+
+- 证书管理：管理端统一通过 Let's Encrypt + Cloudflare DNS-01 签发**泛域名**证书，自动分发到所有节点（`PUT /agent/v1/cert`），入站通过 `cert_id` 引用；含到期自动续签调度。CF Token 加密存储，证书私钥仅落节点本地。
+
+**P1（待完成，此前误列入 P2）**
+
+- 监控与统计（节点/用户流量、按日聚合、排行、趋势图）
+- 预警通知（邮件 / Telegram Bot）
 
 **P2（待做）**
 
-- 监控统计、预警通知（邮件 / Telegram）
-- 证书管理（Let's Encrypt + Cloudflare DNS-01）
-- 安全强化：HTTPS、密码修改、2FA
+- 安全强化：HTTPS、2FA
 
 ## 许可证
 

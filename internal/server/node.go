@@ -1,9 +1,13 @@
 package server
 
 import (
+	"log"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"nodepilot/internal/auth"
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
@@ -45,6 +49,49 @@ func LoginHandler(c *gin.Context) {
 
 func LogoutHandler(c *gin.Context) {
 	// MVP：无服务端会话存储，由客户端丢弃 token
+	c.JSON(200, gin.H{"ok": true})
+}
+
+// ChangePassword 修改当前管理员密码（需校验旧密码）
+func ChangePassword(c *gin.Context) {
+	var body struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if body.NewPassword == "" {
+		c.JSON(400, gin.H{"error": "新密码不能为空"})
+		return
+	}
+	authz := c.GetHeader("Authorization")
+	t := strings.TrimPrefix(authz, "Bearer ")
+	claims, err := auth.ParseJWT(t)
+	if err != nil {
+		c.JSON(401, gin.H{"error": "invalid token"})
+		return
+	}
+	username, _ := claims["sub"].(string)
+	var admin model.Admin
+	if err := store.DB.Where("username = ?", username).First(&admin).Error; err != nil {
+		c.JSON(404, gin.H{"error": "admin not found"})
+		return
+	}
+	if !auth.CheckPassword(body.OldPassword, admin.PasswordHash) {
+		c.JSON(401, gin.H{"error": "旧密码不正确"})
+		return
+	}
+	hash, err := auth.HashPassword(body.NewPassword)
+	if err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	if err := store.DB.Model(&admin).Update("password_hash", hash).Error; err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -167,7 +214,62 @@ func Heartbeat(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 
-// Traffic MVP 占位
+// Traffic agent 上报按用户流量增量（已用 -reset 取得距上次采集的差值）。
+// body: {"stats":[{"email":"<uuid>","up":N,"down":N}]}。email 即 xray 统计键（=client UUID），
+// 按 uuid 解析 client/inbound/node，按天累加到 traffic_stats（唯一键已建复合唯一索引）。
 func Traffic(c *gin.Context) {
+	id := c.Param("id")
+	node, err := getNode(c, id)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "node not found"})
+		return
+	}
+	var body struct {
+		Stats []struct {
+			Email string `json:"email"` // xray 统计键，等于 client UUID
+			Up    int64  `json:"up"`
+			Down  int64  `json:"down"`
+		} `json:"stats"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	date := time.Now().UTC().Format("2006-01-02")
+
+	for _, s := range body.Stats {
+		if s.Email == "" {
+			continue
+		}
+		clientID, inboundID, nodeID := uint(0), uint(0), node.ID
+		var client model.Client
+		if store.DB.Where("uuid = ?", s.Email).First(&client).Error == nil {
+			clientID = client.ID
+			inboundID = client.InboundID
+			var in model.Inbound
+			if store.DB.First(&in, inboundID).Error == nil {
+				nodeID = in.NodeID
+			}
+		}
+		row := model.TrafficStat{
+			NodeID:    nodeID,
+			InboundID: inboundID,
+			ClientID:  clientID,
+			Date:      date,
+			UpBytes:   s.Up,
+			DownBytes: s.Down,
+		}
+		if err := store.DB.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "node_id"}, {Name: "inbound_id"}, {Name: "client_id"}, {Name: "date"},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"up_bytes":   gorm.Expr("up_bytes + ?", s.Up),
+				"down_bytes": gorm.Expr("down_bytes + ?", s.Down),
+			}),
+		}).Create(&row).Error; err != nil {
+			log.Printf("[traffic] node=%d upsert failed: %v", node.ID, err)
+		}
+	}
 	c.JSON(200, gin.H{"ok": true})
 }

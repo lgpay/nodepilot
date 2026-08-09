@@ -43,14 +43,14 @@
 | 节点 agent | Go | 调用 / 管理 xray-core，单二进制跨平台 |
 | 通信 | HTTPS REST + JSON，Bearer Token | 契合被动 API 接收（推）模式 |
 | 热重载 | xray api reload（后期）/ systemd restart（初期） | 尽量不中断连接 |
-| 证书 | lego（DNS-01 / Cloudflare） | 节点本地申请 Let's Encrypt |
+| 证书 | lego（DNS-01 / Cloudflare） | 管理端统一申请泛域名证书并分发到节点（节点本地不申请） |
 
 ## 4. 功能需求
 
 ### 4.1 认证（单用户）— P0
 - [ ] 单管理员账号（首次启动初始化密码，无注册 / 多角色）
 - [ ] 登录 / 登出（Session / Token）
-- [ ] 修改管理员密码
+- [x] 修改管理员密码（`POST /api/v1/auth/change-password`，需校验旧密码 + bcrypt）
 - [ ] 2FA（TOTP）：P2 可选
 
 ### 4.2 节点管理 — P0（含连通性能力）
@@ -74,10 +74,14 @@
 - [ ] 连接信息导出（vmess:// 分享链接 / 二维码）：P1
 
 ### 4.5 订阅分组与订阅链接 — P1
-- [ ] 订阅组：按筛选规则（节点 / 协议 / 标签）动态聚合 client
-- [ ] 生成订阅链接 `GET /sub/{token}`
-- [ ] 格式支持：vmess（base64）/ clash（YAML）/ sip008（JSON）
-- [ ] 订阅内容随配置 / 自愈端口变更自动更新
+- [x] 订阅组：按筛选规则（节点 / 协议 / 标签）动态聚合 client
+- [x] 生成订阅链接 `GET /sub/{token}`
+- [x] **模式（mode）**：裸订阅（仅节点）/ ACL4SSR（Clash/Loon/Surfboard 附分流规则，V2Ray 格式退化为裸链接）
+- [x] **格式（format）**：vmess(V2Ray, base64) / clash(YAML) / surfboard(Clash YAML) / loon(.conf) / sip008(JSON)
+- [x] **精确选择入站**：入站支持「名称/别名」字段；订阅分组按 `inbound_ids` **多选具体入站**（按别名勾选），原 `node_ids/protocol/tags` 筛选保留为兜底兼容
+- [x] **订阅二维码**：订阅详情页展示订阅链接二维码（`GET /qr/:token` 公开 PNG，go-qrcode 生成），手机客户端扫码导入
+- [x] ACL4SSR：内置 17 个 rule-provider（BanAD 等）+ 6 分组 + 15 路由规则；Loon 用内置最小规则（GEOIP,CN,DIRECT / FINAL）
+- [x] 订阅内容随配置 / 自愈端口变更自动更新（端口取自 client 所属 inbound 当前 port）
 
 ### 4.6 配置下发 — P0（核心）
 - [ ] 自动（增删改触发）/ 手动下发
@@ -85,17 +89,26 @@
 - [ ] 版本管理 + 一键回滚
 - [ ] 失败回执标红
 
-### 4.7 监控与统计 — P1
-- [ ] 节点 / 用户流量（上行 / 下行）、按日聚合、排行、趋势图
+### 4.7 监控与统计 — P1（已实现基础版）
+- [x] 节点 / 用户流量（上行 / 下行）：agent 周期查询 xray stats API（`user>>>` 按用户计数）并上报
+- [x] 按天聚合（`TrafficStat`，唯一键 node+inbound+client+date，增量累加）
+- [x] Web 统计页：今日卡片、按节点 / 按客户端表（含用量百分比）、近 30 天趋势条；`GET /api/v1/stats/overview`
+- [ ] 排行 / 更精细趋势图（当前为 CSS 条形，未做图表库）
 
 ### 4.8 预警通知 — P1
-- [ ] 流量超额、到期、节点离线 / 下线预警
-- [ ] 渠道：邮件 / Telegram Bot
+- [x] 渠道：邮件（SMTP，支持 465 隐式 TLS / 587 STARTTLS）、企业微信（自建应用消息）、Telegram Bot
+- [x] 事件：节点离线（心跳超时 / 自愈耗尽）、节点已自愈（换端口恢复）、节点恢复在线、流量超额、客户端到期 / 临近到期（提前 3 天）
+- [x] 多渠道同时推送（`notify.Dispatch` 异步扇出到所有「启用」渠道），单渠道失败仅记录日志不阻塞
+- [x] 管理方式：通知渠道 CRUD（`GET/POST /notifiers`、`GET/PATCH/DELETE /notifiers/:id`）+ 即时测试（`POST /notifiers/:id/test`）；Web 侧边栏「通知」分组管理
+- [x] 流量超额 / 到期由 15 分钟定时扫描器触发，按「client:原因:日期」每日起重去重；节点事件为状态切换时触发（不刷屏）
+- 注：企业微信用自建应用消息（corpid + corpsecret + agentid + touser），非群机器人 webhook。
 
-### 4.9 证书管理 — P2
-- [ ] 节点 agent 本地经 Cloudflare DNS-01 申请 Let's Encrypt
-- [ ] inbound 通过 `cert_id` 引用（泛域名可多入站复用）
-- [ ] 本地定时自动续签 + 热重载
+### 4.9 证书管理 — P2（已实现，采用简化后的「管理端统一签发 + 分发」方案）
+- [x] 管理端统一经 Cloudflare DNS-01 申请 Let's Encrypt（lego，单个泛域名证书覆盖全网）
+- [x] 签发后通过 `PUT /agent/v1/cert` 分发到所有已启用节点（证书文件落节点本地 `/opt/nodepilot-agent/certs/`）
+- [x] inbound 通过 `cert_id` 引用（泛域名可多入站复用）
+- [x] 到期前 30 天定时自动续签 + 重分发（24h 调度）
+- [x] CF Token AES-GCM 加密存储，证书私钥仅存节点本地，跨机不传输
 
 ### 4.10 运维 / 安装 — P0/P1
 - [ ] 节点一键安装脚本（xray + agent + systemd）
@@ -120,7 +133,7 @@ Inbound(id, node_id, protocol, port, transport,
         tls{cert_id, enabled}, stream_settings, fallback,
         enabled, port_auto_fixed)
 
-Client(id, inbound_id, uuid, email,
+Client(id, inbound_id, uuid, alias,
        traffic_limit_bytes, expire_time, enabled)
 
 SubscriptionGroup(id, name, token, format[vmess|clash|sip008],
@@ -129,8 +142,8 @@ SubscriptionGroup(id, name, token, format[vmess|clash|sip008],
 ConfigVersion(id, node_id, version, content_json,
               status[applied|failed], applied_at, error)
 
-Certificate(id, node_id, domain, cert_path, key_path, ca_path,
-            auto_renew, expires_at, cf_email, cf_api_key_enc)
+Certificate(id, domain, cert_path, key_path, ca_path,
+            auto_renew, expires_at, cf_email, cf_token_enc, status, last_error)
 
 TrafficStat(id, node_id, inbound_id, client_id?, date, up_bytes, down_bytes)
 
@@ -161,7 +174,10 @@ Setting(key="default_port_range", value="10000-65535")
 | GET/PATCH | `/subscriptions/{id}` | Admin | 详情 / 改筛选格式 |
 | GET | `/sub/{token}` | token | 对外订阅端点（客户端拉取） |
 | POST/GET | `/nodes/{id}/heartbeat` `/nodes/{id}/traffic` | Node Token | 节点上报状态 / 流量 |
-| POST/GET | `/nodes/{id}/certs` `/certs/{id}` | Admin | 证书申请 / 列表 / 改 |
+| GET/POST | `/certs` | Admin | 证书列表 / 申请（签发 + 分发） |
+| GET/DELETE | `/certs/{id}` | Admin | 证书详情 / 删除 |
+| POST | `/certs/{id}/renew` | Admin | 续签并分发 |
+| POST | `/certs/{id}/distribute` | Admin | 重分发到所有节点 |
 | GET/PUT | `/settings/default_port_range` | Admin | 全局默认端口范围 |
 
 ### 6.2 节点 Agent API — 基址 `https://{node}:{port}/agent/v1`（Bearer Node Token）
@@ -174,9 +190,7 @@ Setting(key="default_port_range", value="10000-65535")
 | PUT | `/config` | 接收下发的 xray config JSON |
 | POST | `/config/reload` | 热重载 xray |
 | GET | `/traffic` | 当前流量明细 |
-| GET | `/cert` | 列出节点证书及剩余天数 |
-| POST | `/cert/issue` | 申请证书（domain + CF 凭据） |
-| POST | `/cert/renew` | 续签指定证书 |
+| PUT | `/cert` | 接收管理端分发的证书文件（cert_pem/key_pem/ca_pem） |
 
 ## 7. 关键业务流程
 
@@ -184,15 +198,30 @@ Setting(key="default_port_range", value="10000-65535")
 改配置 → 配置生成器从 DB 拼 xray JSON → `PUT /agent/v1/config` → agent 校验写盘 → `POST /config/reload` 热重载 → 回执（成功 / 失败→标红 / 可回滚上一版本重发）。
 
 ### 7.2 证书申请与匹配
-节点 agent 本地用 lego 走 Cloudflare DNS-01 申请 → 证书存节点本地 `/root/cert/<domain>/` → DB 仅存路径与元数据 → inbound 用 `cert_id` 引用 → 生成 xray 时填入 `tlsSettings.certificates`；泛域名证书可多入站复用；本地定时续签 + reload。证书私钥仅存节点本地，跨机不传输。
+管理端统一用 lego 走 Cloudflare DNS-01 申请**泛域名**证书 → 产物存管理端 `/opt/nodepilot/certs/` → 经 `PUT /agent/v1/cert` 分发到所有已启用节点（证书落节点本地 `/opt/nodepilot-agent/certs/`）→ DB（`Certificate`）仅存节点端路径与元数据 → inbound 用 `cert_id` 引用 → 生成 xray 时填入 `tlsSettings.certificates`；泛域名证书可多入站复用；管理端到期前 30 天定时续签并自动重分发。CF Token 加密存储；证书私钥仅存节点本地，跨机不传输。
 
 ### 7.3 订阅生成
-`GET /sub/{token}` → 校验 token → 按 `SubscriptionGroup.filters` 聚合 client → 逐 client 生成 vmess:// / vless:// / trojan:// / ss:// → 按 `format` 编码（vmess=base64 串；clash=YAML；sip008=JSON）→ 返回。订阅端口取自 client 所属 inbound 当前 `port`（自愈改端口后自动同步）。
+`GET /sub/{token}` → 校验 token → 按 `SubscriptionGroup.filters` 聚合 client → 逐 client 生成 vmess:// → 按 `format`×`mode` 编码：
+- `vmess`=base64 串（`mode=acl4ssr` 时退化为裸链接）；
+- `clash`/`surfboard`=YAML（surfboard 复用 Clash 结构）；`mode=acl4ssr` 时附加 ACL4SSR 的 17 个 rule-provider + 6 分组 + 15 路由规则；
+- `loon`=.conf（`[Proxy]`/`[Proxy Group]`，`mode=acl4ssr` 时附加内置最小规则 `GEOIP,CN,DIRECT` + `FINAL,NodePilot`）；
+- `sip008`=JSON（`mode=acl4ssr` 退化为裸 servers）。
+订阅端口取自 client 所属 inbound 当前 `port`（自愈改端口后自动同步）；xray stats/email 键固定为 client UUID，别名仅作展示（ps）。
+- **精确选择**：入站表新增 `name`（别名）；订阅 `filters` 支持 `inbound_ids`（多选具体入站），UI 按节点分组勾选入站（标签显示别名或 protocol:port）；未指定 inbound_ids 时回退 `node_ids/protocol/tags`。
+- **二维码**：`GET /qr/:token`（公开，与 `/sub/:token` 同安全模型）用 go-qrcode 编码 `scheme://host/api/v1/sub/<token>` 返回 PNG；订阅详情页 `<img>` 展示。
 
 ### 7.4 连通性自检与自愈
 探测调度器周期测节点代理端口连通（L1 TCP / 可选 L2 代理握手）：
 - **节点整体失联**（心跳超时）→ 直接下线，不改端口。
 - **仅端口不通且 agent 在线** → 进入自愈：连续失败达阈值（如 3 次）触发；读取节点 `port_range`（空则用 `default_port_range`）；排除本节点其他 inbound 已占用端口得到候选集；从中选新端口 → 更新 `inbound.port` → 自动下发 → 热重载 → 重新探测；恢复则标记 ok 并同步订阅端口、通知「已自愈」；候选耗尽或达最大尝试次数（如 5）仍失败 → 节点 offline / 禁用 + 预警。
+
+### 7.5 预警通知
+`notify.Dispatch(title, body)` → 读 `notification_channels` 中所有 `enabled` 渠道 → 异步扇出。无外部依赖（SMTP 用 `net/smtp`+`crypto/tls`；企微/TG 用 `net/http`）。
+- **渠道（Send 接口实现）**：
+  - `email`：`smtp_port==465` 走 `tls.Dial` 隐式 TLS，否则 `smtp.Dial`+`StartTLS`；配置 `smtp_host/smtp_port/smtp_user/smtp_pass/from/to[]`。
+  - `wecom`：自建应用消息，先 `gettoken` 取 `access_token`（内存缓存 ~7000s）再 `message/send`；配置 `corpid/corpsecret/agentid/touser/toparty/totag`。
+  - `tg`：Bot API `sendMessage`（Markdown，失败去 parse_mode 重试）；配置 `bot_token/chat_id`。
+- **触发点**：`probe.go` 在节点离线（`notifyOffline`）、自愈成功（`notifyHealed`）、状态切回 ok（`notifyRecovery`，每恢复仅一次）调用；`alert.go` 的 15 分钟扫描器处理流量超额（`TrafficStat` 累计 vs `Client.TrafficLimitBytes>=0`）与客户端到期/临近到期，按 `client:原因:日期` 每日起重去重防刷屏。
 
 ## 8. 非功能需求
 

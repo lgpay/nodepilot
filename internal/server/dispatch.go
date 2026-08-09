@@ -117,3 +117,34 @@ func agentURL(address string) string {
 	}
 	return "http://" + address
 }
+
+// agentPut 向节点 agent 发送 PUT 请求（Bearer node.Token），返回响应体
+func agentPut(node model.Node, path string, body interface{}) ([]byte, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	url := agentURL(node.Address) + path
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+node.Token)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return b, fmt.Errorf("agent rejected: %s", string(b))
+	}
+	return b, nil
+}

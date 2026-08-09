@@ -16,6 +16,7 @@ func main() {
 	serverURL := flag.String("server", "http://127.0.0.1:8080", "control plane base URL")
 	nodeID := flag.String("node-id", "", "node id assigned by control plane")
 	configDir := flag.String("config-dir", "/usr/local/xray", "directory to store xray config.json")
+	certDir := flag.String("cert-dir", "/opt/nodepilot-agent/certs", "directory to store TLS certificates")
 	xrayBin := flag.String("xray", "/usr/local/bin/xray", "path to xray binary")
 	flag.Parse()
 
@@ -23,18 +24,21 @@ func main() {
 		log.Fatal("--token and --node-id are required")
 	}
 
+	agent.SetCertDir(*certDir)
 	agent.SetConfig(agent.AgentConfig{
 		Token:     *token,
 		Addr:      *addr,
 		ServerURL: *serverURL,
 		NodeID:    *nodeID,
 		ConfigDir: *configDir,
+		CertDir:   *certDir,
 	})
 	agent.SetXrayBin(*xrayBin)
 
 	r := gin.Default()
 	agent.RegisterRoutes(r)
 	agent.StartHeartbeat(30 * time.Second)
+	agent.StartTrafficCollector(60 * time.Second)
 
 	log.Printf("[agent] NodePilot node-agent listening on %s (node=%s)", *addr, *nodeID)
 	if err := r.Run(*addr); err != nil {

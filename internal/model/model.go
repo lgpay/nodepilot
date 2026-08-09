@@ -31,6 +31,7 @@ type Node struct {
 type Inbound struct {
 	ID             uint   `gorm:"primaryKey" json:"id"`
 	NodeID         uint   `gorm:"index" json:"node_id"`
+	Name           string `gorm:"size:128" json:"name"` // 别名/备注（用于订阅分组精确选择）
 	Protocol       string `gorm:"size:16" json:"protocol"` // vmess|vless|trojan|ss|socks|http
 	Port           int    `json:"port"`
 	Transport      string `gorm:"size:16" json:"transport"` // tcp|ws|grpc
@@ -47,7 +48,7 @@ type Client struct {
 	ID                uint      `gorm:"primaryKey" json:"id"`
 	InboundID         uint      `gorm:"index" json:"inbound_id"`
 	UUID              string    `gorm:"size:64" json:"uuid"`
-	Email             string    `gorm:"size:128" json:"email"`
+	Alias             string    `gorm:"size:128" json:"alias"` // 别名/备注（vmess ps），仅展示用；xray 统计键固定用 UUID
 	TrafficLimitBytes int64     `gorm:"default:-1" json:"traffic_limit_bytes"` // -1 表示不限
 	ExpireTime        time.Time `json:"expire_time"`
 	Enabled           bool      `gorm:"default:true" json:"enabled"`
@@ -63,4 +64,33 @@ type ConfigVersion struct {
 	Status      string    `gorm:"size:16" json:"status"` // applied|failed
 	AppliedAt   time.Time `json:"applied_at"`
 	Error       string    `gorm:"type:text" json:"error"`
+}
+
+// Certificate 全局 TLS 证书（管理端签发泛域名，分发到各 agent）
+// 证书私钥仅存节点本地；本表仅存 agent 本地路径 + 元数据；CF Token 加密存储。
+type Certificate struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	Domain     string    `gorm:"size:128" json:"domain"`    // 如 *.rootdomain.com
+	CertPath   string    `gorm:"type:text" json:"cert_path"` // agent 本地 fullchain.pem
+	KeyPath    string    `gorm:"type:text" json:"key_path"`  // agent 本地 privkey.pem
+	CAPath     string    `gorm:"type:text" json:"ca_path"`   // agent 本地 ca.pem
+	AutoRenew  bool      `gorm:"default:true" json:"auto_renew"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	CFEmail    string    `gorm:"size:128" json:"cf_email"`
+	CFTokenEnc string    `gorm:"type:text" json:"-"` // AES-GCM 密文，不序列化
+	Status     string    `gorm:"size:16;default:'pending'" json:"status"` // pending|issued|failed
+	LastError  string    `gorm:"type:text" json:"last_error"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// TrafficStat 按天流量统计（节点 / 入站 / 客户端维度）
+// client_id 为 0 表示无法归属到具体客户端（如 xray 计数键在控制面无对应记录）。
+type TrafficStat struct {
+	ID        uint   `gorm:"primaryKey" json:"id"`
+	NodeID    uint   `gorm:"uniqueIndex:uk_traffic;index" json:"node_id"`
+	InboundID uint   `gorm:"uniqueIndex:uk_traffic;index" json:"inbound_id"`
+	ClientID  uint   `gorm:"uniqueIndex:uk_traffic;index" json:"client_id"`
+	Date      string `gorm:"size:10;uniqueIndex:uk_traffic;index" json:"date"` // YYYY-MM-DD (UTC)
+	UpBytes   int64  `json:"up_bytes"`
+	DownBytes int64  `json:"down_bytes"`
 }

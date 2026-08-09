@@ -24,6 +24,8 @@ func main() {
 
 	r := server.NewRouter(*webDir)
 	server.StartProbeScheduler()
+	server.StartCertRenewScheduler()
+	server.StartAlertScheduler()
 	log.Println("[server] NodePilot control plane listening on", *addr)
 	if err := r.Run(*addr); err != nil {
 		log.Fatalf("server run: %v", err)

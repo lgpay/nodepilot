@@ -11,3 +11,6 @@ nodepilot.db
 # OS / 编辑器
 .DS_Store
 *.swp
+
+# 根目录构建产物（控制面二进制）
+/server

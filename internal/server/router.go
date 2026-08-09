@@ -18,6 +18,7 @@ func NewRouter(webDir string) *gin.Engine {
 	// 公开：管理员登录
 	v1.POST("/auth/login", LoginHandler)
 	v1.POST("/auth/logout", AuthMiddleware(), LogoutHandler)
+	v1.POST("/auth/change-password", AuthMiddleware(), ChangePassword)
 
 	// 管理员受保护接口
 	authed := v1.Group("")
@@ -30,6 +31,7 @@ func NewRouter(webDir string) *gin.Engine {
 		authed.DELETE("/nodes/:id", DeleteNode)
 
 		authed.GET("/nodes/:id/inbounds", ListInbounds)
+		authed.GET("/inbounds", ListAllInbounds)
 		authed.POST("/nodes/:id/inbounds", CreateInbound)
 		authed.PUT("/inbounds/:id", UpdateInbound)
 		authed.DELETE("/inbounds/:id", DeleteInbound)
@@ -47,6 +49,25 @@ func NewRouter(webDir string) *gin.Engine {
 		authed.GET("/subscriptions/:id", GetSubscriptionDetail)
 		authed.PATCH("/subscriptions/:id", UpdateSubscription)
 		authed.DELETE("/subscriptions/:id", DeleteSubscription)
+
+		// 全局 TLS 证书（管理端签发泛域名 + 分发）
+		authed.GET("/certs", ListCerts)
+		authed.POST("/certs", CreateCert)
+		authed.GET("/certs/:id", GetCert)
+		authed.DELETE("/certs/:id", DeleteCert)
+		authed.POST("/certs/:id/renew", RenewCert)
+		authed.POST("/certs/:id/distribute", DistributeCert)
+
+		// 流量统计聚合
+		authed.GET("/stats/overview", StatsOverview)
+
+		// 预警通知渠道（邮件 / 企业微信 / Telegram）
+		authed.GET("/notifiers", ListNotifiers)
+		authed.POST("/notifiers", CreateNotifier)
+		authed.GET("/notifiers/:id", GetNotifier)
+		authed.PATCH("/notifiers/:id", UpdateNotifier)
+		authed.DELETE("/notifiers/:id", DeleteNotifier)
+		authed.POST("/notifiers/:id/test", TestNotifier)
 	}
 
 	// 节点 token 受保护接口（agent 上报）
@@ -59,6 +80,7 @@ func NewRouter(webDir string) *gin.Engine {
 
 	// 对外订阅端点（token 校验，非 JWT）
 	v1.GET("/sub/:token", GetSubscription)
+	v1.GET("/qr/:token", GetSubscriptionQR)
 
 	// Web 管理界面（单页 index.html）
 	if webDir != "" {

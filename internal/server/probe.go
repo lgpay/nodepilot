@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"nodepilot/internal/model"
+	"nodepilot/internal/notify"
 	"nodepilot/internal/store"
 )
 
@@ -21,9 +23,11 @@ const (
 )
 
 // failCounts: inboundID -> 连续失败次数；healAttempts: nodeID -> 已换端口次数（内存态）
+// wasOffline: nodeID -> 上次探测是否处于离线/不可达（用于「恢复在线」只通知一次）
 var (
 	failCounts   = map[uint]int{}
 	healAttempts = map[uint]int{}
+	wasOffline   = map[uint]bool{}
 )
 
 // StartProbeScheduler 启动节点连通性探测与自愈调度器
@@ -48,6 +52,7 @@ func probeAll() {
 				"connectivity": "offline",
 			})
 			log.Printf("[probe] node=%d heartbeat timeout, marked offline", node.ID)
+			wasOffline[node.ID] = true
 			notifyOffline(node)
 			continue
 		}
@@ -72,7 +77,13 @@ func probeAll() {
 			}
 		}
 		if allOK {
+			prev := node.Connectivity
 			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Update("connectivity", "ok")
+			// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
+			if wasOffline[node.ID] && prev != "ok" {
+				wasOffline[node.ID] = false
+				notify.Dispatch("✅ 节点恢复在线", fmt.Sprintf("节点 #%d (%s) 代理端口已恢复可达", node.ID, node.Name))
+			}
 		}
 	}
 }
@@ -86,6 +97,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 			"connectivity": "offline",
 		})
 		log.Printf("[probe] node=%d self-heal exhausted after %d attempts, marked offline", node.ID, att)
+		wasOffline[node.ID] = true
 		notifyOffline(node)
 		return
 	}
@@ -115,6 +127,8 @@ func selfHeal(node model.Node, in model.Inbound) {
 	})
 	log.Printf("[probe] node=%d inbound=%d self-heal: port %d -> %d", node.ID, in.ID, oldPort, newPort)
 
+	notifyHealed(node, in, oldPort, newPort)
+
 	if _, err := syncNode(node); err != nil {
 		log.Printf("[probe] node=%d re-dispatch failed: %v", node.ID, err)
 	}
@@ -122,9 +136,14 @@ func selfHeal(node model.Node, in model.Inbound) {
 	failCounts[in.ID] = 0 // 等待下次探测验证新端口
 }
 
-// notifyOffline 节点下线预警钩子（预警模块 P1 未选，先记录日志，预留扩展）
+// notifyOffline 节点下线预警（心跳超时或自愈耗尽）
 func notifyOffline(node model.Node) {
-	log.Printf("[probe] ALERT node=%d (%s) offline", node.ID, node.Name)
+	notify.Dispatch("🔴 节点离线", fmt.Sprintf("节点 #%d (%s) 已离线（心跳超时或自愈尝试耗尽）", node.ID, node.Name))
+}
+
+// notifyHealed 节点自愈成功（换端口后恢复）
+func notifyHealed(node model.Node, in model.Inbound, oldPort, newPort int) {
+	notify.Dispatch("🟡 节点已自愈", fmt.Sprintf("节点 #%d (%s) 入站 #%d 端口 %d → %d 已切换并恢复", node.ID, node.Name, in.ID, oldPort, newPort))
 }
 
 // ---- 端口范围工具 ----
