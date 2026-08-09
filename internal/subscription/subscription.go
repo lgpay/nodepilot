@@ -165,9 +165,13 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 	// 它把订阅更新地址写进文件本身，这样即使客户端是“导入配置文件”（而非“从 URL 导入订阅”），
 	// 也知道从哪里重新拉取更新，避免“扫到代理但无法更新”。
 	if subURL != "" {
-		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
+		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=86400 strict=false\n", subURL))
 	}
+	// [General]：Surfboard 基础设置（对齐参考订阅样式：日志级别、DNS、局域网绕过、增强模式等）。
+	sb.WriteString(surfboardGeneralBlock())
 	sb.WriteString("[Proxy]\n")
+	// DIRECT 是 Surge/Surfboard 内置策略；参考订阅中显式声明为 direct，使分组可指向 DIRECT。
+	sb.WriteString("DIRECT = direct\n")
 	names := []string{}
 	for _, it := range items {
 		line, ok := buildSurgeProxyLine(it)
@@ -206,10 +210,12 @@ func buildSurgeProxyLine(it ExportItem) (string, bool) {
 	host := it.Host
 	switch it.Protocol {
 	case "vmess":
-		// vmess, server, port, username=uuid, tls=true, sni=host, ws=true, ws-path=, ws-headers="Host: host"
+		// vmess, server, port, username=uuid, vmess-aead=true, tls=true, sni=host, ws=true, ws-path=, ws-headers=Host:host
+		// 注意：Surfboard/Surge 原生用 vmess-aead=true 启用 AEAD（参考订阅样式），ws-headers 不加引号。
 		parts := []string{
 			fmt.Sprintf("%s = vmess, %s, %d", name, host, it.Port),
 			"username=" + it.UUID,
+			"vmess-aead=true",
 		}
 		if it.TLSEnabled {
 			parts = append(parts, "tls=true", "sni="+it.SNI)
@@ -217,12 +223,12 @@ func buildSurgeProxyLine(it ExportItem) (string, bool) {
 		if it.Transport == "ws" {
 			parts = append(parts, "ws=true", "ws-path="+path)
 			if it.TLSEnabled && it.SNI != "" {
-				parts = append(parts, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI))
+				parts = append(parts, "ws-headers=Host:"+it.SNI)
 			}
 		}
 		return strings.Join(parts, ", "), true
 	case "trojan":
-		// trojan, server, port, password=pass, sni=host, ws=true, ws-path=, ws-headers="Host: host"
+		// trojan, server, port, password=pass, sni=host, ws=true, ws-path=, ws-headers=Host:host
 		parts := []string{
 			fmt.Sprintf("%s = trojan, %s, %d", name, host, it.Port),
 			"password=" + it.UUID,
@@ -233,7 +239,7 @@ func buildSurgeProxyLine(it ExportItem) (string, bool) {
 		if it.Transport == "ws" {
 			parts = append(parts, "ws=true", "ws-path="+path)
 			if it.TLSEnabled && it.SNI != "" {
-				parts = append(parts, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI))
+				parts = append(parts, "ws-headers=Host:"+it.SNI)
 			}
 		}
 		return strings.Join(parts, ", "), true
@@ -294,8 +300,8 @@ func BuildSIP008(items []ExportItem) (string, error) {
 // ---- 结构定义 ----
 
 // BuildClashACL4SSR 生成 Clash 配置（ACL4SSR_Online 模式）：节点 + 11 标准分组 +
-// rule-providers(指向 NodePilot 自托管 /api/v1/rules/<name>?fmt=yaml) + RULE-SET 路由规则。
-// rulesBaseURL 为本机规则镜像基址（如 http://host:8080/api/v1/rules）。
+// rule-providers(指向 ACL4SSR 规则源 raw .list) + RULE-SET 路由规则。
+// rulesBaseURL 为 ACL4SSR 规则源基址（默认 GitHub raw，可被 Setting acl4ssr_base 覆盖）。
 func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) {
 	cfg := clashConfig{
 		Port:             7890,
@@ -387,6 +393,18 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 		sb.WriteString("FINAL,NodePilot\n")
 	}
 	return sb.String(), nil
+}
+
+// surfboardGeneralBlock 返回 Surfboard 的 [General] 基础设置（对齐参考订阅样式）。
+func surfboardGeneralBlock() string {
+	return "[General]\n" +
+		"loglevel=notify\n" +
+		"interface=127.0.0.1\n" +
+		"ipv6=false\n" +
+		"dns-server=system, 223.5.5.5\n" +
+		"skip-proxy=192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, localhost, *.local\n" +
+		"exclude-simple-hostnames=true\n" +
+		"enhanced-mode-by-rule=true\n\n"
 }
 
 // loonGeneralBlock 返回 Loon 的 [General] 基础设置（DNS、局域网绕过、geoip 库等）。
