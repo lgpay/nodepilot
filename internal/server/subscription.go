@@ -142,10 +142,20 @@ func GetSubscription(c *gin.Context) {
 	// （官方 FAQ 明确），且它并不解析 Clash YAML 的 proxies: 段，只认 Surge 的 [Proxy] 段。
 	// 因此 surfboard 格式走 BuildSurfboard（Surge 语法）。这里预先剔除不被支持的协议/传输，
 	// 避免 BuildSurfboard 里残留不支持类型导致整份订阅解析失败。
+	// Loon 支持 vless，但不支持 gRPC/ssr；clash 保留全协议（Clash.Meta 支持 vless/gRPC）。
 	if g.Format == "surfboard" {
 		kept := make([]subscription.ExportItem, 0, len(items))
 		for _, it := range items {
 			if it.Protocol == "vless" || it.Protocol == "ssr" || it.Transport == "grpc" {
+				continue
+			}
+			kept = append(kept, it)
+		}
+		items = kept
+	} else if g.Format == "loon" {
+		kept := make([]subscription.ExportItem, 0, len(items))
+		for _, it := range items {
+			if it.Protocol == "ssr" || it.Transport == "grpc" {
 				continue
 			}
 			kept = append(kept, it)
@@ -164,6 +174,14 @@ func GetSubscription(c *gin.Context) {
 		subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
 		content, err = subscription.BuildSurfboard(items, subURL)
 		ctype = "text/plain; charset=utf-8"
+	case "loon":
+		scheme := "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
+		subURL := fmt.Sprintf("%s://%s/api/v1/sub/%s", scheme, c.Request.Host, token)
+		content, err = subscription.BuildLoon(items, acl, subURL)
+		ctype = "text/plain; charset=utf-8"
 	case "clash":
 		if acl {
 			content, err = subscription.BuildClashACL4SSR(items)
@@ -171,9 +189,6 @@ func GetSubscription(c *gin.Context) {
 			content, err = subscription.BuildClash(items)
 		}
 		ctype = "application/yaml; charset=utf-8"
-	case "loon":
-		content, err = subscription.BuildLoon(items, acl)
-		ctype = "text/plain; charset=utf-8"
 	case "sip008":
 		content, err = subscription.BuildSIP008(items)
 		ctype = "application/json; charset=utf-8"

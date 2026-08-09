@@ -363,30 +363,27 @@ func BuildClashACL4SSR(items []ExportItem) (string, error) {
 	return string(b), nil
 }
 
-// BuildLoon 生成 Loon 配置（.conf）。withRules=true（ACL4SSR 模式）时附加内置最小路由规则
-// （ACL4SSR 规则是 Clash 格式，Loon 不能直接消费，故用内置规则保证可用）。
-func BuildLoon(items []ExportItem, withRules bool) (string, error) {
+// BuildLoon 生成 Loon 配置（.conf）。Loon 采用 address=/port= 键值风格（与 Surge 的位置风格不同），
+// 支持 vmess/vless/trojan/ss/socks5/http（Loon 支持 vless，与 Surfboard 不同；但不支持 gRPC 传输）。
+// subURL 非空时首行写入 #!MANAGED-CONFIG 指令，使客户端可自动更新。
+// withRules=true（acl4ssr 模式）时附加内置最小路由规则（ACL4SSR 规则是 Clash 格式，Loon 不能直接消费）。
+func BuildLoon(items []ExportItem, withRules bool, subURL string) (string, error) {
 	var sb strings.Builder
+	if subURL != "" {
+		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=60 strict=true\n", subURL))
+	}
 	sb.WriteString("[Proxy]\n")
 	names := []string{}
 	for _, it := range items {
-		if it.Protocol != "vmess" {
+		line, ok := buildLoonProxyLine(it)
+		if !ok {
 			continue
 		}
-		path := it.WsPath
-		if path == "" {
-			path = "/v2ray"
-		}
-		sni := ""
-		if it.TLSEnabled {
-			sni = it.SNI
-		}
-		// Loon vmess 关键字语法
-		name := proxyName(it)
-		line := fmt.Sprintf("%s = vmess, address=%s, port=%d, username=%s, vmess-aid=0, vmess-security=aes-128-gcm, tls=%v, sni=%s, ws=true, ws-path=%s, ws-headers=Host=%s",
-			name, it.Host, it.Port, it.UUID, it.TLSEnabled, sni, path, it.SNI)
 		sb.WriteString(line + "\n")
-		names = append(names, name)
+		names = append(names, proxyName(it))
+	}
+	if len(names) == 0 {
+		return "", fmt.Errorf("没有 Loon 支持的代理")
 	}
 	sb.WriteString("\n[Proxy Group]\n")
 	sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
@@ -396,6 +393,85 @@ func BuildLoon(items []ExportItem, withRules bool) (string, error) {
 		sb.WriteString("FINAL,NodePilot\n")
 	}
 	return sb.String(), nil
+}
+
+// buildLoonProxyLine 生成单条 Loon 风格代理定义行。ok=false 表示该协议/传输不被 Loon 支持。
+func buildLoonProxyLine(it ExportItem) (string, bool) {
+	name := proxyName(it)
+	path := it.WsPath
+	if path == "" {
+		path = "/v2ray"
+	}
+	host := it.Host
+	if it.Transport == "grpc" {
+		return "", false // Loon 不支持 gRPC 传输
+	}
+	switch it.Protocol {
+	case "vmess":
+		// Loon vmess 关键字语法（alterId=0 即 AEAD，用 vmess-security=aes-128-gcm 表示）
+		parts := []string{
+			fmt.Sprintf("%s = vmess, address=%s, port=%d", name, host, it.Port),
+			"username=" + it.UUID,
+			"vmess-aid=0",
+			"vmess-security=aes-128-gcm",
+		}
+		if it.TLSEnabled {
+			parts = append(parts, "tls=true", "sni="+it.SNI)
+		}
+		if it.Transport == "ws" {
+			parts = append(parts, "ws=true", "ws-path="+path)
+			if it.TLSEnabled && it.SNI != "" {
+				parts = append(parts, "ws-headers=Host="+it.SNI)
+			}
+		}
+		return strings.Join(parts, ", "), true
+	case "vless":
+		// Loon 支持 vless（与 Surfboard 不同）；flow 视服务端而定，此处不强制写入
+		parts := []string{
+			fmt.Sprintf("%s = vless, address=%s, port=%d", name, host, it.Port),
+			"username=" + it.UUID,
+		}
+		if it.TLSEnabled {
+			parts = append(parts, "tls=true", "sni="+it.SNI)
+		}
+		if it.Transport == "ws" {
+			parts = append(parts, "ws=true", "ws-path="+path)
+			if it.TLSEnabled && it.SNI != "" {
+				parts = append(parts, "ws-headers=Host="+it.SNI)
+			}
+		}
+		return strings.Join(parts, ", "), true
+	case "trojan":
+		parts := []string{
+			fmt.Sprintf("%s = trojan, address=%s, port=%d", name, host, it.Port),
+			"password=" + it.UUID,
+		}
+		if it.TLSEnabled {
+			parts = append(parts, "sni="+it.SNI)
+		}
+		if it.Transport == "ws" {
+			parts = append(parts, "ws=true", "ws-path="+path)
+			if it.TLSEnabled && it.SNI != "" {
+				parts = append(parts, "ws-headers=Host="+it.SNI)
+			}
+		}
+		return strings.Join(parts, ", "), true
+	case "ss":
+		return fmt.Sprintf("%s = ss, address=%s, port=%d, encrypt-method=aes-256-gcm, password=%s", name, host, it.Port, it.UUID), true
+	case "socks", "http":
+		pType := it.Protocol
+		if it.Protocol == "socks" {
+			pType = "socks5"
+		}
+		parts := []string{
+			fmt.Sprintf("%s = %s, address=%s, port=%d", name, pType, host, it.Port),
+		}
+		if it.UUID != "" {
+			parts = append(parts, "password="+it.UUID)
+		}
+		return strings.Join(parts, ", "), true
+	}
+	return "", false
 }
 
 type clashProxy struct {
