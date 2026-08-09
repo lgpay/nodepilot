@@ -155,6 +155,94 @@ func buildClashProxy(it ExportItem) clashProxy {
 	return p
 }
 
+// BuildSurfboard 生成 Surfboard(=Surge 兼容) 订阅内容：[Proxy] INI 段。
+// 关键：Surfboard 官方明确“兼容 Surge 配置”，并不解析 Clash YAML 的 proxies: 段；
+// 之前输出 Clash YAML 会导致 Surfboard 扫到 0 代理。因此 surfboard 必须输出 Surge 语法。
+// 支持的协议（官方 FAQ）：HTTP/HTTPS/SOCKS5、SS/SS-OBFS、VMess、Trojan。
+func BuildSurfboard(items []ExportItem) (string, error) {
+	var sb strings.Builder
+	sb.WriteString("[Proxy]\n")
+	names := []string{}
+	for _, it := range items {
+		line, ok := buildSurgeProxyLine(it)
+		if !ok {
+			continue // 跳过 Surfboard 不支持的协议（vless / grpc / ssr 等）
+		}
+		sb.WriteString(line + "\n")
+		names = append(names, proxyName(it))
+	}
+	if len(names) == 0 {
+		return "", fmt.Errorf("没有 Surfboard 支持的代理（仅支持 vmess/trojan/ss/socks5/http）")
+	}
+	sb.WriteString("\n[Proxy Group]\n")
+	sb.WriteString("NodePilot = select, " + strings.Join(names, ", ") + "\n")
+	sb.WriteString("\n[Rule]\n")
+	sb.WriteString("FINAL,NodePilot\n")
+	return sb.String(), nil
+}
+
+// buildSurgeProxyLine 生成单条 Surge 风格代理定义行。ok=false 表示该协议不被 Surfboard 支持。
+func buildSurgeProxyLine(it ExportItem) (string, bool) {
+	name := proxyName(it)
+	path := it.WsPath
+	if path == "" {
+		path = "/v2ray"
+	}
+	host := it.Host
+	switch it.Protocol {
+	case "vmess":
+		// vmess, server, port, username=uuid, tls=true, sni=host, ws=true, ws-path=, ws-headers="Host: host"
+		parts := []string{
+			fmt.Sprintf("%s = vmess, %s, %d", name, host, it.Port),
+			"username=" + it.UUID,
+		}
+		if it.TLSEnabled {
+			parts = append(parts, "tls=true", "sni="+it.SNI)
+		}
+		if it.Transport == "ws" {
+			parts = append(parts, "ws=true", "ws-path="+path)
+			if it.TLSEnabled && it.SNI != "" {
+				parts = append(parts, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI))
+			}
+		}
+		return strings.Join(parts, ", "), true
+	case "trojan":
+		// trojan, server, port, password=pass, sni=host, ws=true, ws-path=, ws-headers="Host: host"
+		parts := []string{
+			fmt.Sprintf("%s = trojan, %s, %d", name, host, it.Port),
+			"password=" + it.UUID,
+		}
+		if it.TLSEnabled {
+			parts = append(parts, "sni="+it.SNI)
+		}
+		if it.Transport == "ws" {
+			parts = append(parts, "ws=true", "ws-path="+path)
+			if it.TLSEnabled && it.SNI != "" {
+				parts = append(parts, fmt.Sprintf("ws-headers=\"Host: %s\"", it.SNI))
+			}
+		}
+		return strings.Join(parts, ", "), true
+	case "ss":
+		// ss, server, port, encrypt-method=aes-256-gcm, password=pass
+		return fmt.Sprintf("%s = ss, %s, %d, encrypt-method=aes-256-gcm, password=%s", name, host, it.Port, it.UUID), true
+	case "socks", "http":
+		// socks5/http(s), server, port[, password=...]
+		pType := it.Protocol
+		if it.Protocol == "socks" {
+			pType = "socks5"
+		}
+		if it.TLSEnabled {
+			pType = "https" // Surge: https 类型即走 TLS
+		}
+		line := fmt.Sprintf("%s = %s, %s, %d", name, pType, host, it.Port)
+		if it.UUID != "" {
+			line += ", password=" + it.UUID
+		}
+		return line, true
+	}
+	return "", false
+}
+
 // BuildSIP008 生成 SIP008 订阅（JSON）
 func BuildSIP008(items []ExportItem) (string, error) {
 	sip := sip008{Version: 1}
@@ -203,7 +291,7 @@ var acl4ssrProviders = []string{
 }
 
 // BuildClashACL4SSR 生成 Clash 配置（ACL4SSR 模式）：节点 + 分组 + ACL4SSR rule-providers + 路由规则。
-// Surfboard 同为 Clash YAML，可直接复用本函数。
+// 注意：仅 Clash 客户端使用；Surfboard 是 Surge 兼容、不解析 Clash YAML，故 surfboard 走 BuildSurfboard。
 func BuildClashACL4SSR(items []ExportItem) (string, error) {
 	cfg := clashConfig{
 		Port:             7890,

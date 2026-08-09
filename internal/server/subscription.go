@@ -138,13 +138,14 @@ func GetSubscription(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	// Surfboard 严格遵循 Surge 配置格式，不支持 vless / Trojan-gRPC 等协议
-	// （官方 FAQ 明确）。若订阅含这些类型，Surfboard 会整体解析失败→代理组为空。
-	// 因此在 surfboard 格式下预先剔除不被支持的协议/传输，仅保留 vmess/trojan/ss/socks/http。
+	// Surfboard 严格遵循 Surge 配置格式，不支持 vless / Trojan-gRPC / ssr 等协议
+	// （官方 FAQ 明确），且它并不解析 Clash YAML 的 proxies: 段，只认 Surge 的 [Proxy] 段。
+	// 因此 surfboard 格式走 BuildSurfboard（Surge 语法）。这里预先剔除不被支持的协议/传输，
+	// 避免 BuildSurfboard 里残留不支持类型导致整份订阅解析失败。
 	if g.Format == "surfboard" {
 		kept := make([]subscription.ExportItem, 0, len(items))
 		for _, it := range items {
-			if it.Protocol == "vless" || it.Transport == "grpc" {
+			if it.Protocol == "vless" || it.Protocol == "ssr" || it.Transport == "grpc" {
 				continue
 			}
 			kept = append(kept, it)
@@ -155,7 +156,10 @@ func GetSubscription(c *gin.Context) {
 	var ctype string
 	acl := g.Mode == "acl4ssr"
 	switch g.Format {
-	case "clash", "surfboard":
+	case "surfboard":
+		content, err = subscription.BuildSurfboard(items)
+		ctype = "text/plain; charset=utf-8"
+	case "clash":
 		if acl {
 			content, err = subscription.BuildClashACL4SSR(items)
 		} else {
