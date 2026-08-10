@@ -67,6 +67,31 @@ need_root() {
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
+# 校验文件是否为合法 gzip（magic bytes: 1f 8b）
+is_gzip() { [ "$(od -An -tx1 -N2 "$1" 2>/dev/null | tr -d ' \n')" = "1f8b" ]; }
+
+# 下载单个 URL 到目标文件（curl -f 使 404 等 HTTP 错误返回非零，避免把错误页当文件收下）
+fetch_url() {
+  local u="$1" dst="$2"
+  if command_exists curl; then curl -fsSL --max-time 180 "$u" -o "$dst"; return $?; fi
+  if command_exists wget; then wget -q -T 180 -O "$dst" "$u"; return $?; fi
+  return 127
+}
+
+# 按顺序尝试多个 URL，下载并校验 gzip；成功返回 0
+try_download() {
+  local u
+  for u in "$@"; do
+    yellow "下载 agent 二进制: $u"
+    rm -f /tmp/$BINARY_NAME.tar.gz
+    if fetch_url "$u" /tmp/$BINARY_NAME.tar.gz && is_gzip /tmp/$BINARY_NAME.tar.gz; then
+      return 0
+    fi
+    red "  下载失败或文件无效: $u"
+  done
+  return 1
+}
+
 # ---------- 步骤 ----------
 install_xray() {
   if [ -x "$XRAY_BIN" ]; then
@@ -96,24 +121,25 @@ get_agent_binary() {
     cp ./bin/agent "$dest"
     return
   fi
-  # 2) 自定义 URL
-  local url="${NP_BINARY_URL:-}"
-  if [ -z "$url" ]; then
-    local arch; arch=$(detect_arch)
-    url="https://gitee.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
-  fi
-  yellow "下载 agent 二进制: $url"
-  if command_exists curl; then
-    curl -L "$url" -o /tmp/$BINARY_NAME.tar.gz || true
-  elif command_exists wget; then
-    wget -O /tmp/$BINARY_NAME.tar.gz "$url" || true
+  # 2) 下载 release 二进制（gitee 主源 → github 备源 → go build 回退）
+  local arch; arch=$(detect_arch)
+  local urls=()
+  if [ -n "$NP_BINARY_URL" ]; then
+    urls=("$NP_BINARY_URL")
   else
-    red "未找到 curl/wget，无法下载"; exit 1
+    urls=(
+      "https://gitee.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
+      "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
+    )
   fi
-  if [ -s /tmp/$BINARY_NAME.tar.gz ]; then
-    tar -xzf /tmp/$BINARY_NAME.tar.gz -C "$INSTALL_DIR/bin" && rm -f /tmp/$BINARY_NAME.tar.gz
-    green "agent 二进制已下载并解压"
-    return
+  if try_download "${urls[@]}"; then
+    if tar -xzf /tmp/$BINARY_NAME.tar.gz -C "$INSTALL_DIR/bin"; then
+      rm -f /tmp/$BINARY_NAME.tar.gz
+      green "agent 二进制已下载并解压"
+      return
+    fi
+    red "解压失败，下载文件可能损坏"
+    rm -f /tmp/$BINARY_NAME.tar.gz
   fi
   # 3) 回退：本地 go build
   red "下载失败，尝试本地 go build 回退..."
