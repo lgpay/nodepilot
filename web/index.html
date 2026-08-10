@@ -319,7 +319,7 @@ function renderSidebar() {
     h += '<div class="ti ' + (sel.type === 'node' && sel.id === n.id ? 'active' : '') + '" onclick="selectNode(' + n.id + ')">' +
       '<span class="caret" onclick="event.stopPropagation();toggleNode(' + n.id + ')">' + (open ? '▾' : '▸') + '</span>' +
       '<span class="dot ' + dot + '"></span>' +
-      '<span class="lbl">' + esc(n.name) + ' <span class="muted">#' + n.id + '</span></span></div>';
+      '<span class="lbl">' + (n.flag ? n.flag + ' ' : '') + esc(n.name) + ' <span class="muted">#' + n.id + '</span></span></div>';
     if (open) {
       const ins = inboundsCache[n.id] || [];
       if (!ins.length) h += '<div class="ti leaf muted">（无入站）</div>';
@@ -418,26 +418,38 @@ function fmtBytes(b) {
   return (i === 0 ? b : b.toFixed(2)) + ' ' + u[i];
 }
 
-// 节点详情：打开即按地址自动识别区域（优先中文地区名，如"德国"），并持久化供订阅旗帜使用
+// 区域展示：国家（中文名）+ 城市，如"德国·法兰克福"；无数据回退"识别中…"
+function regionLabel(n) {
+  if (!n) return '';
+  const r = n.region || '', c = n.city || '';
+  return (r || c) ? (r + (c ? '·' + c : '')) : '识别中…';
+}
+// 节点详情：打开即按地址自动识别区域（国家+城市），并持久化供订阅旗帜/精确显示
 async function detectRegion(id) {
   const n = nodesData.find(x => x.id === id); if (!n || !n.address) return;
-  const el = document.getElementById('n_region'); if (el) el.value = '识别中…';
+  const el = document.getElementById('n_region'); if (el) el.value = regionLabel(n);
   const d = await api('GET', '/geo?host=' + encodeURIComponent(n.address));
-  if (!d) { if (el) el.value = (n.region || '（识别失败）'); return; }
+  if (!d) { if (el) el.value = regionLabel(n); return; }
   const name = d.country || d.country_code || '';
-  if (el) el.value = name || '（识别失败）';
-  if (name && name !== (n.region || '')) {
-    const r = await api('PATCH', '/nodes/' + id, { region: name });
-    if (r) { const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i].region = name; }
+  const city = d.city || d.region || '';
+  if (el) el.value = (name ? (city ? name + '·' + city : name) : '（识别失败）');
+  if (name && (name !== (n.region || '') || city !== (n.city || ''))) {
+    const r = await api('PATCH', '/nodes/' + id, { region: name, city: city });
+    if (r) { await loadNodes(); }
   }
 }
-// 新建节点弹窗：填写地址后（失焦或点 ↻）自动识别区域，无需手填
+// 新建节点弹窗：填写地址后（失焦）自动识别区域，无需手填；国家与城市分存，旗帜只用国家
 async function detectRegionNew() {
-  const addr = val('m_n_addr'); if (!addr) return showToast('请先填写节点地址', 'warn');
+  const addr = val('m_n_addr'); if (!addr) return;
   const el = document.getElementById('m_n_region'); if (el) el.value = '识别中…';
   const d = await api('GET', '/geo?host=' + encodeURIComponent(addr));
-  if (d && (d.country || d.country_code)) { if (el) el.value = d.country || d.country_code; }
-  else if (el) el.value = '（识别失败）';
+  if (d && (d.country || d.country_code)) {
+    const name = d.country || d.country_code;
+    const city = d.city || d.region || '';
+    if (el) el.value = city ? name + '·' + city : name;
+    document.getElementById('m_n_country').value = name;
+    document.getElementById('m_n_city').value = city;
+  } else if (el) el.value = '（识别失败）';
 }
 
 // ---- 统计 ----
@@ -521,7 +533,7 @@ async function renderNodeDetail(id) {
     '<div class="row">' +
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
-    '<div><label>区域</label><div style="display:flex;gap:6px;align-items:center"><input id="n_region" value="' + esc(n.region || '识别中…') + '" disabled style="background:var(--input-dis)"><button class="sm" style="margin-top:0;flex:0 0 auto" title="重新识别区域" onclick="detectRegion(' + n.id + ')">↻</button></div></div></div>' +
+    '<div><label>区域</label><input id="n_region" value="' + esc(regionLabel(n)) + '" disabled style="background:var(--input-dis)"></div>' +
     '<div class="row">' +
     '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
     '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
@@ -781,7 +793,7 @@ function subInboundChecklist(selected) {
 function subNodeChecklist(selected) {
   selected = selected || [];
   if (!nodesData.length) return '<div class="muted">（暂无节点）</div>';
-  return nodesData.map(n => '<label class="chk"><input type="checkbox" name="sub_node" value="' + n.id + '" ' + (selected.includes(n.id) ? 'checked' : '') + '> ' + esc(n.name) + ' <span class="muted">#' + n.id + '</span></label>').join('');
+  return nodesData.map(n => '<label class="chk"><input type="checkbox" name="sub_node" value="' + n.id + '" ' + (selected.includes(n.id) ? 'checked' : '') + '> ' + (n.flag ? n.flag + ' ' : '') + esc(n.name) + ' <span class="muted">#' + n.id + '</span></label>').join('');
 }
 function subProtoChecklist(selected) {
   selected = selected || [];
@@ -946,7 +958,8 @@ function showCreateNode() {
   setModal('<h2>注册节点</h2>' +
     '<label>名称</label><input id="m_n_name" placeholder="hk-01">' +
     '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321" onblur="detectRegionNew()">' +
-    '<label>区域</label><div style="display:flex;gap:6px;align-items:center"><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)"><button class="sm" style="margin-top:0;flex:0 0 auto" title="重新识别区域" onclick="detectRegionNew()">↻</button></div>' +
+    '<label>区域</label><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)">' +
+    '<input type="hidden" id="m_n_country"><input type="hidden" id="m_n_city">' +
     '<label>标签(逗号)</label><input id="m_n_tags">' +
     '<label>端口范围</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>');
@@ -971,8 +984,8 @@ async function doCreateNode() {
   const pr = (val('m_n_pr') || '').trim();
   if (!validPortRange(pr)) return showToast('端口范围格式不正确（如 10000-20000,30000-40000）', 'err');
   const rawRegion = val('m_n_region');
-  const region = (rawRegion && !rawRegion.includes('识别') && !rawRegion.includes('失败')) ? rawRegion : '';
-  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: region, tags: val('m_n_tags'), port_range: pr });
+  const region = (rawRegion && !rawRegion.includes('识别') && !rawRegion.includes('失败')) ? val('m_n_country') : '';
+  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: region, city: val('m_n_city'), tags: val('m_n_tags'), port_range: pr });
   if (d) { closeModal(); showToast('节点已注册', 'ok'); copyText(d.token); await loadNodes(); }
 }
 async function showCreateSub() {

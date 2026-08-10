@@ -15,7 +15,9 @@ type Node struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	Name          string    `gorm:"size:128" json:"name"`
 	Address       string    `gorm:"size:128" json:"address"` // agent 监听地址，如 127.0.0.1:54321
-	Region        string    `gorm:"size:64" json:"region"`
+	Region        string    `gorm:"size:64" json:"region"`   // 国家（中文名或 ISO 码），用于生成旗帜
+	City          string    `gorm:"size:64" json:"city"`     // 城市（如 法兰克福），让区域显示更精确
+	Flag          string    `json:"flag" gorm:"-"`           // 由 region 派生，不入库
 	Tags          string    `gorm:"size:512" json:"tags"` // 逗号分隔
 	Token         string    `gorm:"size:128" json:"-"` // 节点 token 明文（不随节点序列化；仅 GetNode 详情以顶层 token 字段返回）
 	Enabled       bool      `gorm:"default:true" json:"enabled"`

@@ -13,6 +13,7 @@ import (
 	"nodepilot/internal/auth"
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
+	"nodepilot/internal/subscription"
 )
 
 // getNode 按 id 取节点（id 可为数字主键）
@@ -104,6 +105,7 @@ func CreateNode(c *gin.Context) {
 		Name      string `json:"name"`
 		Address   string `json:"address"`
 		Region    string `json:"region"`
+		City      string `json:"city"`
 		Tags      string `json:"tags"`
 		PortRange string `json:"port_range"`
 	}
@@ -120,6 +122,7 @@ func CreateNode(c *gin.Context) {
 		Name:      strings.TrimSpace(body.Name),
 		Address:   strings.TrimSpace(body.Address),
 		Region:    strings.TrimSpace(body.Region),
+		City:      strings.TrimSpace(body.City),
 		Tags:      strings.TrimSpace(body.Tags),
 		PortRange: strings.TrimSpace(body.PortRange),
 		Token:     token,
@@ -138,8 +141,11 @@ func CreateNode(c *gin.Context) {
 func ListNodes(c *gin.Context) {
 	var nodes []model.Node
 	// 不返回 Token 字段
-	store.DB.Select("id,name,address,region,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,created_at").
+	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,created_at").
 		Find(&nodes)
+	for i := range nodes {
+		nodes[i].Flag = subscription.FlagEmoji(nodes[i].Region)
+	}
 	c.JSON(200, nodes)
 }
 
@@ -152,6 +158,7 @@ func GetNode(c *gin.Context) {
 	}
 	var versions []model.ConfigVersion
 	store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions)
+	node.Flag = subscription.FlagEmoji(node.Region)
 	c.JSON(200, gin.H{"node": node, "token": node.Token, "config_versions": versions})
 }
 
@@ -205,6 +212,7 @@ func UpdateNode(c *gin.Context) {
 	var body struct {
 		Name      *string `json:"name"`
 		Region    *string `json:"region"`
+		City      *string `json:"city"`
 		Tags      *string `json:"tags"`
 		Enabled   *bool   `json:"enabled"`
 		PortRange *string `json:"port_range"`
@@ -219,6 +227,9 @@ func UpdateNode(c *gin.Context) {
 	}
 	if body.Region != nil {
 		updates["region"] = *body.Region
+	}
+	if body.City != nil {
+		updates["city"] = *body.City
 	}
 	if body.Tags != nil {
 		updates["tags"] = *body.Tags

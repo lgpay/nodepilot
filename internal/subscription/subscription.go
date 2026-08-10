@@ -120,6 +120,9 @@ func flagEmoji(region string) string {
 	return string(rune(0x1F1E6)+rune(code[0]-'A')) + string(rune(0x1F1E6)+rune(code[1]-'A'))
 }
 
+// FlagEmoji 暴露给其它包（如控制面节点列表）生成区域旗帜 emoji。
+func FlagEmoji(region string) string { return flagEmoji(region) }
+
 // regionCode 把区域名解析为 ISO 两位国家码；已是两位字母码则原样返回。
 func regionCode(upper string) string {
 	if len(upper) == 2 && upper[0] >= 'A' && upper[0] <= 'Z' && upper[1] >= 'A' && upper[1] <= 'Z' {
