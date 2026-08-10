@@ -49,7 +49,7 @@ type Client struct {
 	InboundID         uint      `gorm:"index" json:"inbound_id"`
 	UUID              string    `gorm:"size:64" json:"uuid"`
 	Alias             string    `gorm:"size:128" json:"alias"` // 别名/备注（vmess ps），仅展示用；xray 统计键固定用 UUID
-	TrafficLimitBytes int64     `gorm:"default:-1" json:"traffic_limit_bytes"` // -1 表示不限
+	TrafficLimitBytes int64     `gorm:"default:0" json:"traffic_limit_bytes"` // 0 表示不限（历史 -1 亦按不限处理）
 	ExpireTime        time.Time `json:"expire_time"`
 	Enabled           bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt         time.Time `json:"created_at"`

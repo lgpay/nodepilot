@@ -82,8 +82,8 @@ func StatsOverview(c *gin.Context) {
 	clientStats := make([]gin.H, 0, len(clientRows))
 	for _, r := range clientRows {
 		cl := clientByID[r.ClientID]
-		limit := int64(-1)
-		if cl.ID != 0 {
+		limit := int64(0) // 0 = 无限制
+		if cl.ID != 0 && cl.TrafficLimitBytes > 0 {
 			limit = cl.TrafficLimitBytes
 		}
 		clientStats = append(clientStats, gin.H{

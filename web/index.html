@@ -615,7 +615,7 @@ async function renderInboundDetail(id) {
     '<h3>新建客户端</h3>' +
     '<div class="row">' +
     '<div><label>别名/备注(ps)</label><input id="c_alias" placeholder="如 hk01-iphone"></div>' +
-    '<div><label>流量上限(字节,-1不限)</label><input id="c_traffic" value="-1" type="number"></div>' +
+    '<div><label>流量上限(字节,0不限)</label><input id="c_traffic" value="0" type="number" min="0"></div>' +
     '<div><label>到期时间</label><input id="c_expire" type="datetime-local"></div></div>' +
     '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + id + '))">新建客户端</button></div></div>';
 }
@@ -629,7 +629,7 @@ async function saveInbound(id) {
   }
 }
 async function createClient(inboundId) {
-  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || -1), expire_time: fromDTLocal(val('c_expire')) });
+  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || 0), expire_time: fromDTLocal(val('c_expire')) });
   if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已建: ' + d.uuid, 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
 }
 async function delClient(id, inboundId) {
@@ -650,7 +650,7 @@ async function renderClientDetail(id) {
     '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
     '<div class="row">' +
     '<div><label>别名/备注(ps)</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
-    '<div><label>流量上限(字节,-1不限)</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes != null ? c.traffic_limit_bytes : -1) + '" type="number"></div>' +
+    '<div><label>流量上限(字节,0不限)</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
     '<div class="row">' +
     '<div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div>' +
@@ -661,10 +661,10 @@ async function renderClientDetail(id) {
 }
 async function saveClient(id) {
   const inbId = sel.parentId;
-  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
   if (d) {
     const arr = clientsCache[inbId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || -1), enabled: chk('c_enabled2') };
+    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2') };
     showToast('客户端已保存', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderClientDetail(id);
   }
 }

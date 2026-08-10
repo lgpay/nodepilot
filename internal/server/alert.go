@@ -51,7 +51,7 @@ func checkTrafficLimit() {
 		cids = append(cids, r.ClientID)
 	}
 	var clients []model.Client
-	store.DB.Where("id IN ? AND traffic_limit_bytes >= 0", cids).Find(&clients)
+	store.DB.Where("id IN ? AND traffic_limit_bytes > 0", cids).Find(&clients)
 	byID := map[uint]model.Client{}
 	for _, c := range clients {
 		byID[c.ID] = c

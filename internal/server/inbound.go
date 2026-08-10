@@ -210,18 +210,22 @@ func CreateClient(c *gin.Context) {
 	inboundID := c.Param("id")
 	var body struct {
 		Alias             string `json:"alias"`
-		TrafficLimitBytes int64  `json:"traffic_limit_bytes"` // -1 不限
+		TrafficLimitBytes int64  `json:"traffic_limit_bytes"` // 0 不限（历史 -1 亦按不限处理）
 		ExpireTime        string `json:"expire_time"`         // RFC3339，可空
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	trafficLimit := body.TrafficLimitBytes
+	if trafficLimit < 0 {
+		trafficLimit = 0 // 0 = 无限制，归一化历史 -1
+	}
 	client := model.Client{
 		InboundID:         uint(atoiSafe(inboundID)),
 		UUID:              configgen.GenUUID(),
 		Alias:             body.Alias,
-		TrafficLimitBytes: body.TrafficLimitBytes,
+		TrafficLimitBytes: trafficLimit,
 		Enabled:           true,
 	}
 	if body.ExpireTime != "" {
@@ -258,7 +262,11 @@ func UpdateClient(c *gin.Context) {
 		updates["alias"] = *body.Alias
 	}
 	if body.TrafficLimitBytes != nil {
-		updates["traffic_limit_bytes"] = *body.TrafficLimitBytes
+		lim := *body.TrafficLimitBytes
+		if lim < 0 {
+			lim = 0 // 0 = 无限制，归一化历史 -1
+		}
+		updates["traffic_limit_bytes"] = lim
 	}
 	if body.Enabled != nil {
 		updates["enabled"] = *body.Enabled
