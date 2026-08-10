@@ -26,6 +26,7 @@ type Node struct {
 	AgentVersion  string    `gorm:"size:32" json:"agent_version"`
 	LastHeartbeat time.Time `json:"last_heartbeat"`
 	PortRange     string    `gorm:"size:64" json:"port_range"` // 如 10000-65535 或 10000-20000,30000-40000；空=全局默认
+	MonthlyTrafficBytes int64 `gorm:"default:0" json:"monthly_traffic_bytes"` // 月流量上限(字节)，0=不限
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -43,8 +44,8 @@ type Inbound struct {
 	Fallback       string `gorm:"type:text" json:"fallback"` // JSON
 	Enabled        bool   `gorm:"default:true" json:"enabled"`
 	PortAutoFixed  bool   `gorm:"default:false" json:"port_auto_fixed"` // 当前端口是否由自愈换过（诊断标记）
-	AutoHeal       bool   `gorm:"default:true" json:"auto_heal"`       // 端口不通时是否允许自动换端口
-	AutoHealInterval int `gorm:"default:600" json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
+	AutoHeal       bool   `gorm:"default:true" json:"auto_heal"`       // 端口不通时是否允许自动换端口（已由间隔控制，此字段保留兼容）
+	AutoHealInterval int `gorm:"default:10" json:"auto_heal_interval"` // 自动修复最小间隔(分钟)，0=不自动修复
 }
 
 // Client 代理用户（vmess 等客户端账号）

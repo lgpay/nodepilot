@@ -108,6 +108,7 @@ func CreateNode(c *gin.Context) {
 		City      string `json:"city"`
 		Tags      string `json:"tags"`
 		PortRange string `json:"port_range"`
+		MonthlyTrafficBytes int64 `json:"monthly_traffic_bytes"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -125,6 +126,7 @@ func CreateNode(c *gin.Context) {
 		City:      strings.TrimSpace(body.City),
 		Tags:      strings.TrimSpace(body.Tags),
 		PortRange: strings.TrimSpace(body.PortRange),
+		MonthlyTrafficBytes: body.MonthlyTrafficBytes,
 		Token:     token,
 		Enabled:   true,
 		Status:    "offline",
@@ -141,7 +143,7 @@ func CreateNode(c *gin.Context) {
 func ListNodes(c *gin.Context) {
 	var nodes []model.Node
 	// 不返回 Token 字段
-	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,created_at").
+	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,monthly_traffic_bytes,created_at").
 		Find(&nodes)
 	for i := range nodes {
 		nodes[i].Flag = subscription.FlagEmoji(nodes[i].Region)
@@ -216,6 +218,7 @@ func UpdateNode(c *gin.Context) {
 		Tags      *string `json:"tags"`
 		Enabled   *bool   `json:"enabled"`
 		PortRange *string `json:"port_range"`
+		MonthlyTrafficBytes *int64 `json:"monthly_traffic_bytes"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -244,6 +247,13 @@ func UpdateNode(c *gin.Context) {
 		}
 		updates["port_range"] = strings.TrimSpace(*body.PortRange)
 	}
+	if body.MonthlyTrafficBytes != nil {
+		v := *body.MonthlyTrafficBytes
+		if v < 0 {
+			v = 0 // 0 = 无限制，归一化负数
+		}
+		updates["monthly_traffic_bytes"] = v
+	}
 	store.DB.Model(&node).Updates(updates)
 	c.JSON(200, gin.H{"ok": true})
 }
@@ -255,6 +265,30 @@ func DeleteNode(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
+}
+
+// NodeTraffic 返回节点当月已用流量与上限（字节）；月流量上限 0 表示不限。
+func NodeTraffic(c *gin.Context) {
+	id := c.Param("id")
+	var node model.Node
+	if err := store.DB.First(&node, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "node not found"})
+		return
+	}
+	month := time.Now().UTC().Format("2006-01")
+	var agg struct {
+		Up   int64 `gorm:"column:up"`
+		Down int64 `gorm:"column:down"`
+	}
+	store.DB.Model(&model.TrafficStat{}).
+		Select("COALESCE(SUM(up_bytes),0) AS up, COALESCE(SUM(down_bytes),0) AS down").
+		Where("node_id = ? AND date LIKE ?", node.ID, month+"%").Scan(&agg)
+	c.JSON(200, gin.H{
+		"node_id":     node.ID,
+		"month":       month,
+		"used_bytes":  agg.Up + agg.Down,
+		"limit_bytes": node.MonthlyTrafficBytes,
+	})
 }
 
 // validPortRange 严格校验端口范围格式：空串合法（用全局默认）；非空须为逗号分隔的

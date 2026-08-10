@@ -28,6 +28,7 @@ func NewRouter(webDir string) *gin.Engine {
 		authed.POST("/nodes", CreateNode)
 		authed.GET("/nodes/:id", GetNode)
 		authed.GET("/nodes/:id/install", NodeInstall)
+		authed.GET("/nodes/:id/traffic", NodeTraffic)
 		authed.PATCH("/nodes/:id", UpdateNode)
 		authed.DELETE("/nodes/:id", DeleteNode)
 

@@ -29,6 +29,7 @@ func StartAlertScheduler() {
 func scanAlerts() {
 	log.Printf("[alert] scan run (traffic/expiry)")
 	checkTrafficLimit()
+	checkNodeMonthlyTraffic()
 	checkExpiry()
 }
 
@@ -72,6 +73,48 @@ func checkTrafficLimit() {
 		alerted[key] = true
 		notify.Dispatch("🟡 流量超额", fmt.Sprintf("客户端 %s (#%d) 已用 %s / 限额 %s",
 			c.Alias, c.ID, fmtBytes(r.Total), fmtBytes(c.TrafficLimitBytes)))
+	}
+}
+
+// checkNodeMonthlyTraffic 节点级月流量控制：达 90% 提醒一次，达 100% 直接停用节点。
+// 月流量上限 0 表示不限。统计按 UTC 自然月（date LIKE 'YYYY-MM%'）。
+func checkNodeMonthlyTraffic() {
+	var nodes []model.Node
+	store.DB.Where("enabled = ? AND monthly_traffic_bytes > 0", true).Find(&nodes)
+	if len(nodes) == 0 {
+		return
+	}
+	month := time.Now().UTC().Format("2006-01")
+	for _, n := range nodes {
+		var agg struct {
+			Up   int64 `gorm:"column:up"`
+			Down int64 `gorm:"column:down"`
+		}
+		store.DB.Model(&model.TrafficStat{}).
+			Select("COALESCE(SUM(up_bytes),0) AS up, COALESCE(SUM(down_bytes),0) AS down").
+			Where("node_id = ? AND date LIKE ?", n.ID, month+"%").Scan(&agg)
+		used := agg.Up + agg.Down
+		limit := n.MonthlyTrafficBytes
+		if used >= limit {
+			// 100%：直接停用节点
+			store.DB.Model(&model.Node{}).Where("id = ?", n.ID).Update("enabled", false)
+			key := fmt.Sprintf("%d:node-monthly-off:%s", n.ID, month)
+			if !alerted[key] {
+				alerted[key] = true
+				notify.Dispatch("🔴 节点月流量耗尽", fmt.Sprintf("节点 #%d (%s) 本月已用 %s / 上限 %s，已达 100%%，已自动停用",
+					n.ID, n.Name, fmtBytes(used), fmtBytes(limit)))
+			}
+			continue
+		}
+		if used >= limit*9/10 {
+			// 90%：提醒一次（每月去重）
+			key := fmt.Sprintf("%d:node-monthly-90:%s", n.ID, month)
+			if !alerted[key] {
+				alerted[key] = true
+				notify.Dispatch("🟡 节点月流量预警", fmt.Sprintf("节点 #%d (%s) 本月已用 %s / 上限 %s（约 %.0f%%）",
+					n.ID, n.Name, fmtBytes(used), fmtBytes(limit), float64(used)*100/float64(limit)))
+			}
+		}
 	}
 }
 
