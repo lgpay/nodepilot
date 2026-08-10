@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 func main() {
 	dbPath := flag.String("db", "nodepilot.db", "sqlite db file path (relative to working dir)")
 	webDir := flag.String("web-dir", "web", "directory containing web/index.html to serve at /")
-	addr := flag.String("addr", ":8080", "listen address")
+	addr := flag.String("addr", ":8080", "listen addresses (comma-separated, e.g. 127.0.0.1:6200,:8080)")
 	flag.Parse()
 
 	// 结构化日志（文本格式，带时间/级别/调用点）
@@ -52,14 +53,23 @@ func main() {
 	server.StartCertRenewScheduler()
 	server.StartAlertScheduler()
 
-	srv := &http.Server{Addr: *addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
-	go func() {
-		slog.Info("[server] NodePilot control plane listening", "addr", *addr)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server run failed", "err", err)
-			os.Exit(1)
+	// 支持逗号分隔的多个监听地址（如反代走 127.0.0.1:6200，节点直连保留 :8080）
+	var servers []*http.Server
+	for _, a := range strings.Split(*addr, ",") {
+		a = strings.TrimSpace(a)
+		if a == "" {
+			continue
 		}
-	}()
+		srv := &http.Server{Addr: a, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+		servers = append(servers, srv)
+		go func(s *http.Server) {
+			slog.Info("[server] NodePilot control plane listening", "addr", s.Addr)
+			if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("server run failed", "err", err, "addr", s.Addr)
+				os.Exit(1)
+			}
+		}(srv)
+	}
 
 	// 优雅关闭：捕获 SIGINT/SIGTERM，等待在途请求完成
 	quit := make(chan os.Signal, 1)
@@ -68,8 +78,10 @@ func main() {
 	slog.Info("[server] shutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("graceful shutdown failed", "err", err)
+	for _, s := range servers {
+		if err := s.Shutdown(ctx); err != nil {
+			slog.Error("graceful shutdown failed", "err", err)
+		}
 	}
 	slog.Info("[server] stopped")
 }
