@@ -339,7 +339,7 @@ function renderSidebar() {
   h += '<div class="sb-head">订阅<button class="sm" onclick="showCreateSub()">+ 新建</button></div>';
   if (!subsData.length) h += '<div class="ti leaf muted">（无订阅）</div>';
   subsData.forEach(s => {
-    const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '<span class="badge blue">ACL4SSR</span>' : '<span class="badge">裸订阅</span>';
+    const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '<span class="badge blue">ACL4SSR</span>' : '<span class="badge">无规则</span>';
     h += '<div class="ti ' + (sel.type === 'sub' && sel.id === s.id ? 'active' : '') + '" onclick="selectSub(' + s.id + ')">' +
       '<span class="lbl">' + esc(s.name) + ' <span class="muted">' + s.format + '</span> ' + mod + '</span>' +
       '<button class="sm" title="复制订阅链接" onclick="event.stopPropagation();copyText(location.origin+\'/api/v1/sub/' + s.token + '\')">⧉</button></div>';
@@ -699,7 +699,7 @@ async function renderSubDetail(id) {
     '<details class="adv"><summary>高级筛选 JSON（可选，需熟练使用）</summary>' +
     '<p class="muted">inbound_ids / node_ids / protocol / tags 由上方勾选与输入覆盖，此处的其他字段会合并进 filters。</p>' +
     '<input id="s_adv2" value="' + esc(g.filters) + '"></details>' +
-    '<p class="muted">裸订阅 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为裸链接）。</p>' +
+    '<p class="muted">无规则 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为裸链接）。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveSub(' + g.id + '))">保存</button>' +
     '<button onclick="copyText(\'' + url + '\')">复制链接</button>' +
@@ -780,7 +780,7 @@ function subFmtOptions(cur) {
   return fs.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 function subModeOptions(cur) {
-  const ms = [['none', '无规则(裸订阅)'], ['acl4ssr_online', 'ACL4SSR_Online']];
+  const ms = [['none', '无规则'], ['acl4ssr_online', 'ACL4SSR_Online']];
   return ms.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 async function delSub(id) {
