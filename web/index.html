@@ -502,7 +502,7 @@ async function renderNodeDetail(id) {
     '<div><label>地域</label><input id="n_region" value="' + esc(n.region || '') + '"></div></div>' +
     '<div class="row">' +
     '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
-    '<div><label>端口范围</label><input id="n_portrange" value="' + esc(n.port_range || '') + '"></div>' +
+    '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '"></div>' +
     '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div></div>' +
     '<div class="row">' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
@@ -601,8 +601,8 @@ async function renderInboundDetail(id) {
     '<label>TLS 证书（从全局证书选择；留空则用占位证书）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div class="row">' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
-    '<div><label>自动修复端口</label><input value="' + (inb.port_auto_fixed ? '是' : '否') + '" disabled></div>' +
-    '<div></div></div>' +
+    '<div><label>自动修复（端口不通自动换端口）</label><input id="ib_autoheal" type="checkbox" ' + (inb.auto_heal !== false ? 'checked' : '') + '></div>' +
+    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自愈改端口</span>' : '') + '</div></div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
@@ -621,10 +621,10 @@ async function renderInboundDetail(id) {
 }
 async function saveInbound(id) {
   const nodeId = sel.parentId;
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
     showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderInboundDetail(id);
   }
 }

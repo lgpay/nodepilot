@@ -68,7 +68,8 @@ func probeAll() {
 				failCounts[in.ID]++
 				allOK = false
 				log.Printf("[probe] node=%d inbound=%d port=%d unreachable (fails=%d)", node.ID, in.ID, in.Port, failCounts[in.ID])
-				if failCounts[in.ID] >= failThreshold {
+				// 仅当该入站开启自动修复（auto_heal）且连续失败达阈值时才换端口
+				if in.AutoHeal && failCounts[in.ID] >= failThreshold {
 					selfHeal(node, in)
 				}
 			} else {

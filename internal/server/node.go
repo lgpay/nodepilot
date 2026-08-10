@@ -112,11 +112,11 @@ func CreateNode(c *gin.Context) {
 	}
 	token := auth.GenToken()
 	node := model.Node{
-		Name:      body.Name,
-		Address:   body.Address,
-		Region:    body.Region,
-		Tags:      body.Tags,
-		PortRange: body.PortRange,
+		Name:      strings.TrimSpace(body.Name),
+		Address:   strings.TrimSpace(body.Address),
+		Region:    strings.TrimSpace(body.Region),
+		Tags:      strings.TrimSpace(body.Tags),
+		PortRange: strings.TrimSpace(body.PortRange),
 		Token:     token,
 		Enabled:   true,
 		Status:    "offline",
@@ -222,7 +222,7 @@ func UpdateNode(c *gin.Context) {
 		updates["enabled"] = *body.Enabled
 	}
 	if body.PortRange != nil {
-		updates["port_range"] = *body.PortRange
+		updates["port_range"] = strings.TrimSpace(*body.PortRange)
 	}
 	store.DB.Model(&node).Updates(updates)
 	c.JSON(200, gin.H{"ok": true})

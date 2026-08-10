@@ -40,7 +40,8 @@ type Inbound struct {
 	StreamSettings string `gorm:"type:text" json:"stream_settings"` // JSON（高级 streamSettings 覆盖）
 	Fallback       string `gorm:"type:text" json:"fallback"` // JSON
 	Enabled        bool   `gorm:"default:true" json:"enabled"`
-	PortAutoFixed  bool   `gorm:"default:false" json:"port_auto_fixed"`
+	PortAutoFixed  bool   `gorm:"default:false" json:"port_auto_fixed"` // 当前端口是否由自愈换过（诊断标记）
+	AutoHeal       bool   `gorm:"default:true" json:"auto_heal"`       // 端口不通时是否允许自动换端口
 }
 
 // Client 代理用户（vmess 等客户端账号）

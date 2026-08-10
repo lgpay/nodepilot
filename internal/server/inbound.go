@@ -46,6 +46,8 @@ type InboundView struct {
 	Transport   string `json:"transport"`
 	TLSEnabled  bool   `json:"tls_enabled"`
 	Enabled     bool   `json:"enabled"`
+	AutoHeal    bool   `json:"auto_heal"`
+	PortAutoFixed bool `json:"port_auto_fixed"`
 }
 
 // ListAllInbounds 列出全部入站并附带所属节点名（供订阅分组精确选择）
@@ -73,6 +75,8 @@ func ListAllInbounds(c *gin.Context) {
 			Transport:  in.Transport,
 			TLSEnabled: in.TLSEnabled,
 			Enabled:    in.Enabled,
+			AutoHeal:   in.AutoHeal,
+			PortAutoFixed: in.PortAutoFixed,
 		})
 	}
 	c.JSON(200, views)
@@ -89,6 +93,7 @@ func CreateInbound(c *gin.Context) {
 		TLSCertID      uint    `json:"cert_id"`
 		StreamSettings string  `json:"stream_settings"` // JSON 字符串
 		Fallback       string  `json:"fallback"`        // JSON 字符串
+		AutoHeal       *bool   `json:"auto_heal"`       // 端口不通时自动换端口（默认 true）
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -105,6 +110,7 @@ func CreateInbound(c *gin.Context) {
 		StreamSettings: body.StreamSettings,
 		Fallback:       body.Fallback,
 		Enabled:        true,
+		AutoHeal:       derefBool(body.AutoHeal, true),
 	}
 	if err := validateInbound(in.Protocol, in.TLSEnabled, in.TLSCertID); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -134,6 +140,7 @@ func UpdateInbound(c *gin.Context) {
 		StreamSettings *string `json:"stream_settings"`
 		Fallback       *string `json:"fallback"`
 		Enabled        *bool   `json:"enabled"`
+		AutoHeal       *bool   `json:"auto_heal"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -166,6 +173,9 @@ func UpdateInbound(c *gin.Context) {
 	}
 	if body.Enabled != nil {
 		updates["enabled"] = *body.Enabled
+	}
+	if body.AutoHeal != nil {
+		updates["auto_heal"] = *body.AutoHeal
 	}
 	// 校验更新后的最终状态（trojan 必须 TLS + 证书），防止生成非法配置拖垮节点
 	effProto := in.Protocol
@@ -301,4 +311,12 @@ func derefStr(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// derefBool 安全解引用 *bool，nil 时返回默认值
+func derefBool(b *bool, def bool) bool {
+	if b == nil {
+		return def
+	}
+	return *b
 }
