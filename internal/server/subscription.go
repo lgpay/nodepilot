@@ -30,7 +30,7 @@ func CreateSubscription(c *gin.Context) {
 		body.Format = "vmess"
 	}
 	if body.Mode == "" {
-		body.Mode = "acl4ssr_online"
+		body.Mode = "none"
 	}
 	if body.Filters != "" && !json.Valid([]byte(body.Filters)) {
 		c.JSON(400, gin.H{"error": "filters 不是合法 JSON"})
@@ -291,7 +291,7 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 				SNI:        sni,
 				UUID:       cl.UUID,
 				Alias:      cl.Alias,
-				Region:     node.Region,
+				Region:     subscription.RegionCode(node.Region), // 订阅对外统一用英文 ISO 码
 			})
 		}
 	}

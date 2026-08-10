@@ -123,6 +123,10 @@ func flagEmoji(region string) string {
 // FlagEmoji 暴露给其它包（如控制面节点列表）生成区域旗帜 emoji。
 func FlagEmoji(region string) string { return flagEmoji(region) }
 
+// RegionCode 把任意区域名（ISO 码/中英文地区名）解析为两位 ISO 国家码；无法识别返回空串。
+// 订阅对外（如 SIP008 的 region 字段、代理名旗帜）统一用英文码，便于客户端解析。
+func RegionCode(region string) string { return regionCode(strings.ToUpper(strings.TrimSpace(region))) }
+
 // regionCode 把区域名解析为 ISO 两位国家码；已是两位字母码则原样返回。
 func regionCode(upper string) string {
 	if len(upper) == 2 && upper[0] >= 'A' && upper[0] <= 'Z' && upper[1] >= 'A' && upper[1] <= 'Z' {
@@ -344,6 +348,7 @@ func BuildSIP008(items []ExportItem) (string, error) {
 			Address:  it.Host,
 			Port:     it.Port,
 			Protocol: "vmess",
+			Region:   it.Region,
 			Settings: map[string]interface{}{"uuid": it.UUID, "alterId": 0, "security": "auto"},
 			StreamSettings: map[string]interface{}{
 				"network":  it.Transport,
@@ -645,6 +650,7 @@ type sipServer struct {
 	Address        string                 `json:"address"`
 	Port           int                    `json:"port"`
 	Protocol       string                 `json:"protocol"`
+	Region         string                 `json:"region"` // 两位 ISO 国家码（英文），便于客户端按地区分组
 	Settings       map[string]interface{} `json:"settings"`
 	StreamSettings map[string]interface{} `json:"streamSettings"`
 }

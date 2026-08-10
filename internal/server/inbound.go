@@ -47,6 +47,7 @@ type InboundView struct {
 	TLSEnabled  bool   `json:"tls_enabled"`
 	Enabled     bool   `json:"enabled"`
 	AutoHeal    bool   `json:"auto_heal"`
+	AutoHealInterval int `json:"auto_heal_interval"`
 	PortAutoFixed bool `json:"port_auto_fixed"`
 }
 
@@ -76,6 +77,7 @@ func ListAllInbounds(c *gin.Context) {
 			TLSEnabled: in.TLSEnabled,
 			Enabled:    in.Enabled,
 			AutoHeal:   in.AutoHeal,
+			AutoHealInterval: in.AutoHealInterval,
 			PortAutoFixed: in.PortAutoFixed,
 		})
 	}
@@ -94,6 +96,7 @@ func CreateInbound(c *gin.Context) {
 		StreamSettings string  `json:"stream_settings"` // JSON 字符串
 		Fallback       string  `json:"fallback"`        // JSON 字符串
 		AutoHeal       *bool   `json:"auto_heal"`       // 端口不通时自动换端口（默认 true）
+		AutoHealInterval int   `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -111,6 +114,7 @@ func CreateInbound(c *gin.Context) {
 		Fallback:       body.Fallback,
 		Enabled:        true,
 		AutoHeal:       derefBool(body.AutoHeal, true),
+		AutoHealInterval: body.AutoHealInterval,
 	}
 	if err := validateInbound(in.Protocol, in.TLSEnabled, in.TLSCertID); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -141,6 +145,7 @@ func UpdateInbound(c *gin.Context) {
 		Fallback       *string `json:"fallback"`
 		Enabled        *bool   `json:"enabled"`
 		AutoHeal       *bool   `json:"auto_heal"`
+		AutoHealInterval *int   `json:"auto_heal_interval"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -176,6 +181,9 @@ func UpdateInbound(c *gin.Context) {
 	}
 	if body.AutoHeal != nil {
 		updates["auto_heal"] = *body.AutoHeal
+	}
+	if body.AutoHealInterval != nil {
+		updates["auto_heal_interval"] = *body.AutoHealInterval
 	}
 	// 校验更新后的最终状态（trojan 必须 TLS + 证书），防止生成非法配置拖垮节点
 	effProto := in.Protocol

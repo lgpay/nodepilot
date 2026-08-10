@@ -27,6 +27,7 @@ const (
 var (
 	failCounts   = map[uint]int{}
 	healAttempts = map[uint]int{}
+	lastHeal     = map[uint]time.Time{} // nodeID -> 上次自愈时间（用于间隔冷却）
 	wasOffline   = map[uint]bool{}
 )
 
@@ -68,10 +69,12 @@ func probeAll() {
 				failCounts[in.ID]++
 				allOK = false
 				log.Printf("[probe] node=%d inbound=%d port=%d unreachable (fails=%d)", node.ID, in.ID, in.Port, failCounts[in.ID])
-				// 仅当该入站开启自动修复（auto_heal）且连续失败达阈值时才换端口
-				if in.AutoHeal && failCounts[in.ID] >= failThreshold {
+			// 仅当该入站开启自动修复（auto_heal）且连续失败达阈值、且距上次自愈已过最小间隔时才换端口
+			if in.AutoHeal && in.AutoHealInterval > 0 && failCounts[in.ID] >= failThreshold {
+				if last, ok := lastHeal[node.ID]; !ok || time.Since(last) >= time.Duration(in.AutoHealInterval)*time.Second {
 					selfHeal(node, in)
 				}
+			}
 			} else {
 				conn.Close()
 				failCounts[in.ID] = 0
@@ -134,6 +137,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 		log.Printf("[probe] node=%d re-dispatch failed: %v", node.ID, err)
 	}
 	healAttempts[node.ID] = att + 1
+	lastHeal[node.ID] = time.Now()
 	failCounts[in.ID] = 0 // 等待下次探测验证新端口
 }
 

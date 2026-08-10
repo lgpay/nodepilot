@@ -341,7 +341,7 @@ function renderSidebar() {
   subsData.forEach(s => {
     const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '<span class="badge blue">ACL4SSR</span>' : '<span class="badge">无规则</span>';
     h += '<div class="ti ' + (sel.type === 'sub' && sel.id === s.id ? 'active' : '') + '" onclick="selectSub(' + s.id + ')">' +
-      '<span class="lbl">' + esc(s.name) + ' <span class="muted">' + s.format + '</span> ' + mod + '</span>' +
+      '<span class="lbl">' + esc(s.name) + ' <span class="muted">' + formatName(s.format) + '</span> ' + mod + '</span>' +
       '<button class="sm" title="复制订阅链接" onclick="event.stopPropagation();copyText(location.origin+\'/api/v1/sub/' + s.token + '\')">⧉</button></div>';
   });
   h += '<div class="sb-head">证书<button class="sm" onclick="showCreateCert()">+ 申请</button></div>';
@@ -640,6 +640,7 @@ async function renderInboundDetail(id) {
     '<label>TLS 证书（从全局证书选择；留空则用占位证书）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div class="row">' +
     '<div><label>自动修复（端口不通自动换端口）</label><input id="ib_autoheal" type="checkbox" ' + (inb.auto_heal !== false ? 'checked' : '') + '></div>' +
+    '<div><label>自动修复间隔(秒,0=不修复)</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
     '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自愈改端口</span>' : '') + '</div>' +
     '<div></div></div>' +
     '<p class="muted" style="margin-top:10px">停用的入站不会生成到节点 xray 配置，也不参与连通性探测；修改后需「下发配置」才在节点上生效。</p>' +
@@ -661,10 +662,10 @@ async function renderInboundDetail(id) {
 }
 async function saveInbound(id) {
   const nodeId = sel.parentId;
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal: chk('ib_autoheal'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
     showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderInboundDetail(id);
   }
 }
@@ -816,8 +817,12 @@ function buildSubFilters(advId, tagsId) {
   return JSON.stringify(f);
 }
 function subFmtOptions(cur) {
-  const fs = [['vmess', 'V2Ray(vmess)'], ['clash', 'Clash'], ['surfboard', 'Surfboard'], ['loon', 'Loon'], ['sip008', 'SIP008']];
+  const fs = [['vmess', 'V2Ray'], ['clash', 'Clash'], ['surfboard', 'Surfboard'], ['loon', 'Loon'], ['sip008', 'SIP008']];
   return fs.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
+}
+function formatName(fmt) {
+  const m = { vmess: 'V2Ray', clash: 'Clash', surfboard: 'Surfboard', loon: 'Loon', sip008: 'SIP008' };
+  return m[fmt] || fmt;
 }
 function subModeOptions(cur) {
   const ms = [['none', '无规则'], ['acl4ssr_online', 'ACL4SSR_Online']];
@@ -994,7 +999,7 @@ async function showCreateSub() {
     '<label>分组名</label><input id="m_s_name" placeholder="my-sub">' +
     '<div class="row">' +
     '<div><label>格式</label><select id="m_s_fmt">' + subFmtOptions('vmess') + '</select></div>' +
-    '<div><label>规则</label><select id="m_s_mode">' + subModeOptions('acl4ssr_online') + '</select></div></div>' +
+    '<div><label>规则</label><select id="m_s_mode">' + subModeOptions('none') + '</select></div></div>' +
     '<label>纳入的入站（多选精确选择；不选则默认全部）</label>' +
     '<div class="inblist">' + subInboundChecklist([]) + '</div>' +
     '<div class="row">' +
