@@ -62,6 +62,9 @@ func NewRouter(webDir string) *gin.Engine {
 		// 流量统计聚合
 		authed.GET("/stats/overview", StatsOverview)
 
+		// IP 归属查询（自动识别节点区域）
+		authed.GET("/geo", GeoLookup)
+
 		// 预警通知渠道（邮件 / 企业微信 / Telegram）
 		authed.GET("/notifiers", ListNotifiers)
 		authed.POST("/notifiers", CreateNotifier)

@@ -20,6 +20,7 @@ type ExportItem struct {
 	SNI        string // TLS SNI / ws Host 头（tls 时=节点接入 host）
 	UUID       string
 	Alias      string // 别名/备注（vmess ps）
+	Region     string // 节点区域（ISO 两位国家码或常见中英文地区名），用于生成旗帜前缀
 }
 
 // BuildVMess 生成 vmess 订阅内容：各 client 的 vmess:// 链接用 \n 连接后整体 base64
@@ -46,7 +47,7 @@ func vmessLink(it ExportItem) string {
 	}
 	m := map[string]interface{}{
 		"v":    "2",
-		"ps":   it.Alias,
+		"ps":   displayName(it),
 		"add":  it.Host,
 		"port": it.Port,
 		"id":   it.UUID,
@@ -100,10 +101,69 @@ func proxyName(it ExportItem) string {
 	return fmt.Sprintf("%s-%d", strings.ToUpper(it.Protocol), it.Port)
 }
 
+// displayName 返回带区域旗帜的代理显示名（如 "🇩🇪 DE"）；区域无法识别出旗帜时仅返回原显示名。
+func displayName(it ExportItem) string {
+	if f := flagEmoji(it.Region); f != "" {
+		return f + " " + proxyName(it)
+	}
+	return proxyName(it)
+}
+
+// flagEmoji 根据区域生成旗帜 emoji（ISO 3166 两位码 → 区域指示符）。
+// region 支持 ISO 两位国家码（大小写均可）及常见中英文地区名，无法识别返回空串。
+func flagEmoji(region string) string {
+	r := strings.ToUpper(strings.TrimSpace(region))
+	code := regionCode(r)
+	if code == "" {
+		return ""
+	}
+	return string(rune(0x1F1E6)+rune(code[0]-'A')) + string(rune(0x1F1E6)+rune(code[1]-'A'))
+}
+
+// regionCode 把区域名解析为 ISO 两位国家码；已是两位字母码则原样返回。
+func regionCode(upper string) string {
+	if len(upper) == 2 && upper[0] >= 'A' && upper[0] <= 'Z' && upper[1] >= 'A' && upper[1] <= 'Z' {
+		return upper
+	}
+	m := map[string]string{
+		"德国": "DE", "德意志": "DE", "GERMANY": "DE",
+		"日本": "JP", "JAPAN": "JP", "东京": "JP", "大阪": "JP",
+		"香港": "HK", "HONGKONG": "HK", "HONG KONG": "HK",
+		"台湾": "TW", "TAIWAN": "TW",
+		"新加坡": "SG", "SINGAPORE": "SG",
+		"美国": "US", "美利坚": "US", "USA": "US", "UNITED STATES": "US",
+		"韩国": "KR", "南韩": "KR", "KOREA": "KR", "SOUTH KOREA": "KR",
+		"英国": "GB", "UK": "GB", "UNITED KINGDOM": "GB",
+		"法国": "FR", "FRANCE": "FR",
+		"俄罗斯": "RU", "RUSSIA": "RU",
+		"加拿大": "CA", "CANADA": "CA",
+		"澳大利亚": "AU", "澳洲": "AU", "AUSTRALIA": "AU",
+		"印度": "IN", "INDIA": "IN",
+		"荷兰": "NL", "NETHERLANDS": "NL",
+		"意大利": "IT", "ITALY": "IT",
+		"西班牙": "ES", "SPAIN": "ES",
+		"巴西": "BR", "BRAZIL": "BR",
+		"瑞士": "CH", "SWITZERLAND": "CH",
+		"瑞典": "SE", "SWEDEN": "SE",
+		"芬兰": "FI", "FINLAND": "FI",
+		"波兰": "PL", "POLAND": "PL",
+		"越南": "VN", "VIETNAM": "VN",
+		"泰国": "TH", "THAILAND": "TH",
+		"马来西亚": "MY", "MALAYSIA": "MY",
+		"印度尼西亚": "ID", "INDONESIA": "ID",
+		"土耳其": "TR", "TURKEY": "TR",
+		"阿联酋": "AE", "迪拜": "AE", "UAE": "AE",
+	}
+	if v, ok := m[upper]; ok {
+		return v
+	}
+	return ""
+}
+
 // buildClashProxy 构造单个代理（vmess/vless/trojan/ss/socks/http），含 sni / tls / ws headers。
 func buildClashProxy(it ExportItem) clashProxy {
 	p := clashProxy{
-		Name:    proxyName(it),
+		Name:    displayName(it),
 		Server:  it.Host,
 		Port:    it.Port,
 		Network: it.Transport,
@@ -179,7 +239,7 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 			continue // 跳过 Surfboard 不支持的协议（vless / grpc / ssr 等）
 		}
 		sb.WriteString(line + "\n")
-		names = append(names, proxyName(it))
+		names = append(names, displayName(it))
 	}
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Surfboard 支持的代理（仅支持 vmess/trojan/ss/socks5/http）")
@@ -202,7 +262,7 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 
 // buildSurgeProxyLine 生成单条 Surge 风格代理定义行。ok=false 表示该协议不被 Surfboard 支持。
 func buildSurgeProxyLine(it ExportItem) (string, bool) {
-	name := proxyName(it)
+	name := displayName(it)
 	path := it.WsPath
 	if path == "" {
 		path = "/v2ray"
@@ -277,7 +337,7 @@ func BuildSIP008(items []ExportItem) (string, error) {
 		}
 		server := sipServer{
 			ID:       it.UUID,
-			Remarks:  it.Alias,
+			Remarks:  displayName(it),
 			Address:  it.Host,
 			Port:     it.Port,
 			Protocol: "vmess",
@@ -376,7 +436,7 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) 
 			continue
 		}
 		sb.WriteString(line + "\n")
-		names = append(names, proxyName(it))
+		names = append(names, displayName(it))
 	}
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Loon 支持的代理")
@@ -464,7 +524,7 @@ func buildLoonRemoteRules(rulesBaseURL string) string {
 //
 // ok=false 表示该协议/传输不被 Loon 支持（如 gRPC）。
 func buildLoonProxyLine(it ExportItem) (string, bool) {
-	name := proxyName(it)
+	name := displayName(it)
 	path := it.WsPath
 	if path == "" {
 		path = "/v2ray"

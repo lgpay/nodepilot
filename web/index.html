@@ -418,6 +418,16 @@ function fmtBytes(b) {
   return (i === 0 ? b : b.toFixed(2)) + ' ' + u[i];
 }
 
+// 按节点地址自动识别区域（写入 ISO 国家码，供订阅旗帜使用）
+async function autoRegion(inputId, address) {
+  if (!address) return showToast('请先填写节点地址', 'warn');
+  const d = await api('GET', '/geo?host=' + encodeURIComponent(address));
+  if (d && d.country_code) {
+    document.getElementById(inputId).value = d.country_code;
+    showToast('已识别 ' + d.country + '（' + d.country_code + '），保存后生效', 'ok');
+  }
+}
+
 // ---- 统计 ----
 async function renderStats() {
   setLoading('加载统计中…');
@@ -499,7 +509,7 @@ async function renderNodeDetail(id) {
     '<div class="row">' +
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
-    '<div><label>地域</label><input id="n_region" value="' + esc(n.region || '') + '"></div></div>' +
+    '<div><label>地域</label><div style="display:flex;gap:6px"><input id="n_region" value="' + esc(n.region || '') + '"><button class="sm" style="margin-top:0;flex:0 0 auto" onclick="autoRegion(\'n_region\',\'' + esc(n.address) + '\')">自动识别</button></div></div></div>' +
     '<div class="row">' +
     '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
     '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
@@ -923,7 +933,7 @@ function showCreateNode() {
   setModal('<h2>注册节点</h2>' +
     '<label>名称</label><input id="m_n_name" placeholder="hk-01">' +
     '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321">' +
-    '<label>地域</label><input id="m_n_region">' +
+    '<label>地域</label><div style="display:flex;gap:6px"><input id="m_n_region"><button class="sm" style="margin-top:0;flex:0 0 auto" onclick="autoRegion(\'m_n_region\', val(\'m_n_addr\'))">自动识别</button></div>' +
     '<label>标签(逗号)</label><input id="m_n_tags">' +
     '<label>端口范围</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>');

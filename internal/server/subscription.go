@@ -289,9 +289,10 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 				TLSEnabled: in.TLSEnabled,
 				WsPath:     wsPath,
 				SNI:        sni,
-			UUID:       cl.UUID,
-			Alias:      cl.Alias,
-		})
+				UUID:       cl.UUID,
+				Alias:      cl.Alias,
+				Region:     node.Region,
+			})
 		}
 	}
 	return items, nil
