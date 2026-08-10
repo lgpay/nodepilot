@@ -9,24 +9,16 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"os"
+
+	"nodepilot/internal/config"
 )
 
-var key = deriveKey(os.Getenv("NP_MASTER_KEY"))
-
-func deriveKey(env string) []byte {
-	if env == "" {
-		env = "nodepilot-dev-secret-change-me"
-	}
-	// 统一为 32 字节（AES-256）：截断或补零
-	k := make([]byte, 32)
-	copy(k, []byte(env))
-	return k
-}
+// key 取 config.MasterKey（环境变量或持久化密钥文件），不再硬编码 dev 占位串。
+func key() []byte { return config.MasterKey }
 
 // Encrypt 明文加密为 base64 密文
 func Encrypt(plaintext string) (string, error) {
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(key())
 	if err != nil {
 		return "", err
 	}
@@ -51,7 +43,7 @@ func Decrypt(ciphertext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(key())
 	if err != nil {
 		return "", err
 	}

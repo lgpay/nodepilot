@@ -64,7 +64,7 @@ get_server_binary() {
   local url="${NP_BINARY_URL:-}"
   if [ -z "$url" ]; then
     local arch; arch=$(detect_arch)
-    url="https://gitee.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
+    url="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
   fi
   yellow "下载管理端二进制: $url"
   local tmp; tmp=$(mktemp -d)
@@ -154,10 +154,9 @@ verify() {
   sleep 2
   local port="${ADDR#:}"
   local code
-  code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/api/v1/auth/login" \
-    -X POST -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}' || true)
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$port/" || true)
   if [ "$code" = "200" ]; then
-    green "管理端自检通过（登录 API 返回 200）"
+    green "管理端自检通过（Web 控制台可访问）"
   else
     yellow "自检未通过（HTTP $code），请查看日志: journalctl -u $SERVICE_NAME -n 50"
   fi
@@ -176,7 +175,7 @@ install_server() {
   if systemctl is-active --quiet "$SERVICE_NAME"; then
     green "NodePilot 管理端安装并启动成功！"
     blue "控制台: http://<本机IP>$ADDR"
-    yellow "默认管理员: admin / admin123（请尽快修改）"
+    yellow "初始管理员 admin 的随机密码已打印在上方日志与 journalctl 中，请登录后立即修改！"
     verify
   else
     red "管理端启动失败，请查看日志: journalctl -u $SERVICE_NAME -n 50"

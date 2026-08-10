@@ -2,7 +2,6 @@ package agent
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"nodepilot/internal/auth"
+	"nodepilot/internal/httputil"
 )
 
 // cfg 保存 agent 运行配置
@@ -38,7 +38,7 @@ func TokenMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authz := c.GetHeader("Authorization")
 		t := strings.TrimPrefix(authz, "Bearer ")
-		if !auth.CheckNodeToken(t, cfg.Token) {
+		if !auth.CheckNodeToken(t, auth.TokenHash(cfg.Token)) {
 			c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
 			return
 		}
@@ -66,7 +66,7 @@ func PutCert(c *gin.Context) {
 		CAPEM   string `json:"ca_pem"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": "invalid request body"})
 		return
 	}
 	if body.CertPEM == "" || body.KeyPEM == "" {
@@ -74,7 +74,8 @@ func PutCert(c *gin.Context) {
 		return
 	}
 	if err := ReceiveCert(body.CertPEM, body.KeyPEM, body.CAPEM); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[agent] save cert failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to save certificate"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true, "paths": CertPaths()})
@@ -87,20 +88,23 @@ func PutConfig(c *gin.Context) {
 		XrayConfig json.RawMessage `json:"xray_config"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		c.JSON(400, gin.H{"error": "invalid request body"})
 		return
 	}
 	if err := os.MkdirAll(cfg.ConfigDir, 0755); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[agent] mkdir config dir failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to prepare config dir"})
 		return
 	}
 	path := filepath.Join(cfg.ConfigDir, "config.json")
 	if err := os.WriteFile(path, body.XrayConfig, 0644); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[agent] write config failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to write config"})
 		return
 	}
 	if err := Restart(path); err != nil {
-		c.JSON(500, gin.H{"error": "config written but xray start failed: " + err.Error(), "version": body.Version})
+		log.Printf("[agent] xray start failed: %v", err)
+		c.JSON(500, gin.H{"error": "config written but xray start failed", "version": body.Version})
 		return
 	}
 	c.JSON(200, gin.H{"accepted": true, "version": body.Version})
@@ -142,12 +146,7 @@ func postHeartbeat() {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+cfg.Token)
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
+	client := httputil.AgentClient(10 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[agent] heartbeat failed: %v", err)

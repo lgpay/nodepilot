@@ -54,7 +54,8 @@ func CreateCert(c *gin.Context) {
 	}
 	tokenEnc, err := secret.Encrypt(body.CFAPIToken)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[cert] encrypt cf token failed: %v", err)
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	cert := model.Certificate{
@@ -68,7 +69,8 @@ func CreateCert(c *gin.Context) {
 		CAPath:     agentCaFile,
 	}
 	if err := store.DB.Create(&cert).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[cert] create cert record failed: %v", err)
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	exp, err := issueCert(body.Domain, body.CFEmail, body.CFAPIToken)
@@ -76,7 +78,8 @@ func CreateCert(c *gin.Context) {
 		cert.Status = "failed"
 		cert.LastError = err.Error()
 		store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()})
-		c.JSON(502, gin.H{"error": "签发失败: " + err.Error(), "id": cert.ID, "status": "failed"})
+		log.Printf("[cert] issue failed: %v", err)
+		c.JSON(502, gin.H{"error": "证书签发失败，详见服务端日志", "id": cert.ID, "status": "failed"})
 		return
 	}
 	store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""})
@@ -103,7 +106,8 @@ func GetCert(c *gin.Context) {
 func DeleteCert(c *gin.Context) {
 	id := c.Param("id")
 	if err := store.DB.Delete(&model.Certificate{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[cert] delete cert failed: %v", err)
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
@@ -125,7 +129,8 @@ func RenewCert(c *gin.Context) {
 	exp, err := issueCert(cert.Domain, cert.CFEmail, token)
 	if err != nil {
 		store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()})
-		c.JSON(502, gin.H{"error": "签发失败: " + err.Error()})
+		log.Printf("[cert] renew failed: %v", err)
+		c.JSON(502, gin.H{"error": "证书续签失败，详见服务端日志"})
 		return
 	}
 	store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""})
@@ -144,7 +149,8 @@ func DistributeCert(c *gin.Context) {
 		return
 	}
 	if err := distributeCert(cert); err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		log.Printf("[cert] distribute failed: %v", err)
+		c.JSON(500, gin.H{"error": "证书分发失败，详见服务端日志"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})

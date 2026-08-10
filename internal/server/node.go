@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm/clause"
 	"nodepilot/internal/auth"
 	"nodepilot/internal/model"
+	"nodepilot/internal/secret"
 	"nodepilot/internal/store"
 	"nodepilot/internal/subscription"
 )
@@ -44,10 +45,10 @@ func LoginHandler(c *gin.Context) {
 	}
 	token, err := auth.IssueJWT(admin.Username)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	c.JSON(200, gin.H{"token": token})
+	c.JSON(200, gin.H{"token": token, "must_change_pwd": admin.MustChangePwd})
 }
 
 func LogoutHandler(c *gin.Context) {
@@ -88,11 +89,14 @@ func ChangePassword(c *gin.Context) {
 	}
 	hash, err := auth.HashPassword(body.NewPassword)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	if err := store.DB.Model(&admin).Update("password_hash", hash).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+	if err := store.DB.Model(&admin).Updates(map[string]interface{}{
+		"password_hash":   hash,
+		"must_change_pwd": false,
+	}).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
@@ -119,6 +123,11 @@ func CreateNode(c *gin.Context) {
 		return
 	}
 	token := auth.GenToken()
+	tokenEnc, err := secret.Encrypt(token)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	node := model.Node{
 		Name:      strings.TrimSpace(body.Name),
 		Address:   strings.TrimSpace(body.Address),
@@ -127,23 +136,24 @@ func CreateNode(c *gin.Context) {
 		Tags:      strings.TrimSpace(body.Tags),
 		PortRange: strings.TrimSpace(body.PortRange),
 		MonthlyTrafficBytes: body.MonthlyTrafficBytes,
-		Token:     token,
+		TokenHash: auth.TokenHash(token),
+		TokenEnc:  tokenEnc,
 		Enabled:   true,
 		Status:    "offline",
 		Connectivity: "ok",
 	}
 	if err := store.DB.Create(&node).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	// token 仅在创建时明文返回一次，用于部署 agent
+	// token 仅在创建时明文返回一次，用于部署 agent（之后再获取请走 /nodes/:id/install）
 	c.JSON(201, gin.H{"id": node.ID, "token": token, "address": node.Address})
 }
 
 func ListNodes(c *gin.Context) {
 	var nodes []model.Node
 	// 不返回 Token 字段
-	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,monthly_traffic_bytes,created_at").
+	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,monthly_traffic_bytes,expires_at,created_at").
 		Find(&nodes)
 	for i := range nodes {
 		nodes[i].Flag = subscription.FlagEmoji(nodes[i].Region)
@@ -161,7 +171,8 @@ func GetNode(c *gin.Context) {
 	var versions []model.ConfigVersion
 	store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions)
 	node.Flag = subscription.FlagEmoji(node.Region)
-	c.JSON(200, gin.H{"node": node, "token": node.Token, "config_versions": versions})
+	// 不再返回明文 token；需要重新获取部署命令请调用 /nodes/:id/install
+	c.JSON(200, gin.H{"node": node, "config_versions": versions})
 }
 
 // NodeInstall 生成该节点对应的 agent 一键安装命令：预填管理端地址、节点 token、节点 id、
@@ -191,12 +202,18 @@ func NodeInstall(c *gin.Context) {
 	if i := strings.LastIndex(node.Address, ":"); i >= 0 {
 		addr = ":" + node.Address[i+1:]
 	}
-	scriptURL := "https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh"
+	scriptURL := "https://github.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh"
+	// token 以密文存储，安装命令需要明文，这里解密后填入（仅管理员可见）
+	token, err := secret.Decrypt(node.TokenEnc)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s bash <(curl -L %s)",
-		panelURL, node.Token, node.ID, addr, scriptURL)
+		panelURL, token, node.ID, addr, scriptURL)
 	c.JSON(200, gin.H{
 		"node_id":   node.ID,
-		"token":     node.Token,
+		"token":     token,
 		"panel_url": panelURL,
 		"agent_addr": addr,
 		"script_url": scriptURL,
@@ -219,6 +236,7 @@ func UpdateNode(c *gin.Context) {
 		Enabled   *bool   `json:"enabled"`
 		PortRange *string `json:"port_range"`
 		MonthlyTrafficBytes *int64 `json:"monthly_traffic_bytes"`
+		ExpiresAt *string `json:"expires_at"` // RFC3339；空串=清除（长期有效）
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -254,14 +272,48 @@ func UpdateNode(c *gin.Context) {
 		}
 		updates["monthly_traffic_bytes"] = v
 	}
+	if body.ExpiresAt != nil {
+		if *body.ExpiresAt == "" {
+			updates["expires_at"] = nil // 清除有效期
+		} else {
+			t, err := time.Parse(time.RFC3339, *body.ExpiresAt)
+			if err != nil {
+				c.JSON(400, gin.H{"error": "服务器有效期格式不正确"})
+				return
+			}
+			updates["expires_at"] = t
+		}
+	}
 	store.DB.Model(&node).Updates(updates)
 	c.JSON(200, gin.H{"ok": true})
 }
 
 func DeleteNode(c *gin.Context) {
 	id := c.Param("id")
-	if err := store.DB.Delete(&model.Node{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+	// 事务内级联删除关联数据，避免孤儿记录
+	err := store.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("node_id = ?", id).Delete(&model.Inbound{}).Error; err != nil {
+			return err
+		}
+		// clients 通过 inbound 间接归属，按节点下所有 inbound 删除
+		if err := tx.
+			Where("inbound_id IN (SELECT id FROM inbounds WHERE node_id = ?)", id).
+			Delete(&model.Client{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("node_id = ?", id).Delete(&model.ConfigVersion{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("node_id = ?", id).Delete(&model.TrafficStat{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&model.Node{}, id).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})

@@ -63,9 +63,24 @@ go build -o bin/agent  ./cmd/agent
 ./bin/server        # 监听 :8080
 ```
 
-首次启动会初始化默认管理员账号 **admin / admin123**（请尽快修改）。
+首次启动会初始化默认管理员账号 **admin**，并**随机生成密码**（不再使用固定 `admin123`）。
+随机密码会打印到控制台与服务端日志（`journalctl -u nodepilot -n 50`），登录后**强制要求立即修改密码**，
+未修改前除「修改密码」外的所有接口均返回 `403`。
 
 浏览器打开 `http://<管理端IP>:8080`，用 `web/index.html` 或直接调用 API 操作。
+
+### 密钥与安全配置
+
+硬编码的密钥已全部移除，改为环境变量 / 持久化密钥文件：
+
+| 环境变量 | 说明 | 默认 |
+|----------|------|------|
+| `NP_JWT_SECRET` | JWT 签名密钥（HS256）。未设置时在数据库同目录生成随机密钥文件 `.nodepilot_jwt_secret`（权限 `0600`）并持久化 | 随机生成 |
+| `NP_MASTER_KEY` | AES-256 主密钥，用于加密 Cloudflare API Token 与节点 token。未设置时在数据库同目录生成 `.nodepilot_master_key` | 随机生成 |
+| `NP_AGENT_TLS_VERIFY` | 管理端↔agent 通信是否校验 TLS 证书（`true`/`false`）。默认 `false`（MVP 兼容，跳过校验） | `false` |
+
+> 生产环境建议：设置上述密钥环境变量（或备份好密钥文件），并将 `NP_AGENT_TLS_VERIFY=true`（配合可信证书）。
+> 节点 token 在数据库内仅以 `sha256` 哈希 + AES 加密形式存储，不再保存明文。
 
 ### 运行节点 agent
 
@@ -90,7 +105,7 @@ agent 会周期上报心跳；在管理端对节点点击「下发配置」即�
 也可使用一键脚本（自动下载二进制 + 注册 systemd 服务，运行目录隔离）：
 
 ```bash
-bash <(curl -L https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-server.sh)
+bash <(curl -L https://github.com/lgpay/nodepilot/raw/main/scripts/install-server.sh)
 ```
 
 手动部署步骤（与一键脚本等价）：
@@ -133,7 +148,7 @@ systemctl enable --now nodepilot
 
 ```bash
 # 交互式（按提示填管理端地址 / 节点 token / 节点 id）
-bash <(curl -L https://gitee.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh)
+bash <(curl -L https://github.com/lgpay/nodepilot/raw/main/scripts/install-agent.sh)
 
 # 非交互式 / 批量
 NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \

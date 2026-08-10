@@ -56,7 +56,7 @@ func GetRuleFile(c *gin.Context) {
 		}
 		b, err := json.Marshal(map[string]interface{}{"payload": payload})
 		if err != nil {
-			c.JSON(500, gin.H{"error": err.Error()})
+			c.JSON(500, gin.H{"error": "internal error"})
 			return
 		}
 		c.Data(200, "application/yaml; charset=utf-8", b)

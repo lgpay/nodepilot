@@ -1,10 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
-	"log"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
+	"time"
 
+	"nodepilot/internal/config"
 	"nodepilot/internal/server"
 	"nodepilot/internal/store"
 )
@@ -15,22 +22,54 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	flag.Parse()
 
+	// 结构化日志（文本格式，带时间/级别/调用点）
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+
+	// 密钥必须在 store.Init 之前就绪（token 迁移、AES 加解密依赖）
+	config.Init(*dbPath)
+
 	if err := store.Init(*dbPath); err != nil {
-		log.Fatalf("init db: %v", err)
+		slog.Error("init db failed", "err", err)
+		os.Exit(1)
 	}
 	// 规则镜像的磁盘缓存目录（与 db 同目录下的 rules/）
 	server.RulesCacheDir = filepath.Join(filepath.Dir(*dbPath), "rules")
-	// 首次启动初始化默认管理员 admin / admin123（生产务必修改）
-	if err := store.InitAdmin("admin", "admin123"); err != nil {
-		log.Fatalf("init admin: %v", err)
+	// 首次启动初始化默认管理员（随机密码，强制首次登录修改）
+	pwd, err := store.InitAdmin("admin")
+	if err != nil {
+		slog.Error("init admin failed", "err", err)
+		os.Exit(1)
+	}
+	if pwd != "" {
+		slog.Warn("================================================================")
+		slog.Warn("初始管理员已创建", "username", "admin", "password", pwd)
+		slog.Warn("请立即登录并在「修改密码」中更换此随机密码！")
+		slog.Warn("================================================================")
 	}
 
 	r := server.NewRouter(*webDir)
 	server.StartProbeScheduler()
 	server.StartCertRenewScheduler()
 	server.StartAlertScheduler()
-	log.Println("[server] NodePilot control plane listening on", *addr)
-	if err := r.Run(*addr); err != nil {
-		log.Fatalf("server run: %v", err)
+
+	srv := &http.Server{Addr: *addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		slog.Info("[server] NodePilot control plane listening", "addr", *addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server run failed", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	// 优雅关闭：捕获 SIGINT/SIGTERM，等待在途请求完成
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	slog.Info("[server] shutting down...")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("graceful shutdown failed", "err", err)
 	}
+	slog.Info("[server] stopped")
 }

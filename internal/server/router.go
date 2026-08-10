@@ -1,12 +1,17 @@
 package server
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"nodepilot/internal/auth"
+	"nodepilot/internal/model"
+	"nodepilot/internal/store"
 )
 
 // NewRouter 构建管理端 HTTP 路由（/api/v1）
@@ -15,8 +20,8 @@ func NewRouter(webDir string) *gin.Engine {
 	r := gin.Default()
 	v1 := r.Group("/api/v1")
 
-	// 公开：管理员登录
-	v1.POST("/auth/login", LoginHandler)
+	// 公开：管理员登录（加 IP 速率限制，防暴力破解）
+	v1.POST("/auth/login", LoginRateLimit(20, time.Minute), LoginHandler)
 	v1.POST("/auth/logout", AuthMiddleware(), LogoutHandler)
 	v1.POST("/auth/change-password", AuthMiddleware(), ChangePassword)
 
@@ -105,7 +110,7 @@ func fileExists(p string) bool {
 	return err == nil && !info.IsDir()
 }
 
-// AuthMiddleware 校验管理员 JWT
+// AuthMiddleware 校验管理员 JWT，并在 MustChangePwd 时拦截除修改密码外的所有接口。
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authz := c.GetHeader("Authorization")
@@ -114,15 +119,65 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(401, gin.H{"error": "missing token"})
 			return
 		}
-		if _, err := auth.ParseJWT(t); err != nil {
+		claims, err := auth.ParseJWT(t)
+		if err != nil {
 			c.AbortWithStatusJSON(401, gin.H{"error": "invalid token"})
 			return
+		}
+		// 首次启动随机密码未修改前，仅放行修改密码接口（强制改密）
+		if strings.HasSuffix(c.FullPath(), "/auth/change-password") {
+			c.Next()
+			return
+		}
+		if username, _ := claims["sub"].(string); username != "" {
+			var admin model.Admin
+			if store.DB.Where("username = ?", username).First(&admin).Error == nil && admin.MustChangePwd {
+				c.AbortWithStatusJSON(403, gin.H{"error": "please change password first", "must_change_pwd": true})
+				return
+			}
 		}
 		c.Next()
 	}
 }
 
-// NodeTokenMiddleware 校验节点 Bearer token（与管理端存储的明文 token 比对）
+// loginLimit 基于 IP 的固定窗口速率限制（无第三方依赖）。
+type loginLimit struct {
+	mu       sync.Mutex
+	hits     map[string]int
+	window   time.Time
+	maxHits  int
+	interval time.Duration
+}
+
+// LoginRateLimit 限制每个 IP 在 interval 内最多 max 次登录尝试。
+func LoginRateLimit(max int, interval time.Duration) gin.HandlerFunc {
+	lim := &loginLimit{
+		hits:     map[string]int{},
+		window:   time.Now(),
+		maxHits:  max,
+		interval: interval,
+	}
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		lim.mu.Lock()
+		// 窗口到期则重置
+		if time.Since(lim.window) >= lim.interval {
+			lim.hits = map[string]int{}
+			lim.window = time.Now()
+		}
+		n := lim.hits[ip]
+		if n >= lim.maxHits {
+			lim.mu.Unlock()
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts, try later"})
+			return
+		}
+		lim.hits[ip] = n + 1
+		lim.mu.Unlock()
+		c.Next()
+	}
+}
+
+// NodeTokenMiddleware 校验节点 Bearer token（比对 sha256(bearer) 与存储的 TokenHash）
 func NodeTokenMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
@@ -133,7 +188,7 @@ func NodeTokenMiddleware() gin.HandlerFunc {
 		}
 		authz := c.GetHeader("Authorization")
 		t := strings.TrimPrefix(authz, "Bearer ")
-		if !auth.CheckNodeToken(t, node.Token) {
+		if !auth.CheckNodeToken(t, node.TokenHash) {
 			c.AbortWithStatusJSON(401, gin.H{"error": "unauthorized"})
 			return
 		}

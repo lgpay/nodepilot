@@ -6,175 +6,237 @@
 <title>NodePilot 控制台</title>
 <style>
   :root {
-    --bg: #f3f5f9; --card: #ffffff; --border: #e3e7ee; --text: #1f2733; --muted: #8a93a3;
-    --primary: #2f6fed; --primary-strong: #2457c9; --danger: #d64545; --danger-strong: #b33535;
-    --ok: #1a9d54; --warn: #d68910;
-    --header-bg: #1f2d3d; --header-fg: #ffffff;
-    --sidebar-bg: #243447; --sidebar-fg: #cfd8e3; --sidebar-hover: #2f3f54; --sidebar-act: #2f6fed;
-    --input-bg: #fff; --input-border: #ccd1d9; --input-dis: #f0f1f3;
-    --code-bg: #0f1722; --code-fg: #9fe6a0;
-    --shadow: 0 1px 3px rgba(16,24,40,.06), 0 1px 2px rgba(16,24,40,.04);
-    --shadow-lg: 0 8px 30px rgba(0,0,0,.18);
-    --radius: 10px; --radius-sm: 6px;
+    --bg: #f6f7f9; --card: #ffffff; --border: #e6e9ee; --text: #1c1f26; --muted: #7c8494;
+    --primary: #2563eb; --primary-strong: #1d4ed8; --primary-soft: #eaf1fe;
+    --danger: #dc2626; --danger-strong: #b91c1c; --danger-soft: #fdecec;
+    --ok: #16a34a; --ok-soft: #e9f6ee; --warn: #d97706; --warn-soft: #fdf3e5;
+    --header-bg: #ffffff; --header-fg: #1c1f26; --header-accent: #2563eb;
+    --sidebar-bg: #ffffff; --sidebar-fg: #4b5563; --sidebar-hover: #f3f5f8; --sidebar-act: #eaf1fe;
+    --input-bg: #ffffff; --input-border: #d8dce3; --input-dis: #f2f3f5;
+    --code-bg: #f3f5f8; --code-fg: #3f4754;
+    --shadow: 0 1px 3px rgba(16,24,40,.07);
+    --shadow-lg: 0 12px 32px rgba(16,24,40,.15);
+    --radius: 10px; --radius-sm: 6px; --radius-pill: 999px;
+    --maxw: 1180px;
   }
   [data-theme="dark"] {
-    --bg: #10141b; --card: #1a202a; --border: #2a3341; --text: #e4e9f0; --muted: #8792a3;
-    --primary: #3b82f6; --primary-strong: #2f6fed; --danger: #e05555; --danger-strong: #c74040;
-    --ok: #22c55e; --warn: #e5a53d;
-    --header-bg: #0d1117; --header-fg: #e4e9f0;
-    --sidebar-bg: #151b24; --sidebar-fg: #a9b4c2; --sidebar-hover: #212a37; --sidebar-act: #2f6fed;
-    --input-bg: #131922; --input-border: #333e4c; --input-dis: #20272f;
-    --code-bg: #0d1117; --code-fg: #7ee787;
-    --shadow: 0 1px 3px rgba(0,0,0,.3); --shadow-lg: 0 8px 30px rgba(0,0,0,.5);
+    --bg: #0f1116; --card: #171a21; --border: #262c38; --text: #e6eaf1; --muted: #8b94a6;
+    --primary: #3b82f6; --primary-strong: #60a5fa; --primary-soft: #1a2740;
+    --danger: #f87171; --danger-strong: #fca5a5; --danger-soft: #3a2226;
+    --ok: #4ade80; --ok-soft: #142b1d; --warn: #fbbf24; --warn-soft: #332912;
+    --header-bg: #0d0f14; --header-fg: #e6eaf1; --header-accent: #3b82f6;
+    --sidebar-bg: #0d0f14; --sidebar-fg: #a0a9ba; --sidebar-hover: #1a1e28; --sidebar-act: #1a2740;
+    --input-bg: #13161d; --input-border: #2c3340; --input-dis: #1a1d25;
+    --code-bg: #0d0f14; --code-fg: #7ee787;
+    --shadow: 0 1px 3px rgba(0,0,0,.4);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.45);
   }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; font-size: 14px; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+    margin: 0; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+    font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
   a { color: var(--primary); }
 
-  header { background: var(--header-bg); color: var(--header-fg); padding: 0 20px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; box-shadow: var(--shadow); z-index: 5; }
-  header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .3px; }
-  header .right { display: flex; align-items: center; gap: 10px; }
+  header { background: var(--header-bg); color: var(--header-fg); padding: 0 18px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; border-bottom: 1px solid var(--border); z-index: 5; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 26px; height: 26px; border-radius: 6px; background: var(--header-accent); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: .2px; }
+  header .right { display: flex; align-items: center; gap: 9px; }
   header .right .chk { color: var(--header-fg); }
+  header .right button { color: var(--header-fg); border-color: var(--input-border); }
+  header .right button:hover { background: var(--sidebar-hover); border-color: var(--muted); color: var(--header-fg); }
   .burger { display: none; background: transparent; color: var(--header-fg); border: 0; font-size: 20px; cursor: pointer; padding: 0 6px; }
 
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); }
-  .card h2 { font-size: 15px; margin: 0 0 12px; }
-  .card h3 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); }
-  label { display: block; font-size: 13px; margin: 8px 0 3px; color: var(--muted); }
-  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font-size: 13px; }
-  input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: var(--primary); }
-  input:disabled { background: var(--input-dis); color: var(--muted); }
-  button { background: var(--primary); color: #fff; border: 0; padding: 8px 14px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 10px; font-size: 13px; font-weight: 500; transition: background .15s, filter .15s, opacity .15s; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card > h2:first-child, .card > h3:first-child { margin-top: 0; }
+  .card h2 { font-size: 16px; margin: 0 0 14px; font-weight: 650; }
+  .card h3 { font-size: 13px; margin: 18px 0 10px; color: var(--muted); font-weight: 600; }
+  .card h3:first-child { margin-top: 0; }
+  label { display: block; font-size: 12.5px; margin: 10px 0 4px; color: var(--muted); font-weight: 500; }
+  input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font-size: 13px; transition: border-color .15s, box-shadow .15s; font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+  input:disabled { background: var(--input-dis); color: var(--muted); cursor: default; }
+  button { background: var(--primary); color: #fff; border: 0; padding: 9px 16px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 12px; font-size: 13px; font-weight: 600; transition: background .15s, opacity .15s, transform .08s; }
   button:hover { background: var(--primary-strong); }
-  button:disabled { opacity: .6; cursor: not-allowed; }
-  button.secondary { background: #6b7785; } button.secondary:hover { background: #58636f; }
-  [data-theme="dark"] button.secondary { background: #3a4553; } [data-theme="dark"] button.secondary:hover { background: #465260; }
-  button.danger { background: var(--danger); } button.danger:hover { background: var(--danger-strong); }
-  button.small { padding: 4px 10px; font-size: 12px; margin-top: 0; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--input-border); }
+  button.secondary:hover { background: var(--bg); border-color: var(--muted); }
+  [data-theme="dark"] button.secondary { color: var(--text); }
+  button.danger { background: var(--danger); }
+  button.danger:hover { background: var(--danger-strong); }
+  button.small { padding: 5px 11px; font-size: 12px; margin-top: 0; }
   button.sm { padding: 2px 8px; font-size: 11px; margin: 0 0 0 6px; }
-  .btnrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 14px; }
   .btnrow button { margin-top: 0; }
   .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
-  .chk input { width: auto; margin: 0; }
+  .chk input { width: auto; margin: 0; accent-color: var(--primary); }
   .inblist { max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 5px; }
   .subgrp { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 8px; }
   .subgrp:first-child { margin-top: 0; }
   .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
-  .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; }
-  .row { display: flex; gap: 12px; }
+  .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 6px; }
+  .row { display: flex; gap: 14px; }
   .row > div { flex: 1; min-width: 0; }
+  .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
 
-  .tblwrap { overflow: auto; max-height: 440px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .tblwrap { overflow: auto; max-height: 460px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tbl th, .tbl td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .tbl th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--card); z-index: 1; }
-  .tbl tr:last-child td { border-bottom: 0; }
-  .tbl tbody tr:hover { background: rgba(47,111,237,.05); }
-  .search { margin-bottom: 10px; max-width: 260px; }
+  .tbl th, .tbl td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .tbl tbody tr { transition: background .12s; }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr:hover { background: var(--primary-soft); }
+  [data-theme="dark"] .tbl tbody tr:hover { background: rgba(59,130,246,.12); }
+  .search { margin-bottom: 10px; max-width: 280px; }
 
-  pre { background: var(--code-bg); color: var(--code-fg); padding: 12px; border-radius: var(--radius-sm); overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
-  .badge { display: inline-block; background: #eef2f7; color: #4b5563; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 14px; border-radius: var(--radius-sm); overflow: auto; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 420px; }
+  .badge { display: inline-flex; align-items: center; height: 20px; padding: 0 9px; background: #eef2f7; color: #475569; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
   [data-theme="dark"] .badge { background: #263041; color: #b6c2d4; }
-  .badge.blue { background: #e7efff; color: #2457c9; }
-  [data-theme="dark"] .badge.blue { background: #1d2d4f; color: #7aa8ff; }
+  .badge.blue { background: var(--primary-soft); color: var(--primary-strong); }
+  [data-theme="dark"] .badge.blue { color: #93c5fd; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 10px; border-radius: var(--radius-pill); font-size: 11.5px; font-weight: 600; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.off { background: var(--danger-soft); color: var(--danger); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.neutral { background: var(--primary-soft); color: var(--primary-strong); }
   .ok { color: var(--ok); } .off { color: var(--danger); } .warn { color: var(--warn); }
   .hidden { display: none !important; }
-  .muted { color: var(--muted); font-size: 12px; }
+  .muted { color: var(--muted); font-size: 12.5px; }
   .link { color: var(--primary); word-break: break-all; }
 
   #app { flex: 1 1 auto; display: flex; min-height: 0; }
-  .sidebar { width: 272px; flex: 0 0 auto; background: var(--sidebar-bg); color: var(--sidebar-fg); overflow-y: auto; padding: 10px 8px 20px; }
-  .main { flex: 1 1 auto; overflow-y: auto; padding: 18px 22px; }
-  .login-card { max-width: 380px; margin: 70px auto; }
+  .sidebar { width: 280px; flex: 0 0 auto; background: var(--sidebar-bg); color: var(--sidebar-fg); overflow-y: auto; padding: 12px 10px 24px; border-right: 1px solid var(--border); }
+  .main { flex: 1 1 auto; overflow-y: auto; padding: 22px 26px; }
+  @media (min-width: 1300px) { .main { max-width: var(--maxw); margin: 0 auto; width: 100%; } }
+  .login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .login-card { width: 100%; max-width: 400px; margin: 0; border-radius: var(--radius); }
+  .login-card .brand { justify-content: center; margin-bottom: 12px; }
 
-  .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #9fb0c3; margin: 14px 4px 6px; text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
-  .sb-head:first-child { margin-top: 2px; }
-  .ti { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: #dbe3ec; }
-  .ti:hover { background: var(--sidebar-hover); }
-  .ti.active { background: var(--sidebar-act); color: #fff; }
-  .ti.active .muted { color: #dce6ff; }
-  .ti .caret { width: 14px; text-align: center; color: #8aa0b8; user-select: none; flex: 0 0 auto; }
-  .ti.active .caret { color: #fff; }
+  .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 16px 8px 6px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
+  .sb-head:first-child { margin-top: 4px; }
+  .sb-head .sm { background: transparent; color: var(--sidebar-fg); border: 1px solid var(--input-border); margin: 0 0 0 6px; }
+  .sb-head .sm:hover { background: var(--sidebar-hover); color: var(--text); }
+  .ti { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; color: var(--sidebar-fg); transition: background .12s, color .12s; position: relative; }
+  .ti:hover { background: var(--sidebar-hover); color: var(--text); }
+  .ti.active { background: var(--primary-soft); color: var(--primary-strong); font-weight: 600; }
+  .ti.active .muted { color: var(--primary); }
+  .ti .caret { width: 14px; text-align: center; color: var(--muted); user-select: none; flex: 0 0 auto; }
+  .ti.active .caret { color: var(--primary); }
   .ti .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ti.indent { padding-left: 28px; }
-  .ti.indent2 { padding-left: 48px; }
-  .ti.leaf { padding-left: 28px; cursor: default; }
-  .ti.leaf2 { padding-left: 48px; cursor: default; }
+  .ti.indent { padding-left: 30px; }
+  .ti.indent2 { padding-left: 52px; }
+  .ti.leaf { padding-left: 30px; cursor: default; color: var(--muted); }
+  .ti.leaf2 { padding-left: 52px; cursor: default; color: var(--muted); }
   .ti.leaf:hover { background: transparent; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
   .dot.on { background: var(--ok); } .dot.off { background: var(--danger); } .dot.warn { background: var(--warn); }
 
-  .crumb { font-size: 14px; margin-bottom: 14px; color: var(--muted); }
+  .crumb { font-size: 14px; margin-bottom: 16px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .crumb b { color: var(--text); }
 
-  .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow: auto; }
+  .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(8,11,18,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow: auto; animation: fade .15s ease; }
   .modal.hidden { display: none; }
-  .modalcard { width: 440px; max-width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; margin: 0; box-shadow: var(--shadow-lg); }
+  .modalcard { width: 460px; max-width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; margin: 0; box-shadow: var(--shadow-lg); border-radius: var(--radius); animation: pop .18s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 
-  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(8px); background: var(--header-bg); color: var(--header-fg); padding: 9px 18px; border-radius: 8px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 99; font-size: 13px; max-width: 80vw; box-shadow: var(--shadow-lg); }
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(8px); background: var(--header-bg); color: var(--header-fg); padding: 11px 20px; border-radius: 10px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 99; font-size: 13px; max-width: 84vw; box-shadow: var(--shadow-lg); font-weight: 500; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .toast.ok { background: var(--ok); }
-  .toast.err { background: var(--danger); }
-  .toast.warn { background: var(--warn); }
+  .toast.ok { background: var(--ok); color: #fff; }
+  .toast.err { background: var(--danger); color: #fff; }
+  .toast.warn { background: var(--warn); color: #fff; }
+
+  /* 强制改密横幅 */
+  .banner { display: flex; align-items: center; gap: 12px; background: var(--warn-soft); color: #92600a;
+    border-bottom: 1px solid #f3d28a; padding: 11px 20px; font-size: 13.5px; }
+  [data-theme="dark"] .banner { background: #332a14; color: #ffd98a; border-bottom-color: #5a4a1a; }
+  .banner.hidden { display: none; }
+  .banner .grow { flex: 1; }
+  .banner b { color: var(--danger); }
 
   .kpis { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; }
-  .kpi { flex: 1; min-width: 130px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
-  .kv { font-size: 24px; font-weight: 700; color: var(--text); }
+  .kpi { flex: 1; min-width: 140px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+  .kv { font-size: 26px; font-weight: 750; color: var(--text); letter-spacing: -.5px; }
   .kl { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .bar { display: inline-block; width: 90px; height: 8px; background: var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
   .bar span { display: block; height: 100%; background: var(--primary); }
   .trend { margin-top: 8px; }
-  .trow { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12px; }
+  .trow { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12px; }
   .tdate { width: 46px; color: var(--muted); flex: 0 0 auto; }
   .tbar { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
-  .tbar span { display: block; height: 100%; background: linear-gradient(90deg, var(--primary), #5ea0ff); }
+  .tbar span { display: block; height: 100%; background: var(--primary); }
   .tval { width: 84px; text-align: right; color: var(--text); flex: 0 0 auto; }
 
-  .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-  .qcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); transition: transform .12s, border-color .12s, box-shadow .12s; }
-  .qcard:hover { transform: translateY(-2px); border-color: var(--primary); box-shadow: var(--shadow-lg); }
-  .qcard .ic { font-size: 26px; }
-  .qcard .tt { font-weight: 600; margin-top: 8px; }
-  .qcard .ds { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .qcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); transition: border-color .14s; }
+  .qcard:hover { border-color: var(--primary); }
+  .qcard .ic { font-size: 28px; }
+  .qcard .tt { font-weight: 650; margin-top: 10px; }
+  .qcard .ds { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
 
   details.adv { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; margin-top: 10px; background: var(--bg); }
   details.adv summary { cursor: pointer; font-size: 13px; color: var(--muted); }
   details.adv[open] summary { margin-bottom: 8px; }
-  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 30px 0; }
+  .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 40px 0; justify-content: center; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 13px; }
+  .empty .em-ic { font-size: 30px; opacity: .5; }
   .spinner { width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* 滚动条 */
+  .sidebar::-webkit-scrollbar, .main::-webkit-scrollbar, .tblwrap::-webkit-scrollbar, .modalcard::-webkit-scrollbar, pre::-webkit-scrollbar { width: 9px; height: 9px; }
+  .sidebar::-webkit-scrollbar-thumb, .main::-webkit-scrollbar-thumb, .tblwrap::-webkit-scrollbar-thumb, .modalcard::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb { background: rgba(120,130,150,.35); border-radius: 8px; }
+  .sidebar::-webkit-scrollbar-thumb:hover, .main::-webkit-scrollbar-thumb:hover { background: rgba(120,130,150,.55); }
+
   @media (max-width: 900px) {
-    .sidebar { position: fixed; left: 0; top: 52px; bottom: 0; z-index: 50; transform: translateX(-100%); transition: transform .2s; width: 260px; }
+    .sidebar { position: fixed; left: 0; top: 56px; bottom: 0; z-index: 50; transform: translateX(-100%); transition: transform .2s; width: 264px; box-shadow: var(--shadow-lg); }
     .sidebar.open { transform: translateX(0); }
     .burger { display: block; }
-    .main { padding: 12px; }
+    .main { padding: 14px; }
     .row { flex-direction: column; }
+  }
+  @media (max-width: 560px) {
+    .tblwrap { overflow-x: auto; }
+    .tbl { min-width: 560px; }
+    .card { padding: 16px; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <div style="display:flex;align-items:center;gap:10px;">
+  <div class="brand">
     <button class="burger" id="burgerBtn" onclick="toggleSidebar()">☰</button>
+    <div class="logo">N</div>
     <h1>NodePilot 控制台</h1>
   </div>
   <div id="headerRight" class="right hidden">
     <label class="chk"><input type="checkbox" id="autoSyncChk" onchange="setAutoSync(this.checked)"> 自动下发</label>
     <button class="secondary small" id="darkBtn" onclick="toggleDark()">🌙 暗色</button>
-    <span id="who" class="muted" style="color:#9fb0c3"></span>
+    <span id="who" class="muted"></span>
     <button class="secondary small" onclick="showChangePw()">修改密码</button>
     <button class="secondary small" onclick="logout()">退出</button>
   </div>
 </header>
 
-<div id="login" class="card login-card hidden">
-  <h2>管理员登录</h2>
-  <label>用户名</label><input id="user" value="admin">
-  <label>密码</label><input id="pass" type="password" placeholder="请输入密码">
-  <button onclick="login()" style="width:100%">登录</button>
-  <span id="loginMsg" class="muted"></span>
+<div id="pwBanner" class="banner hidden">
+  <span class="grow">⚠ <b>初始密码：</b>请立即修改管理员密码。</span>
+  <button onclick="showChangePw(true)">去修改</button>
+</div>
+
+<div id="loginWrap" class="login-wrap hidden">
+  <div id="login" class="card login-card">
+    <div class="brand"><div class="logo">N</div></div>
+    <h2>管理员登录</h2>
+    <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
+    <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()" style="width:100%">登录</button>
+    <span id="loginMsg" class="muted"></span>
+  </div>
 </div>
 
 <div id="app" class="hidden">
@@ -196,6 +258,7 @@ let subsData = [];
 let certsData = [];
 let notifData = [];
 let inboundCatalog = [];
+let subFiltersBase = ''; // 当前订阅已有的 filters JSON(合并基础,避免保存时丢失)
 let currentNotifType = 'email';
 let expandedNodes = new Set();
 let expandedInbounds = new Set();
@@ -228,6 +291,10 @@ async function api(method, path, body) {
     forceLogin(); return null;
   }
   const data = await r.json().catch(() => ({}));
+  if (r.status === 403 && data.must_change_pwd) {
+    showToast(data.error || '请先修改管理员密码', 'err');
+    forceChangePw(); return null;
+  }
   if (!r.ok) { showToast(data.error || ('请求失败 HTTP ' + r.status), 'err'); return null; }
   return data;
 }
@@ -268,47 +335,101 @@ function confirmModal(msg) {
       '<div class="btnrow"><button onclick="confirmOk()">确认</button><button class="secondary" onclick="closeModal()">取消</button></div>');
   });
 }
-function confirmOk() { closeModal(); if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } }
+function confirmOk() { if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } hideModal(); }
 function setModal(html) { document.getElementById('modalBody').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
-function closeModal() { document.getElementById('modal').classList.add('hidden'); if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } }
+function hideModal() { document.getElementById('modal').classList.add('hidden'); }
+function closeModal() { hideModal(); if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } }
 
 // ---- 认证 ----
+let MUST_CHANGE_PWD = false;
 async function login() {
   const d = await api('POST', '/auth/login', { username: val('user'), password: val('pass') });
-  if (d && d.token) { token = d.token; localStorage.setItem('np_token', token); enterApp(); }
+  if (d && d.token) {
+    token = d.token; localStorage.setItem('np_token', token);
+    MUST_CHANGE_PWD = !!d.must_change_pwd;
+    updatePwBanner();
+    if (MUST_CHANGE_PWD) showChangePw(true);
+    enterApp();
+  }
   else showToast('登录失败', 'err');
 }
-function logout() { localStorage.removeItem('np_token'); token = ''; location.reload(); }
+function logout() { localStorage.removeItem('np_token'); token = ''; MUST_CHANGE_PWD = false; location.reload(); }
 function forceLogin() {
-  token = '';
+  token = ''; MUST_CHANGE_PWD = false; updatePwBanner();
   localStorage.removeItem('np_token');
   const a = document.getElementById('app'); if (a) a.classList.add('hidden');
-  const l = document.getElementById('login'); if (l) l.classList.remove('hidden');
+  const l = document.getElementById('loginWrap'); if (l) l.classList.remove('hidden');
 }
-function showChangePw() {
+// 显示/隐藏强制改密横幅
+function updatePwBanner() {
+  const b = document.getElementById('pwBanner');
+  if (b) b.classList.toggle('hidden', !MUST_CHANGE_PWD);
+}
+// 后端要求先改密：标记并弹窗（已弹则不再重复）
+function forceChangePw() {
+  MUST_CHANGE_PWD = true; updatePwBanner();
+  const m = document.getElementById('modal');
+  if (m && !m.classList.contains('hidden') && document.getElementById('m_old')) return; // 已显示改密框
+  showChangePw(true);
+}
+function showChangePw(forced) {
+  const cancelBtn = forced
+    ? '<button class="secondary" onclick="showToast(\'请先修改密码后再继续\',\'warn\')">稍后</button>'
+    : '<button class="secondary" onclick="closeModal()">取消</button>';
   setModal('<h2>修改管理员密码</h2>' +
+    (forced ? '<p class="muted" style="margin:2px 0 10px">系统检测到初始随机密码，使用前必须修改。</p>' : '') +
     '<label>旧密码</label><input id="m_old" type="password">' +
     '<label>新密码</label><input id="m_new" type="password">' +
-    '<div class="btnrow"><button onclick="withBusy(this, doChangePw)">保存</button><button class="secondary" onclick="closeModal()">取消</button></div>');
+    '<div class="btnrow"><button onclick="withBusy(this, doChangePw)">保存</button>' + cancelBtn + '</div>');
+  const f = document.getElementById('m_old'); if (f) f.focus();
 }
 async function doChangePw() {
   const d = await api('POST', '/auth/change-password', { old_password: val('m_old'), new_password: val('m_new') });
-  if (d && d.ok) { closeModal(); showToast('密码已修改，请重新登录', 'ok'); setTimeout(() => location.reload(), 900); }
-}
-// 弹窗内回车触发第一个主按钮
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const m = document.getElementById('modal');
-    if (m && !m.classList.contains('hidden')) {
-      const btn = m.querySelector('.btnrow button:not(.secondary)');
-      if (btn) btn.click();
-    }
+  if (d && d.ok) {
+    MUST_CHANGE_PWD = false; updatePwBanner();
+    closeModal(); showToast('密码已修改', 'ok');
+    // 无需重新登录：token 仍有效，刷新数据即可
+    loadNodes(); loadSubs(); loadCerts(); loadNotifiers(); loadAllInbounds();
   }
+}
+// 弹窗内回车触发第一个主按钮；ESC / 点遮罩关闭（强制改密时禁止关闭）
+document.addEventListener('keydown', e => {
+  const m = document.getElementById('modal');
+  if (!m || m.classList.contains('hidden')) return;
+  if (e.key === 'Enter') {
+    const btn = m.querySelector('.btnrow button:not(.secondary)');
+    if (btn) btn.click();
+  } else if (e.key === 'Escape' && !MUST_CHANGE_PWD) {
+    closeModal();
+  }
+});
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget && !MUST_CHANGE_PWD) closeModal();
 });
 
 // ---- 侧边栏 ----
 function dotOf(n) { return n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn'))); }
 function inboundLabel(inb) { return inb.name || ((inb.protocol || '?') + ':' + (inb.port || '?')); }
+// 节点状态徽标：综合 status / connectivity 给出 ok/off/warn 三态
+function statusPill(n) {
+  const s = n.status, c = n.connectivity;
+  if (s === 'offline' || c === 'offline') return '<span class="pill off">离线</span>';
+  if (s === 'online' && c === 'ok') return '<span class="pill ok">在线 · 连通</span>';
+  if (s === 'online') return '<span class="pill warn">在线 · 不通</span>';
+  return '<span class="pill warn">' + esc(s || '未知') + '</span>';
+}
+// 证书状态徽标：valid→ok，failed/expired→off，其余 warn
+// 证书状态中文名：issued=Let's Encrypt 已成功签发（含自动续签），pending=申请中
+function certStatusLabel(s) {
+  const m = { pending: '申请中', issued: '已签发', valid: '有效', ok: '有效', failed: '签发失败', expired: '已过期', error: '签发失败' };
+  return m[(s || '').toLowerCase()] || s || '未知';
+}
+function certPill(c) {
+  const st = (c.status || '').toLowerCase();
+  if (st === 'valid' || st === 'ok') return '<span class="pill ok">' + certStatusLabel(c.status) + '</span>';
+  if (st === 'failed' || st === 'expired' || st === 'error') return '<span class="pill off">' + certStatusLabel(c.status) + '</span>';
+  return '<span class="pill warn">' + certStatusLabel(c.status) + '</span>';
+}
 
 function renderSidebar() {
   const sb = document.getElementById('sidebar');
@@ -319,7 +440,7 @@ function renderSidebar() {
     h += '<div class="ti ' + (sel.type === 'node' && sel.id === n.id ? 'active' : '') + '" onclick="selectNode(' + n.id + ')">' +
       '<span class="caret" onclick="event.stopPropagation();toggleNode(' + n.id + ')">' + (open ? '▾' : '▸') + '</span>' +
       '<span class="dot ' + dot + '"></span>' +
-      '<span class="lbl">' + (n.flag ? n.flag + ' ' : '') + esc(n.name) + ' <span class="muted">#' + n.id + '</span></span></div>';
+      '<span class="lbl">' + esc(n.name) + (regionLabel(n) && regionLabel(n) !== '识别中…' ? ' <span class="muted">' + esc(regionLabel(n)) + '</span>' : '') + '</span></div>';
     if (open) {
       const ins = inboundsCache[n.id] || [];
       if (!ins.length) h += '<div class="ti leaf muted">（无入站）</div>';
@@ -346,10 +467,10 @@ function renderSidebar() {
   });
   h += '<div class="sb-head">证书<button class="sm" onclick="showCreateCert()">+ 申请</button></div>';
   if (!certsData.length) h += '<div class="ti leaf muted">（未申请）</div>';
-  certsData.forEach(c => { h += '<div class="ti ' + (sel.type === 'cert' && sel.id === c.id ? 'active' : '') + '" onclick="selectCert(' + c.id + ')"><span class="lbl">' + esc(c.domain) + ' <span class="muted">' + c.status + '</span></span></div>'; });
+  certsData.forEach(c => { h += '<div class="ti ' + (sel.type === 'cert' && sel.id === c.id ? 'active' : '') + '" onclick="selectCert(' + c.id + ')"><span class="lbl">' + esc(c.domain) + ' <span class="muted">' + certStatusLabel(c.status) + '</span></span></div>'; });
   h += '<div class="sb-head">通知<button class="sm" onclick="showCreateNotifier()">+ 新建</button></div>';
   if (!notifData.length) h += '<div class="ti leaf muted">（无渠道）</div>';
-  notifData.forEach(n => { h += '<div class="ti ' + (sel.type === 'notifier' && sel.id === n.id ? 'active' : '') + '" onclick="selectNotifier(' + n.id + ')"><span class="lbl">' + esc(n.name) + ' <span class="muted">' + n.type + '</span></span></div>'; });
+  notifData.forEach(n => { h += '<div class="ti ' + (sel.type === 'notifier' && sel.id === n.id ? 'active' : '') + '" onclick="selectNotifier(' + n.id + ')"><span class="lbl">' + esc(n.name) + ' <span class="muted">' + notifTypeLabel(n.type) + '</span></span></div>'; });
   h += '<div class="ti ' + (sel.type === 'stats' ? 'active' : '') + '" onclick="selectStats()"><span class="dot on"></span><span class="lbl">📊 统计</span></div>';
   sb.innerHTML = h;
 }
@@ -375,9 +496,10 @@ function selectCert(id) { sel = { type: 'cert', id, parentId: null }; renderSide
 function selectStats() { sel = { type: 'stats', parentId: null }; renderSidebar(); renderMain(); }
 function selectNotifier(id) { sel = { type: 'notifier', id, parentId: null }; renderSidebar(); renderMain(); }
 function toggleCertRow() { const r = document.getElementById('ib_cert_row'); if (r) r.style.display = chk('ib_tls') ? '' : 'none'; }
+function toggleInboundCert() { const r = document.getElementById('i_cert_wrap'); if (r) r.style.display = chk('i_tls') ? '' : 'none'; }
 function certOptions(selId) {
   let h = '<option value="">（默认占位证书）</option>';
-  certsData.forEach(c => { h += '<option value="' + c.id + '" ' + (selId === c.id ? 'selected' : '') + '>' + esc(c.domain) + ' (' + esc(c.status) + ')</option>'; });
+  certsData.forEach(c => { h += '<option value="' + c.id + '" ' + (selId === c.id ? 'selected' : '') + '>' + esc(c.domain) + ' (' + certStatusLabel(c.status) + ')</option>'; });
   return h;
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
@@ -395,15 +517,13 @@ function renderMain() {
 function setLoading(tip) { document.getElementById('main').innerHTML = '<div class="loading"><span class="spinner"></span><span>' + (tip || '加载中…') + '</span></div>'; }
 function renderWelcome() {
   document.getElementById('main').innerHTML =
-    '<div class="card"><h2>欢迎使用 NodePilot</h2>' +
-    '<p class="muted">左侧管理节点 / 入站 / 客户端；或配置订阅分组，生成各客户端（Clash / Surfboard / Loon / V2Ray / SIP008）的订阅链接。</p>' +
-    '<p class="muted">提示：改动入站 / 客户端后，在节点详情点击「下发配置」（或开启 header 的「自动下发」）让配置在节点上生效。</p></div>' +
+    '<div class="card"><h2>欢迎使用 NodePilot</h2></div>' +
     '<div class="qgrid">' +
-    quickCard('📊', '流量统计', '查看各节点与客户端用量、30 天趋势', 'selectStats()') +
-    quickCard('🖥', '注册节点', '添加节点并生成 agent 一键安装命令', 'showCreateNode()') +
-    quickCard('🔗', '新建订阅', '创建订阅分组并生成二维码 / 链接', 'showCreateSub()') +
-    quickCard('🔐', '申请证书', "Let's Encrypt 泛域名证书托管", 'showCreateCert()') +
-    quickCard('📢', '新建通知', '邮件 / 企业微信 / Telegram 告警', 'showCreateNotifier()') +
+    quickCard('📊', '流量统计', '节点与客户端用量、30 天趋势', 'selectStats()') +
+    quickCard('🖥', '注册节点', '添加节点并生成安装命令', 'showCreateNode()') +
+    quickCard('🔗', '新建订阅', '创建订阅分组、生成链接', 'showCreateSub()') +
+    quickCard('🔐', '申请证书', '泛域名证书托管', 'showCreateCert()') +
+    quickCard('📢', '新建通知', '邮件 / 企业微信 / Telegram', 'showCreateNotifier()') +
     '</div>';
 }
 function quickCard(ic, tt, ds, fn) {
@@ -469,7 +589,7 @@ function renderStatsView() {
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div></div></div>';
 
   h += '<div class="card"><h3>按节点</h3>';
-  if (!d.nodes || !d.nodes.length) h += '<p class="muted">暂无数据</p>';
+  if (!d.nodes || !d.nodes.length) h += '<div class="empty"><div class="em-ic">📡</div>暂无节点流量数据</div>';
   else {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th></tr></thead><tbody>';
     d.nodes.forEach(n => { h += '<tr><td>' + esc(n.name || ('#' + n.node_id)) + '</td><td>' + fmtBytes(n.up) + '</td><td>' + fmtBytes(n.down) + '</td><td>' + fmtBytes(n.up + n.down) + '</td></tr>'; });
@@ -478,7 +598,7 @@ function renderStatsView() {
   h += '</div>';
 
   h += '<div class="card"><h3>按客户端</h3>';
-  if (!d.clients || !d.clients.length) h += '<p class="muted">暂无数据</p>';
+  if (!d.clients || !d.clients.length) h += '<div class="empty"><div class="em-ic">👥</div>暂无客户端流量数据</div>';
   else {
     h += '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'stats_clients_tb\', this.value)">';
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody id="stats_clients_tb">';
@@ -496,7 +616,7 @@ function renderStatsView() {
   h += '</div>';
 
   h += '<div class="card"><h3>近 30 天趋势</h3>';
-  if (!d.daily || !d.daily.length) h += '<p class="muted">暂无数据</p>';
+  if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
   else {
     let max = 1;
     d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
@@ -527,47 +647,47 @@ async function renderNodeDetail(id) {
   let cmd = '';
   const inst = await api('GET', '/nodes/' + id + '/install');
   if (inst) cmd = inst.command || '';
+  const tp = trafficParts(n.monthly_traffic_bytes);
   main.innerHTML =
-    '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span> <span class="badge">' + esc(n.status || '-') + ' / ' + esc(n.connectivity || '-') + '</span></div>' +
-    '<div class="card">' +
-    '<div class="row">' +
+    '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span> ' + statusPill(n) + '</div>' +
+    '<div class="card"><h2>基本信息</h2>' +
+    '<div class="field-grid">' +
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
-    '<div><label>区域</label><input id="n_region" value="' + esc(regionLabel(n)) + '" disabled style="background:var(--input-dis)"></div>' +
-    '<div class="row">' +
-    '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
+    '<div><label>区域</label><input id="n_region" value="' + esc(regionLabel(n)) + '" disabled></div>' +
+    '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '" placeholder="如 hk, ws"></div>' +
     '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
-    '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div></div>' +
-    '<div class="row">' +
+    '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
-    '<div></div><div></div></div>' +
-    '<div class="row">' +
-    '<div><label>月流量上限(字节,0=不限)</label><input id="n_mtraffic" type="number" min="0" value="' + (n.monthly_traffic_bytes || 0) + '"></div>' +
-    '<div><label>本月已用</label><input id="n_mused" value="加载中…" disabled></div></div>' +
+    '<div><label>月流量上限(0=不限)</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
+    '<div><label>本月已用</label><input id="n_mused" value="加载中…" disabled></div>' +
+    '<div><label>服务器有效期</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
+    '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
     '<button class="secondary" onclick="showNodeToken(' + n.id + ')">显示 token</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
     '<div class="card"><h2>Agent 一键安装</h2>' +
-    '<p class="muted">在节点服务器上执行以下命令，自动安装 xray + agent 并接入本管理端：</p>' +
+    '<p class="muted">在节点服务器执行以下命令安装接入：</p>' +
     '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
     '<div class="btnrow"><button onclick="copyInstall()">复制安装命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自愈改端口</th><th>启用</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '是' : '') + '</td><td>' + (inb.enabled ? 'yes' : 'no') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '是' : '') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<h3>新建入站</h3>' +
-    '<label>名称/别名（可选，用于订阅分组选择）</label><input id="i_name" placeholder="如 hk-tg-ws">' +
+    '<label>名称/别名（可选）</label><input id="i_name" placeholder="如 hk-tg-ws">' +
     '<div class="row">' +
     '<div><label>协议</label><select id="i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select></div>' +
     '<div><label>端口</label><input id="i_port" type="number" placeholder="10086"></div>' +
     '<div><label>传输</label><select id="i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select></div>' +
-    '<div><label>TLS</label><input id="i_tls" type="checkbox"></div></div>' +
+    '<div><label>TLS</label><input id="i_tls" type="checkbox" onchange="toggleInboundCert()"></div></div>' +
+    '<div id="i_cert_wrap" style="display:none"><label>证书（TLS 必选）</label><select id="i_cert"><option value="">未选择</option>' + (certsData || []).map(c => '<option value="' + c.id + '">' + esc(c.domain) + '</option>').join('') + '</select></div>' +
     '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + n.id + '))">新建入站</button></div></div>' +
     '<div class="card"><h2>配置版本</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>应用时间</th><th>错误</th></tr></thead><tbody>' +
-    (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td class="' + (v.status === 'applied' ? 'ok' : 'off') + '">' + esc(v.status) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
+    (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">' + esc(v.status) + '</span>' : (v.status === 'failed' ? '<span class="pill off">' + esc(v.status) + '</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
     '</tbody></table></div></div>';
   detectRegion(id);
   loadNodeTraffic(id);
@@ -575,10 +695,11 @@ async function renderNodeDetail(id) {
 async function saveNode(id) {
   const pr = (val('n_portrange') || '').trim();
   if (!validPortRange(pr)) return showToast('端口范围格式不正确（如 10000-20000,30000-40000）', 'err');
-  const mt = Math.max(0, parseInt(val('n_mtraffic')) || 0);
-  const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), tags: val('n_tags'), port_range: pr, monthly_traffic_bytes: mt });
+  const mtBytes = Math.round(Math.max(0, parseFloat(val('n_mtraffic')) || 0) * trafficUnitMul(val('n_mtraffic_unit')));
+  const ex = (val('n_expire') || '').trim();
+  const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), tags: val('n_tags'), port_range: pr, monthly_traffic_bytes: mtBytes, expires_at: ex ? fromDTLocal(ex) : '' });
   if (d) {
-    const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), tags: val('n_tags'), port_range: pr, monthly_traffic_bytes: mt };
+    const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), tags: val('n_tags'), port_range: pr, monthly_traffic_bytes: mtBytes };
     showToast('节点已保存', 'ok'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id);
   }
 }
@@ -611,7 +732,7 @@ async function syncAllNodes() {
   showToast('下发完成：' + ok + ' 成功' + (fail ? '，' + fail + ' 失败' : ''), fail ? (ok ? 'warn' : 'err') : 'ok');
   loadNodes();
 }
-async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id); if (d && d.token) { copyText(d.token); } }
+async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id + '/install'); if (d && d.token) { copyText(d.token); } }
 async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); } }
 async function delNode(id) {
   if (!await confirmModal('确认删除节点 #' + id + '？其入站/客户端也会失效')) return;
@@ -619,7 +740,10 @@ async function delNode(id) {
   if (d) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); expandedNodes.delete(id); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 async function createInbound(nodeId) {
-  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('i_name'), protocol: val('i_proto'), port: +val('i_port'), transport: val('i_trans'), tls_enabled: chk('i_tls') });
+  const tls = chk('i_tls');
+  const certId = val('i_cert') ? +val('i_cert') : 0;
+  if (tls && !certId) return showToast('启用 TLS 需选择证书', 'err');
+  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('i_name'), protocol: val('i_proto'), port: +val('i_port'), transport: val('i_trans'), tls_enabled: tls, cert_id: certId });
   if (d) { inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; showToast('入站已创建', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId); }
 }
 async function delInbound(id, nodeId) {
@@ -636,6 +760,24 @@ function toDTLocal(s) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 function fromDTLocal(s) { if (!s) return ''; const d = new Date(s); if (isNaN(d)) return ''; return d.toISOString(); }
+// 月流量上限单位换算：MB=1024^2, GB=1024^3, TB=1024^4
+function trafficUnitMul(u) { return { mb: 1048576, gb: 1073741824, tb: 1099511627776 }[u] || 1073741824; }
+// 把字节值拆成「数值+合适单位」：取第一个 b>=mul 的最大单位，否则按 MB 显示小数
+function trafficParts(b) {
+  b = Number(b) || 0;
+  if (b <= 0) return { v: 0, unit: 'gb' };
+  for (const [u, mul] of [['tb', 1099511627776], ['gb', 1073741824], ['mb', 1048576]]) {
+    if (b >= mul) return { v: Math.round(b / mul * 1000) / 1000, unit: u };
+  }
+  return { v: Math.round(b / 1048576 * 1000) / 1000, unit: 'mb' };
+}
+// 月流量单位下拉（MB/GB/TB）
+function unitSelect(sel) {
+  return '<select id="n_mtraffic_unit" style="width:auto;flex:0 0 auto;padding:9px 8px">' +
+    [['mb', 'MB'], ['gb', 'GB'], ['tb', 'TB']]
+      .map(x => '<option value="' + x[0] + '"' + (x[0] === sel ? ' selected' : '') + '>' + x[1] + '</option>')
+      .join('') + '</select>';
+}
 // 人类可读字节数（前端版）
 function fmtBytesJS(b) {
   b = Number(b) || 0;
@@ -659,7 +801,7 @@ async function renderInboundDetail(id) {
     '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
     '<div class="card">' +
     '<div class="row">' +
-    '<div style="flex:2"><label>名称/别名（用于订阅分组精确选择）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
+    '<div style="flex:2"><label>名称/别名（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div></div>' +
     '<div class="row">' +
     '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
@@ -667,12 +809,12 @@ async function renderInboundDetail(id) {
     '<div><label>传输</label><select id="ib_trans"><option ' + (inb.transport === 'tcp' || !inb.transport ? 'selected' : '') + '>tcp</option><option ' + (inb.transport === 'ws' ? 'selected' : '') + '>ws</option><option ' + (inb.transport === 'grpc' ? 'selected' : '') + '>grpc</option></select></div>' +
     '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div></div>' +
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '">' +
-    '<label>TLS 证书（从全局证书选择；留空则用占位证书）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
+    '<label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div class="row">' +
     '<div><label>自动修复间隔(分钟,0=不修复)</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
     '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自愈改端口</span>' : '') + '</div>' +
     '<div></div></div>' +
-    '<p class="muted" style="margin-top:10px">停用的入站不会生成到节点 xray 配置，也不参与连通性探测；修改后需「下发配置」才在节点上生效。</p>' +
+    '<p class="muted" style="margin-top:10px">停用的入站不生成到节点配置；修改后需「下发配置」生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
@@ -680,7 +822,7 @@ async function renderInboundDetail(id) {
     '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
-    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? 'yes' : 'no') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
+    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<h3>新建客户端</h3>' +
     '<div class="row">' +
@@ -746,12 +888,10 @@ async function renderSubDetail(id) {
   if (!d) return;
   if (!inboundCatalog.length) await loadAllInbounds();
   const g = d.group, url = location.origin + API + '/sub/' + g.token;
+  subFiltersBase = g.filters || '';
   let cur = {};
   try { cur = JSON.parse(g.filters || '{}'); } catch (e) {}
   const selectedIds = cur.inbound_ids || [];
-  const selectedNodes = cur.node_ids || [];
-  const selectedProtos = cur.protocol || [];
-  const tagsStr = (cur.tags || []).join(', ');
   document.getElementById('main').innerHTML =
     '<div class="crumb">订阅 / <b>' + esc(g.name) + '</b></div>' +
     '<div class="card">' +
@@ -760,29 +900,21 @@ async function renderSubDetail(id) {
     '<div><label>格式</label><select id="s_fmt2">' + subFmtOptions(g.format) + '</select></div>' +
     '<div><label>规则</label><select id="s_mode2">' + subModeOptions(g.mode) + '</select></div>' +
     '<div><label>启用</label><input id="s_en2" type="checkbox" ' + (g.enabled ? 'checked' : '') + '></div></div>' +
-    '<label>纳入的入站（按别名精确选择；不选则默认全部）</label>' +
+    '<label>纳入的入站</label>' +
     '<div class="inblist">' + subInboundChecklist(selectedIds) + '</div>' +
-    '<div class="row">' +
-    '<div><label>节点（可选）</label><div class="inblist">' + subNodeChecklist(selectedNodes) + '</div></div>' +
-    '<div><label>协议（可选）</label><div class="inblist">' + subProtoChecklist(selectedProtos) + '</div></div>' +
-    '<div><label>标签（可选，逗号分隔）</label><input id="s_tags2" value="' + esc(tagsStr) + '" placeholder="如 hk, ws"></div></div>' +
-    '<details class="adv"><summary>高级筛选 JSON（可选，需熟练使用）</summary>' +
-    '<p class="muted">inbound_ids / node_ids / protocol / tags 由上方勾选与输入覆盖，此处的其他字段会合并进 filters。</p>' +
-    '<input id="s_adv2" value="' + esc(g.filters) + '"></details>' +
-    '<p class="muted">无规则 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为纯节点链接）。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveSub(' + g.id + '))">保存</button>' +
     '<button onclick="copyText(\'' + url + '\')">复制链接</button>' +
     '<button class="secondary" onclick="copySubContent(\'' + g.token + '\')">复制配置</button>' +
     '<button class="danger" onclick="delSub(' + g.id + ')">删除</button></div>' +
     '<div class="qr">' +
-    '<div>订阅二维码（手机客户端扫码导入）</div>' +
+    '<div>订阅二维码</div>' +
     '<img src="' + API + '/qr/' + g.token + '" width="160" height="160" alt="订阅二维码">' +
     '<div class="muted link">' + esc(url) + '</div></div></div>' +
     '<div class="card"><h2>成员预览（' + (d.members || []).length + '）</h2>' +
     '<details class="adv"><summary>查看 JSON</summary><pre>' + esc(JSON.stringify(d.members || [], null, 2)) + '</pre></details></div>' +
     '<div class="card"><h2>订阅内容预览</h2>' +
-    '<details class="adv" ontoggle="loadSubPreview(\'' + g.token + '\')"><summary>查看实际生成的订阅内容（各客户端格式）</summary>' +
+    '<details class="adv" ontoggle="loadSubPreview(\'' + g.token + '\')"><summary>查看订阅内容</summary>' +
     '<pre id="sub_preview" class="muted">点击展开后加载…</pre></details></div>';
 }
 async function loadSubPreview(token) {
@@ -796,7 +928,7 @@ async function loadSubPreview(token) {
   } catch (e) { pre.textContent = '获取失败'; }
 }
 async function saveSub(id) {
-  const filters = buildSubFilters('s_adv2', 's_tags2');
+  const filters = buildSubFilters(subFiltersBase);
   if (filters === null) return;
   const d = await api('PATCH', '/subscriptions/' + id, { name: val('s_name2'), format: val('s_fmt2'), mode: val('s_mode2'), enabled: chk('s_en2'), filters });
   if (d) {
@@ -806,7 +938,7 @@ async function saveSub(id) {
 }
 function subInboundChecklist(selected) {
   selected = selected || [];
-  if (!inboundCatalog.length) return '<div class="muted">（暂无入站，请先在节点下创建）</div>';
+  if (!inboundCatalog.length) return '<div class="muted">（暂无入站）</div>';
   const byNode = {};
   inboundCatalog.forEach(inb => { (byNode[inb.node_id] = byNode[inb.node_id] || []).push(inb); });
   let h = '';
@@ -815,34 +947,16 @@ function subInboundChecklist(selected) {
     h += '<div class="subgrp">' + esc(n ? n.name : '节点#' + nid) + '</div>';
     byNode[nid].forEach(inb => {
       const chk = selected.includes(inb.id) ? 'checked' : '';
-      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> ' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
+      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
     });
   });
   return h;
 }
-function subNodeChecklist(selected) {
-  selected = selected || [];
-  if (!nodesData.length) return '<div class="muted">（暂无节点）</div>';
-  return nodesData.map(n => '<label class="chk"><input type="checkbox" name="sub_node" value="' + n.id + '" ' + (selected.includes(n.id) ? 'checked' : '') + '> ' + (n.flag ? n.flag + ' ' : '') + esc(n.name) + ' <span class="muted">#' + n.id + '</span></label>').join('');
-}
-function subProtoChecklist(selected) {
-  selected = selected || [];
-  const ps = ['vmess', 'vless', 'trojan', 'ss', 'socks', 'http'];
-  return ps.map(p => '<label class="chk"><input type="checkbox" name="sub_proto" value="' + p + '" ' + (selected.includes(p) ? 'checked' : '') + '> ' + p + '</label>').join('');
-}
-function buildSubFilters(advId, tagsId) {
+function buildSubFilters(base) {
   const ids = Array.from(document.querySelectorAll('input[name=sub_inb]:checked')).map(e => +e.value);
-  const nids = Array.from(document.querySelectorAll('input[name=sub_node]:checked')).map(e => +e.value);
-  const protos = Array.from(document.querySelectorAll('input[name=sub_proto]:checked')).map(e => e.value);
-  let adv = {};
-  const txt = val(advId);
-  if (txt && txt.trim()) { try { adv = JSON.parse(txt); } catch (e) { showToast('高级筛选 JSON 解析失败', 'err'); return null; } }
-  const f = Object.assign({}, adv);
+  let f = {};
+  if (base && base.trim()) { try { f = JSON.parse(base); } catch (e) { showToast('已有筛选解析失败', 'err'); return null; } }
   f.inbound_ids = ids;
-  if (nids.length) f.node_ids = nids; else delete f.node_ids;
-  if (protos.length) f.protocol = protos; else delete f.protocol;
-  const tags = (val(tagsId) || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (tags.length) f.tags = tags; else delete f.tags;
   return JSON.stringify(f);
 }
 function subFmtOptions(cur) {
@@ -873,7 +987,7 @@ async function renderCertDetail() {
   const cert = (d && d.domain) ? d : c;
   const days = cert.expires_at ? Math.ceil((new Date(cert.expires_at).getTime() - Date.now()) / 86400000) : '-';
   document.getElementById('main').innerHTML =
-    '<div class="crumb">证书 / <b>' + esc(cert.domain) + '</b> <span class="badge">' + esc(cert.status) + '</span></div>' +
+    '<div class="crumb">证书 / <b>' + esc(cert.domain) + '</b> ' + certPill(cert) + '</div>' +
     '<div class="card">' +
     '<div class="row">' +
     '<div><label>域名</label><input value="' + esc(cert.domain) + '" disabled></div>' +
@@ -886,7 +1000,7 @@ async function renderCertDetail() {
     '<div class="row">' +
     '<div><label>CA 路径</label><input value="' + esc(cert.ca_path || '') + '" disabled></div>' +
     '<div></div><div></div></div>' +
-    (cert.last_error ? '<div class="card" style="background:#fdecea;border-color:#f5c6cb"><b class="off">最近错误</b><br><span class="muted">' + esc(cert.last_error) + '</span></div>' : '') +
+    (cert.last_error ? '<div class="card" style="background:var(--danger-soft);border-color:var(--danger)"><b class="off">最近错误</b><br><span class="muted">' + esc(cert.last_error) + '</span></div>' : '') +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => renewCert(' + cert.id + '))">续签</button>' +
     '<button onclick="withBusy(this, () => distributeCert(' + cert.id + '))">分发到所有节点</button>' +
@@ -901,6 +1015,34 @@ async function delCert(id) {
 }
 
 // ---- 通知渠道 ----
+// 渠道类型中文名（tg 保持英文）
+function notifTypeLabel(t) {
+  const m = { email: '邮件', wecom: '企业微信', tg: 'Telegram' };
+  return m[t] || t;
+}
+// 可订阅的通知事件（与后端 notify.NotifyEvents 一一对应）
+const NOTIF_EVENTS = [
+  ['node_offline', '节点离线'],
+  ['node_recovered', '节点恢复在线'],
+  ['node_healed', '节点自愈'],
+  ['node_traffic_exhausted', '节点月流量耗尽'],
+  ['node_traffic_warning', '节点月流量预警'],
+  ['client_traffic_over', '客户端流量超额'],
+  ['client_expired', '客户端已过期'],
+  ['client_expiring', '客户端即将到期'],
+];
+function notifEventChecklist(selected) {
+  selected = selected || [];
+  const s = selected.length ? selected : NOTIF_EVENTS.map(x => x[0]); // 空=全部
+  return NOTIF_EVENTS.map(([k, t]) =>
+    '<label class="chk"><input type="checkbox" name="n_event" value="' + k + '" ' + (s.includes(k) ? 'checked' : '') + '> ' + t + '</label>'
+  ).join('');
+}
+// 收集勾选事件；全选返回 ''（=订阅全部），否则返回 JSON 数组字符串
+function notifCollectEvents() {
+  const checked = Array.from(document.querySelectorAll('input[name=n_event]:checked')).map(e => e.value);
+  return checked.length === NOTIF_EVENTS.length ? '' : JSON.stringify(checked);
+}
 async function renderNotifierDetail(id) {
   setLoading('加载通知渠道中…');
   const d = await api('GET', '/notifiers/' + id);
@@ -908,15 +1050,19 @@ async function renderNotifierDetail(id) {
   currentNotifType = d.type;
   let cfg = {};
   try { cfg = JSON.parse(d.config || '{}'); } catch (e) {}
+  let ev = [];
+  try { ev = JSON.parse(d.events || '[]'); } catch (e) {}
   document.getElementById('main').innerHTML =
     '<div class="crumb">通知 / <b>' + esc(d.name) + '</b></div>' +
     '<div class="card">' +
     '<div class="row">' +
     '<div><label>名称</label><input id="n_name2" value="' + esc(d.name) + '"></div>' +
-    '<div><label>类型</label><input value="' + esc(d.type) + '" disabled></div>' +
+    '<div><label>类型</label><input value="' + esc(notifTypeLabel(d.type)) + '" disabled></div>' +
     '<div><label>启用</label><input id="n_en2" type="checkbox" ' + (d.enabled ? 'checked' : '') + '></div></div>' +
     notifConfigFields(d.type, cfg) +
-    '<p class="muted">保存后即时生效；触发点：节点离线 / 自愈 / 恢复在线（事件驱动），流量超额 / 客户端到期（每 15 分钟扫描）。</p>' +
+    '<label>通知项目</label>' +
+    '<div class="inblist">' + notifEventChecklist(ev) + '</div>' +
+    '<p class="muted">保存后即时生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNotifier(' + d.id + '))">保存</button>' +
     '<button class="secondary" onclick="withBusy(this, () => testNotifier(' + d.id + '))">发送测试</button>' +
@@ -957,7 +1103,7 @@ function notifCollectConfig(type) {
   return '{}';
 }
 async function saveNotifier(id) {
-  const d = await api('PATCH', '/notifiers/' + id, { name: val('n_name2'), enabled: chk('n_en2'), config: notifCollectConfig(currentNotifType) });
+  const d = await api('PATCH', '/notifiers/' + id, { name: val('n_name2'), enabled: chk('n_en2'), config: notifCollectConfig(currentNotifType), events: notifCollectEvents() });
   if (d) { showToast('通知渠道已保存', 'ok'); await loadNotifiers(); renderNotifierDetail(id); }
 }
 async function testNotifier(id) {
@@ -980,10 +1126,12 @@ function showCreateNotifier() {
     '<label>名称</label><input id="n_name" placeholder="我的告警通道">' +
     '<label>类型</label><select id="n_type" onchange="onNotifTypeChange()">' + notifTypeOptions('email') + '</select>' +
     '<div id="n_cfg_fields">' + notifConfigFields('email', {}) + '</div>' +
+    '<label>通知项目</label>' +
+    '<div class="inblist">' + notifEventChecklist(null) + '</div>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNotifier)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateNotifier() {
-  const d = await api('POST', '/notifiers', { name: val('n_name'), type: val('n_type'), enabled: true, config: notifCollectConfig(val('n_type')) });
+  const d = await api('POST', '/notifiers', { name: val('n_name'), type: val('n_type'), enabled: true, config: notifCollectConfig(val('n_type')), events: notifCollectEvents() });
   if (d) { closeModal(); showToast('通知渠道已建 #' + d.id, 'ok'); await loadNotifiers(); }
 }
 
@@ -1029,29 +1177,22 @@ async function showCreateSub() {
     '<div class="row">' +
     '<div><label>格式</label><select id="m_s_fmt">' + subFmtOptions('vmess') + '</select></div>' +
     '<div><label>规则</label><select id="m_s_mode">' + subModeOptions('none') + '</select></div></div>' +
-    '<label>纳入的入站（多选精确选择；不选则默认全部）</label>' +
+    '<label>纳入的入站</label>' +
     '<div class="inblist">' + subInboundChecklist([]) + '</div>' +
-    '<div class="row">' +
-    '<div><label>节点（可选）</label><div class="inblist">' + subNodeChecklist([]) + '</div></div>' +
-    '<div><label>协议（可选）</label><div class="inblist">' + subProtoChecklist([]) + '</div></div>' +
-    '<div><label>标签（可选，逗号分隔）</label><input id="m_s_tags" placeholder="如 hk, ws"></div></div>' +
-    '<details class="adv"><summary>高级筛选 JSON（可选）</summary><input id="m_s_adv" placeholder=\'{"node_ids":[9]}\'></details>' +
-    '<p class="muted">ACL4SSR 模式对 Clash/Loon/Surfboard 附带分流规则，V2Ray 格式退化为纯节点链接。</p>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateSub)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateSub() {
-  const filters = buildSubFilters('m_s_adv', 'm_s_tags');
+  const filters = buildSubFilters('');
   if (filters === null) return;
   const d = await api('POST', '/subscriptions', { name: val('m_s_name'), format: val('m_s_fmt'), mode: val('m_s_mode'), filters });
   if (d) { closeModal(); showToast('订阅已建，token: ' + d.token, 'ok'); await loadSubs(); }
 }
 function showCreateCert() {
-  setModal('<h2>申请证书（全流程托管）</h2>' +
-    '<label>域名（泛域名，如 *.example.com）</label><input id="m_dom" placeholder="*.example.com">' +
-    '<label>Cloudflare 邮箱（可选，使用 API Token 方式无需填写）</label><input id="m_cfemail" placeholder="admin@example.com">' +
-    '<label>Cloudflare API Token（需 DNS:Edit 权限）</label><input id="m_cftoken" type="password">' +
+  setModal('<h2>申请证书</h2>' +
+    '<label>域名（泛域名）</label><input id="m_dom" placeholder="*.example.com">' +
+    '<label>Cloudflare 邮箱（可选）</label><input id="m_cfemail" placeholder="admin@example.com">' +
+    '<label>Cloudflare API Token</label><input id="m_cftoken" type="password">' +
     '<label class="chk"><input type="checkbox" id="m_autorenew" checked> 自动续签</label>' +
-    '<p class="muted">管理端将通过 Let\'s Encrypt + Cloudflare DNS-01 校验签发泛域名证书，并自动分发到所有已启用节点。</p>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateCert)">申请并分发</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateCert() {
@@ -1076,7 +1217,7 @@ async function loadNotifiers() { const n = await api('GET', '/notifiers'); if (n
 async function loadAllInbounds() { const v = await api('GET', '/inbounds'); if (v) { inboundCatalog = v; } }
 
 function enterApp() {
-  document.getElementById('login').classList.add('hidden');
+  document.getElementById('loginWrap').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('headerRight').classList.remove('hidden');
   document.getElementById('who').textContent = 'admin';
@@ -1084,11 +1225,11 @@ function enterApp() {
   renderSidebar(); renderWelcome();
   loadNodes(); loadSubs(); loadCerts(); loadNotifiers(); loadAllInbounds();
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(loadNodes, 30000);
+  if (!MUST_CHANGE_PWD) refreshTimer = setInterval(loadNodes, 30000);
 }
 
 if (token) enterApp();
-else { document.getElementById('login').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); }
+else { document.getElementById('loginWrap').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); }
 </script>
 </body>
 </html>

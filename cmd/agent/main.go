@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"nodepilot/internal/agent"
+	"nodepilot/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +24,7 @@ func main() {
 	if *token == "" || *nodeID == "" {
 		log.Fatal("--token and --node-id are required")
 	}
+	config.InitAgent()
 
 	agent.SetCertDir(*certDir)
 	agent.SetConfig(agent.AgentConfig{

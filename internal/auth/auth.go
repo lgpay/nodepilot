@@ -9,10 +9,11 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+
+	"nodepilot/internal/config"
 )
 
-// jwtSecret MVP 写死，生产应来自配置/环境变量
-var jwtSecret = []byte("nodepilot-dev-secret-change-me")
+// jwtSecret 来自 config.Init（环境变量或持久化密钥文件），不再硬编码。
 
 // HashPassword bcrypt 哈希管理员密码
 func HashPassword(pw string) (string, error) {
@@ -41,12 +42,16 @@ func TokenHash(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
-// CheckNodeToken 校验节点上报/下发的 Bearer token：
-// 比较 sha256(bearer) 与 sha256(expected)，常量时间避免时序攻击
-func CheckNodeToken(bearer, expected string) bool {
-	h1 := sha256.Sum256([]byte(bearer))
-	h2 := sha256.Sum256([]byte(expected))
-	return subtle.ConstantTimeCompare(h1[:], h2[:]) == 1
+// CheckNodeToken 校验节点 Bearer token：
+// 对传入的 bearer 取 sha256 hex，与已存储的哈希（expectedHash）做常量时间比较，
+// 避免时序攻击，且数据库侧不再保存明文 token。
+func CheckNodeToken(bearer, expectedHash string) bool {
+	if expectedHash == "" || bearer == "" {
+		return false
+	}
+	h := sha256.Sum256([]byte(bearer))
+	hh := hex.EncodeToString(h[:])
+	return subtle.ConstantTimeCompare([]byte(hh), []byte(expectedHash)) == 1
 }
 
 // IssueJWT 签发管理员 JWT（24h）
@@ -56,13 +61,13 @@ func IssueJWT(username string) (string, error) {
 		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return t.SignedString(jwtSecret)
+	return t.SignedString(config.JWTSecret)
 }
 
 // ParseJWT 校验并返回 claims
 func ParseJWT(tokenStr string) (jwt.MapClaims, error) {
 	t, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
+		return config.JWTSecret, nil
 	})
 	if err != nil {
 		return nil, err

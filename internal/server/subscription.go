@@ -45,7 +45,7 @@ func CreateSubscription(c *gin.Context) {
 		Enabled: true,
 	}
 	if err := store.DB.Create(&g).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(201, gin.H{"id": g.ID, "token": g.Token})
@@ -113,7 +113,7 @@ func UpdateSubscription(c *gin.Context) {
 func DeleteSubscription(c *gin.Context) {
 	id := c.Param("id")
 	if err := store.DB.Delete(&model.SubscriptionGroup{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
@@ -143,7 +143,7 @@ func GetSubscription(c *gin.Context) {
 	}
 	items, err := aggregate(g)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	// Surfboard 严格遵循 Surge 配置格式，不支持 vless / Trojan-gRPC / ssr 等协议
@@ -206,7 +206,7 @@ func GetSubscription(c *gin.Context) {
 		ctype = "text/plain; charset=utf-8"
 	}
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.Data(200, ctype, []byte(content))
@@ -227,7 +227,7 @@ func GetSubscriptionQR(c *gin.Context) {
 	subURL := schemeHost(c) + "/api/v1/sub/" + token
 	png, err := qrcode.Encode(subURL, qrcode.Medium, 256)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.Data(200, "image/png", png)

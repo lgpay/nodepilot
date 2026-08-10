@@ -4,10 +4,11 @@ import "time"
 
 // Admin 单管理员账号（MVP 不实现多账号/角色）
 type Admin struct {
-	ID           uint   `gorm:"primaryKey" json:"id"`
-	Username     string `gorm:"uniqueIndex;size:64" json:"username"`
-	PasswordHash string `json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Username      string    `gorm:"uniqueIndex;size:64" json:"username"`
+	PasswordHash  string    `json:"-"`
+	MustChangePwd bool      `gorm:"default:true" json:"must_change_pwd"` // 首次启动随机密码，要求登录后立即修改
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Node 代理节点（数据面）：运行 node-agent + xray
@@ -19,7 +20,12 @@ type Node struct {
 	City          string    `gorm:"size:64" json:"city"`     // 城市（如 法兰克福），让区域显示更精确
 	Flag          string    `json:"flag" gorm:"-"`           // 由 region 派生，不入库
 	Tags          string    `gorm:"size:512" json:"tags"` // 逗号分隔
-	Token         string    `gorm:"size:128" json:"-"` // 节点 token 明文（不随节点序列化；仅 GetNode 详情以顶层 token 字段返回）
+	// 节点 token 不再以明文持久化：
+	//   TokenHash：sha256(token) hex，用于校验 agent 上报/下发的 Bearer（常量时间比较）。
+	//   TokenEnc ：AES-GCM 加密的明文 token，仅用于管理端主动推送配置/证书到 agent 时解密使用。
+	// 明文 token 仅在创建节点时返回一次（部署 agent 用）。
+	TokenHash string `gorm:"size:64;index" json:"-"`
+	TokenEnc  string `gorm:"type:text" json:"-"`
 	Enabled       bool      `gorm:"default:true" json:"enabled"`
 	Status        string    `gorm:"size:16;default:'offline'" json:"status"` // online|offline
 	Connectivity  string    `gorm:"size:16;default:'ok'" json:"connectivity"` // ok|degraded|offline
@@ -27,6 +33,7 @@ type Node struct {
 	LastHeartbeat time.Time `json:"last_heartbeat"`
 	PortRange     string    `gorm:"size:64" json:"port_range"` // 如 10000-65535 或 10000-20000,30000-40000；空=全局默认
 	MonthlyTrafficBytes int64 `gorm:"default:0" json:"monthly_traffic_bytes"` // 月流量上限(字节)，0=不限
+	ExpiresAt     *time.Time `json:"expires_at"` // 服务器有效期（到期时间），空=长期有效
 	CreatedAt     time.Time `json:"created_at"`
 }
 

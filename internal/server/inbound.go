@@ -1,11 +1,16 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"nodepilot/internal/configgen"
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
@@ -121,9 +126,10 @@ func CreateInbound(c *gin.Context) {
 		return
 	}
 	if err := store.DB.Create(&in).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	afterInboundSave(in)
 	c.JSON(201, gin.H{"id": in.ID})
 }
 
@@ -203,16 +209,126 @@ func UpdateInbound(c *gin.Context) {
 		return
 	}
 	store.DB.Model(&in).Updates(updates)
+	// 用更新后的生效值触发后续动作
+	in.TLSEnabled = effTLS
+	in.TLSCertID = effCert
+	afterInboundSave(in)
 	c.JSON(200, gin.H{"ok": true})
+}
+
+// afterInboundSave 入站保存后：若使用 TLS 证书，把证书产物分发到该节点并触发配置下发（保存即生效）。
+// 免去「保存入站 → 证书页手动分发 → 再下发配置」的步骤。
+func afterInboundSave(in model.Inbound) {
+	if !in.TLSEnabled || in.TLSCertID == 0 {
+		return
+	}
+	var node model.Node
+	if err := store.DB.First(&node, in.NodeID).Error; err != nil {
+		log.Printf("[inbound] 节点 #%d 不存在，跳过证书分发", in.NodeID)
+		return
+	}
+	pushCertToNode(node, in.TLSCertID)
+	if _, err := syncNode(node); err != nil {
+		log.Printf("[inbound] 节点 #%d 配置下发失败: %v", node.ID, err)
+	}
+}
+
+// pushCertToNode 把证书签发产物推送到单个节点 agent（幂等；失败仅记录，不阻断保存）。
+func pushCertToNode(node model.Node, certID uint) {
+	if certID == 0 {
+		return
+	}
+	var cert model.Certificate
+	if err := store.DB.First(&cert, certID).Error; err != nil {
+		log.Printf("[inbound] 证书 #%d 不存在，跳过对节点 %d 的分发", certID, node.ID)
+		return
+	}
+	if cert.Status != "issued" {
+		log.Printf("[inbound] 证书 #%d 状态 %s，跳过对节点 %d 的分发", certID, cert.Status, node.ID)
+		return
+	}
+	base := filepath.Join(ctrlCertDir, "certificates", sanitize(cert.Domain))
+	certPEM, err1 := os.ReadFile(base + ".crt")
+	keyPEM, err2 := os.ReadFile(base + ".key")
+	if err1 != nil || err2 != nil {
+		log.Printf("[inbound] 读取证书产物失败(crt=%v key=%v)，跳过对节点 %d 的分发", err1, err2, node.ID)
+		return
+	}
+	caPEM, _ := os.ReadFile(base + ".issuer.crt")
+	if _, err := agentPut(node, "/agent/v1/cert", map[string]string{
+		"cert_pem": string(certPEM),
+		"key_pem":  string(keyPEM),
+		"ca_pem":   string(caPEM),
+	}); err != nil {
+		log.Printf("[inbound] 证书分发到节点 %d 失败: %v", node.ID, err)
+		return
+	}
+	log.Printf("[inbound] 证书 #%d 已分发到节点 %d", certID, node.ID)
 }
 
 func DeleteInbound(c *gin.Context) {
 	id := c.Param("id")
-	if err := store.DB.Delete(&model.Inbound{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+	// 事务内级联清理：clients / traffic_stats / 订阅筛选引用，避免孤儿记录
+	err := store.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("inbound_id = ?", id).Delete(&model.Client{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("inbound_id = ?", id).Delete(&model.TrafficStat{}).Error; err != nil {
+			return err
+		}
+		if err := removeInboundFromSubscriptionFilters(tx, id); err != nil {
+			return err
+		}
+		return tx.Delete(&model.Inbound{}, id).Error
+	})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
+}
+
+// removeInboundFromSubscriptionFilters 从所有订阅分组的 filters JSON 的 inbound_ids 中移除该入站，
+// 保留其余筛选键（node_ids/protocol/tags）。
+func removeInboundFromSubscriptionFilters(tx *gorm.DB, inboundID string) error {
+	var groups []model.SubscriptionGroup
+	if err := tx.Find(&groups).Error; err != nil {
+		return err
+	}
+	var fid uint
+	fmt.Sscanf(inboundID, "%d", &fid)
+	if fid == 0 {
+		return nil
+	}
+	for _, g := range groups {
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(g.Filters), &m); err != nil {
+			continue
+		}
+		var ids []uint
+		_ = json.Unmarshal(m["inbound_ids"], &ids)
+		changed := false
+		out := ids[:0]
+		for _, x := range ids {
+			if x == fid {
+				changed = true
+			} else {
+				out = append(out, x)
+			}
+		}
+		if !changed {
+			continue
+		}
+		m["inbound_ids"], _ = json.Marshal(out)
+		nf, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		if err := tx.Model(&g).Update("filters", string(nf)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ---- 用户/客户端 CRUD ----
@@ -252,7 +368,7 @@ func CreateClient(c *gin.Context) {
 		}
 	}
 	if err := store.DB.Create(&client).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(201, gin.H{"id": client.ID, "uuid": client.UUID})
@@ -301,7 +417,7 @@ func UpdateClient(c *gin.Context) {
 func DeleteClient(c *gin.Context) {
 	id := c.Param("id")
 	if err := store.DB.Delete(&model.Client{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})

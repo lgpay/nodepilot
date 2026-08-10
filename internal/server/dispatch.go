@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"nodepilot/internal/configgen"
+	"nodepilot/internal/httputil"
 	"nodepilot/internal/model"
+	"nodepilot/internal/secret"
 	"nodepilot/internal/store"
 )
 
@@ -29,7 +30,7 @@ func SyncNode(c *gin.Context) {
 	}
 	version, err := syncNode(node)
 	if err != nil {
-		c.JSON(502, gin.H{"error": "dispatch failed: " + err.Error()})
+		c.JSON(502, gin.H{"error": "dispatch failed"})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true, "version": version})
@@ -62,20 +63,23 @@ func syncNode(node model.Node) (int, error) {
 		"xray_config": json.RawMessage(jsonStr),
 	})
 
+	// 推送需携带明文 token（从密文解密），用于通过 agent 的 Bearer 校验
+	token, err := secret.Decrypt(node.TokenEnc)
+	if err != nil {
+		cv := model.ConfigVersion{NodeID: node.ID, Version: version, ContentJSON: jsonStr, AppliedAt: time.Now(), Status: "failed", Error: "decrypt token failed"}
+		store.DB.Create(&cv)
+		return 0, err
+	}
+
 	url := agentURL(node.Address) + "/agent/v1/config"
 	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
 	if err != nil {
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+node.Token)
+	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // MVP：agent 自签/HTTP，生产需校验证书
-		},
-	}
+	client := httputil.AgentClient(15 * time.Second)
 	resp, err := client.Do(req)
 	cv := model.ConfigVersion{
 		NodeID:      node.ID,
@@ -118,9 +122,13 @@ func agentURL(address string) string {
 	return "http://" + address
 }
 
-// agentPut 向节点 agent 发送 PUT 请求（Bearer node.Token），返回响应体
+// agentPut 向节点 agent 发送 PUT 请求（Bearer 明文 token，由 TokenEnc 解密），返回响应体
 func agentPut(node model.Node, path string, body interface{}) ([]byte, error) {
 	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	token, err := secret.Decrypt(node.TokenEnc)
 	if err != nil {
 		return nil, err
 	}
@@ -130,13 +138,8 @@ func agentPut(node model.Node, path string, body interface{}) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+node.Token)
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	client := httputil.AgentClient(30 * time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

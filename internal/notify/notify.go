@@ -62,8 +62,30 @@ func BuildSender(ch model.NotificationChannel) (Sender, error) {
 	}
 }
 
-// Dispatch 向所有已启用渠道异步扇出；单渠道失败仅记录日志，不阻塞调用方。
-func Dispatch(title, body string) {
+// NotifyEvents 全部可订阅的通知事件 key（与前端勾选项一一对应）。
+var NotifyEvents = []string{
+	"node_offline",       // 节点离线
+	"node_recovered",     // 节点恢复在线
+	"node_healed",        // 节点自愈
+	"node_traffic_exhausted", // 节点月流量耗尽(自动停用)
+	"node_traffic_warning",   // 节点月流量预警
+	"client_traffic_over",    // 客户端流量超额
+	"client_expired",         // 客户端已过期
+	"client_expiring",        // 客户端即将到期
+}
+
+// IsValidEvent 判断事件 key 是否合法
+func IsValidEvent(e string) bool {
+	for _, v := range NotifyEvents {
+		if v == e {
+			return true
+		}
+	}
+	return false
+}
+
+// Dispatch 向所有已启用且订阅了 event 的渠道异步扇出；单渠道失败仅记录日志，不阻塞调用方。
+func Dispatch(event, title, body string) {
 	var channels []model.NotificationChannel
 	if err := store.DB.Where("enabled = ?", true).Find(&channels).Error; err != nil {
 		log.Printf("[notify] load channels failed: %v", err)
@@ -74,6 +96,9 @@ func Dispatch(title, body string) {
 		return
 	}
 	for _, ch := range channels {
+		if !ch.Subscribes(event) {
+			continue
+		}
 		go func(ch model.NotificationChannel) {
 			s, err := BuildSender(ch)
 			if err != nil {
