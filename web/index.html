@@ -699,7 +699,7 @@ async function renderSubDetail(id) {
     '<details class="adv"><summary>高级筛选 JSON（可选，需熟练使用）</summary>' +
     '<p class="muted">inbound_ids / node_ids / protocol / tags 由上方勾选与输入覆盖，此处的其他字段会合并进 filters。</p>' +
     '<input id="s_adv2" value="' + esc(g.filters) + '"></details>' +
-    '<p class="muted">无规则 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为裸链接）。</p>' +
+    '<p class="muted">无规则 = 仅节点列表；ACL4SSR = Clash/Loon/Surfboard 附带分流规则（V2Ray 格式下退化为纯节点链接）。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveSub(' + g.id + '))">保存</button>' +
     '<button onclick="copyText(\'' + url + '\')">复制链接</button>' +
@@ -941,7 +941,7 @@ async function showCreateSub() {
     '<div><label>协议（可选）</label><div class="inblist">' + subProtoChecklist([]) + '</div></div>' +
     '<div><label>标签（可选，逗号分隔）</label><input id="m_s_tags" placeholder="如 hk, ws"></div></div>' +
     '<details class="adv"><summary>高级筛选 JSON（可选）</summary><input id="m_s_adv" placeholder=\'{"node_ids":[9]}\'></details>' +
-    '<p class="muted">ACL4SSR 模式对 Clash/Loon/Surfboard 附带分流规则，V2Ray 格式退化为裸链接。</p>' +
+    '<p class="muted">ACL4SSR 模式对 Clash/Loon/Surfboard 附带分流规则，V2Ray 格式退化为纯节点链接。</p>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateSub)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 async function doCreateSub() {
