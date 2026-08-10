@@ -458,7 +458,7 @@ func buildLoonRemoteRules(rulesBaseURL string) string {
 // buildLoonProxyLine 生成单条 Loon 原生风格代理定义行（参考官方模板 LoonExampleConfig/example.conf）。
 // Loon 原生语法与 Surge 兼容风格不同：
 //   - vmess:  vmess, server, port, cipher, "uuid", transport=, path=, host=, over-tls=, tls-name=
-//   - vless:  VLESS, server, port, "uuid", , transport=, path=, host=, over-tls=, tls-name=（第 5 位为空）
+//   - vless:  vless, server, port, "uuid", , transport=, path=, host=, over-tls=, tls-name=（第 5 位为空）
 //   - trojan: trojan, server, port, "password", tls-name=
 //   - ss:     Shadowsocks, server, port, method, "password"
 //
@@ -499,9 +499,9 @@ func buildLoonProxyLine(it ExportItem) (string, bool) {
 		parts = append(parts, tlsParts()...)
 		return strings.Join(parts, ", "), true
 	case "vless":
-		// VLESS 无 encryption 字段，故 uuid 后留一个空位（第 5 位）。
+		// vless 与 vmess/trojan 一致用小写；vless 无 encryption 字段，故 uuid 后留一个空位（第 5 位）。
 		parts := []string{
-			fmt.Sprintf("%s = VLESS, %s, %d, \"%s\", ", name, host, it.Port, it.UUID),
+			fmt.Sprintf("%s = vless, %s, %d, \"%s\", ", name, host, it.Port, it.UUID),
 			"transport=" + transport,
 			"path=" + path,
 		}
