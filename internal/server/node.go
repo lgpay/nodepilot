@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -108,6 +109,10 @@ func CreateNode(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if !validPortRange(body.PortRange) {
+		c.JSON(400, gin.H{"error": "端口范围格式不正确（如 10000-20000,30000-40000）"})
 		return
 	}
 	token := auth.GenToken()
@@ -222,6 +227,10 @@ func UpdateNode(c *gin.Context) {
 		updates["enabled"] = *body.Enabled
 	}
 	if body.PortRange != nil {
+		if !validPortRange(*body.PortRange) {
+			c.JSON(400, gin.H{"error": "端口范围格式不正确（如 10000-20000,30000-40000）"})
+			return
+		}
 		updates["port_range"] = strings.TrimSpace(*body.PortRange)
 	}
 	store.DB.Model(&node).Updates(updates)
@@ -235,6 +244,44 @@ func DeleteNode(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true})
+}
+
+// validPortRange 严格校验端口范围格式：空串合法（用全局默认）；非空须为逗号分隔的
+// "N" 或 "N-M"，每段端口 1-65535 且 lo<=hi。
+func validPortRange(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return true
+	}
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return false
+		}
+		var lo, hi int
+		if strings.Contains(part, "-") {
+			ps := strings.SplitN(part, "-", 2)
+			a, err1 := strconv.Atoi(ps[0])
+			b, err2 := strconv.Atoi(ps[1])
+			if err1 != nil || err2 != nil {
+				return false
+			}
+			lo, hi = a, b
+			if lo > hi {
+				return false
+			}
+		} else {
+			v, err := strconv.Atoi(part)
+			if err != nil {
+				return false
+			}
+			lo, hi = v, v
+		}
+		if lo < 1 || hi > 65535 {
+			return false
+		}
+	}
+	return true
 }
 
 // Heartbeat agent 上报状态

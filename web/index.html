@@ -502,7 +502,7 @@ async function renderNodeDetail(id) {
     '<div><label>地域</label><input id="n_region" value="' + esc(n.region || '') + '"></div></div>' +
     '<div class="row">' +
     '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '"></div>' +
-    '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '"></div>' +
+    '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
     '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div></div>' +
     '<div class="row">' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
@@ -534,9 +534,11 @@ async function renderNodeDetail(id) {
     '</tbody></table></div></div>';
 }
 async function saveNode(id) {
-  const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: val('n_portrange') });
+  const pr = (val('n_portrange') || '').trim();
+  if (!validPortRange(pr)) return showToast('端口范围格式不正确（如 10000-20000,30000-40000）', 'err');
+  const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: pr });
   if (d) {
-    const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: val('n_portrange') };
+    const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), region: val('n_region'), tags: val('n_tags'), port_range: pr };
     showToast('节点已保存', 'ok'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id);
   }
 }
@@ -920,11 +922,29 @@ function showCreateNode() {
     '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321">' +
     '<label>地域</label><input id="m_n_region">' +
     '<label>标签(逗号)</label><input id="m_n_tags">' +
-    '<label>端口范围</label><input id="m_n_pr" placeholder="10000-65535">' +
+    '<label>端口范围</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
+// 端口范围严格校验：空=用全局默认；非空须为 逗号分隔的 "N" 或 "N-M"，每段端口 1-65535 且 lo<=hi
+function validPortRange(s) {
+  s = (s || '').trim();
+  if (!s) return true;
+  if (!/^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(s)) return false;
+  for (const p of s.split(',')) {
+    if (p.includes('-')) {
+      const [a, b] = p.split('-').map(Number);
+      if (a < 1 || b > 65535 || a > b) return false;
+    } else {
+      const v = Number(p);
+      if (v < 1 || v > 65535) return false;
+    }
+  }
+  return true;
+}
 async function doCreateNode() {
-  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: val('m_n_region'), tags: val('m_n_tags'), port_range: val('m_n_pr') });
+  const pr = (val('m_n_pr') || '').trim();
+  if (!validPortRange(pr)) return showToast('端口范围格式不正确（如 10000-20000,30000-40000）', 'err');
+  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: val('m_n_region'), tags: val('m_n_tags'), port_range: pr });
   if (d) { closeModal(); showToast('节点已注册', 'ok'); copyText(d.token); await loadNodes(); }
 }
 async function showCreateSub() {
