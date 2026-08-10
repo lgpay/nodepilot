@@ -121,14 +121,13 @@ get_agent_binary() {
     cp ./bin/agent "$dest"
     return
   fi
-  # 2) 下载 release 二进制（gitee 主源 → github 备源 → go build 回退）
+  # 2) 下载 release 二进制（github 主源 → go build 回退）
   local arch; arch=$(detect_arch)
   local urls=()
   if [ -n "$NP_BINARY_URL" ]; then
     urls=("$NP_BINARY_URL")
   else
     urls=(
-      "https://gitee.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
       "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$RELEASE_TAG/$BINARY_NAME-linux-$arch.tar.gz"
     )
   fi
