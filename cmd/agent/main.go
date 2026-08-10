@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"nodepilot/internal/agent"
@@ -36,6 +38,16 @@ func main() {
 		CertDir:   *certDir,
 	})
 	agent.SetXrayBin(*xrayBin)
+
+	// 开机自动拉起 xray：本地已有已落盘的配置则直接用其启动，避免节点重启后代理停摆
+	cfgFile := filepath.Join(*configDir, "config.json")
+	if _, err := os.Stat(cfgFile); err == nil {
+		if err := agent.Restart(cfgFile); err != nil {
+			log.Printf("[agent] auto-start xray failed: %v", err)
+		} else {
+			log.Printf("[agent] xray auto-started with existing config: %s", cfgFile)
+		}
+	}
 
 	r := gin.Default()
 	agent.RegisterRoutes(r)
