@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +18,19 @@ import (
 
 // RulesCacheDir 规则镜像的磁盘缓存目录（由 main 按 db 所在目录设置）。
 var RulesCacheDir string
+
+// InitACLTemplate 加载仓库内 rules/ACL4SSR_Online.ini（由 GitHub Actions 每日同步）作为
+// 订阅生成的分组/规则模板；文件缺失或解析失败时回退内置静态快照并告警。
+func InitACLTemplate(rulesDir string) {
+	path := filepath.Join(rulesDir, "ACL4SSR_Online.ini")
+	tpl, err := subscription.LoadACLFile(path)
+	if err != nil {
+		log.Printf("[acl] ACL4SSR_Online.ini 加载失败，使用内置静态快照: %v", err)
+		return
+	}
+	subscription.SetACLTemplate(tpl)
+	log.Printf("[acl] ACL4SSR 模板已加载: %s (groups=%d rules=%d)", path, len(tpl.Groups), len(tpl.Rules))
+}
 
 const ruleCacheTTL = 24 * time.Hour
 

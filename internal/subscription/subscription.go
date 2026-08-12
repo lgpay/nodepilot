@@ -391,7 +391,7 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 	// 否则缺省按 yaml 解析可能告警/异常。
 	base := strings.TrimRight(rulesBaseURL, "/")
 	rps := map[string]clashRuleProvider{}
-	for _, r := range acl4ssrRules {
+	for _, r := range currentTemplate().Rules {
 		if r.List == "" {
 			continue
 		}
@@ -411,7 +411,7 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 
 	// 规则
 	rules := []string{}
-	for _, r := range acl4ssrRules {
+	for _, r := range currentTemplate().Rules {
 		rules = append(rules, aclRuleLineClash(r))
 	}
 	cfg.Rules = rules
@@ -514,7 +514,7 @@ func loonGeneralBlock(geoipURL string) string {
 // buildSurgeBuiltinRules 输出 ACL4SSR 模板中的内置规则（GEOIP/FINAL），用于 Loon 的 [Rule] 段。
 func buildSurgeBuiltinRules() string {
 	var sb strings.Builder
-	for _, r := range acl4ssrRules {
+	for _, r := range currentTemplate().Rules {
 		if r.List != "" {
 			continue
 		}
@@ -527,7 +527,7 @@ func buildSurgeBuiltinRules() string {
 func buildLoonRemoteRules(rulesBaseURL string) string {
 	base := strings.TrimRight(rulesBaseURL, "/")
 	var sb strings.Builder
-	for _, r := range acl4ssrRules {
+	for _, r := range currentTemplate().Rules {
 		if r.List == "" {
 			continue
 		}

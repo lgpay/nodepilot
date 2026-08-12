@@ -1,0 +1,45 @@
+name: Sync ACL4SSR Online
+
+# 每日与上游 ACL4SSR 同步分组/规则模板到仓库 rules/ACL4SSR_Online.ini，
+# 服务端启动时加载该文件生成订阅（缺失/解析失败回退内置静态快照）。
+# 规则列表内容（.list）仍由服务端运行时经 /api/v1/rules 镜像拉取，此处仅同步 ini。
+
+on:
+  schedule:
+    # UTC 03:00（北京时间 11:00）每日同步
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream ACL4SSR_Online.ini
+        run: |
+          curl -fsSL --max-time 60 \
+            "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/config/ACL4SSR_Online.ini" \
+            -o rules/ACL4SSR_Online.ini
+          # 校验内容有效性：必须包含 ruleset 与 custom_proxy_group，且分组数足够
+          grep -q "^ruleset=" rules/ACL4SSR_Online.ini || { echo "invalid: no ruleset"; exit 1; }
+          grep -q "^custom_proxy_group=" rules/ACL4SSR_Online.ini || { echo "invalid: no custom_proxy_group"; exit 1; }
+          test "$(grep -c "^custom_proxy_group=" rules/ACL4SSR_Online.ini)" -ge 5 || { echo "invalid: too few groups"; exit 1; }
+          echo "fetched OK: $(wc -l < rules/ACL4SSR_Online.ini) lines"
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet rules/ACL4SSR_Online.ini; then
+            echo "no change, skip commit"
+            exit 0
+          fi
+          SHA=$(curl -fsSL --max-time 30 \
+            "https://api.github.com/repos/ACL4SSR/ACL4SSR/commits?per_page=1" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['sha'])")
+          git add rules/ACL4SSR_Online.ini
+          git commit -m "sync: ACL4SSR_Online.ini @ ${SHA}"
+          git push

@@ -21,6 +21,7 @@ func main() {
 	dbPath := flag.String("db", "nodepilot.db", "sqlite db file path (relative to working dir)")
 	webDir := flag.String("web-dir", "web", "directory containing web/index.html to serve at /")
 	addr := flag.String("addr", ":8080", "listen addresses (comma-separated, e.g. 127.0.0.1:6200,:8080)")
+	rulesDir := flag.String("rules-dir", "rules", "directory containing ACL4SSR_Online.ini (ACL4SSR rule template, synced by GitHub Actions)")
 	flag.Parse()
 
 	// 结构化日志（文本格式，带时间/级别/调用点）
@@ -40,6 +41,9 @@ func main() {
 	}
 	// 规则镜像的磁盘缓存目录（与 db 同目录下的 rules/）
 	server.RulesCacheDir = filepath.Join(filepath.Dir(*dbPath), "rules")
+	// ACL4SSR 分组/规则模板：优先加载仓库内 rules/ACL4SSR_Online.ini（GitHub Actions 同步），
+	// 缺失或解析失败时回退内置静态快照
+	server.InitACLTemplate(*rulesDir)
 	// 首次启动初始化默认管理员（随机密码，强制首次登录修改）
 	pwd, err := store.InitAdmin("admin")
 	if err != nil {
