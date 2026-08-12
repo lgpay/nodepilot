@@ -23,7 +23,7 @@ blue()   { echo -e "\033[34m$1\033[0m"; }
 # ---------- 常量 ----------
 REPO_OWNER="lgpay"
 REPO_NAME="nodepilot"
-RELEASE_TAG="v0.1.0"
+RELEASE_TAG="v0.1.1"
 LEGO_VERSION="${NP_LEGO_VERSION:-v5.3.1}"
 INSTALL_DIR="${NP_INSTALL_DIR:-/opt/nodepilot}"
 WEB_DIR="${NP_WEB_DIR:-$INSTALL_DIR/web}"

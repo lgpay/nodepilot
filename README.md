@@ -191,7 +191,7 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 环境变量可覆盖：`NP_ADDR`（默认 `:8081`，须与注册节点时 `address` 端口一致）、`NP_XRAY`、`NP_CONFIG_DIR`、`NP_INSTALL_DIR`、`NP_BINARY_URL`。
 管理菜单：`bash install-agent.sh` 可选 安装 / 启动 / 停止 / 重启 / 状态 / 配置 / 卸载；`bash install-agent.sh uninstall` 卸载。
 
-> agent 二进制从 GitHub Release `v0.1.0` 下载（当前仓库为 public）。私有化部署可设置 `NP_BINARY_URL` 指向自托管地址。
+> agent 二进制从 GitHub Release `v0.1.1` 下载（当前仓库为 public）。私有化部署可设置 `NP_BINARY_URL` 指向自托管地址。
 
 ### ACL4SSR 规则同步
 

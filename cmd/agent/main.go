@@ -16,7 +16,7 @@ import (
 // Version 构建版本号，可由构建期注入：
 //
 //	go build -ldflags "-X main.Version=$(git describe --tags 2>/dev/null || echo dev)"
-var Version = "0.1.0"
+var Version = "0.1.1"
 
 func main() {
 	token := flag.String("token", "", "node token (from control plane registration)")

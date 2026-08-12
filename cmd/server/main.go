@@ -20,7 +20,7 @@ import (
 // Version 构建版本号，可由构建期注入：
 //
 //	go build -ldflags "-X main.Version=$(git describe --tags 2>/dev/null || echo dev)" ./cmd/server
-var Version = "0.1.0"
+var Version = "0.1.1"
 
 func main() {
 	dbPath := flag.String("db", "nodepilot.db", "sqlite db file path (relative to working dir)")
