@@ -1,0 +1,73 @@
+name: Release
+
+# 打 v* tag 时自动构建并发布 Release 资产：
+#   nodepilot-server-linux-<arch>.tar.gz（含 bin/server + web/* + rules/）
+#   nodepilot-agent-linux-<arch>.tar.gz（单二进制）
+# 与 scripts/install-server.sh / install-agent.sh 的下载解压结构保持一致。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+          cache: true
+
+      - name: Build server (CGO for sqlite)
+        run: |
+          CGO_ENABLED=1 GOOS=linux GOARCH=${{ matrix.arch }} \
+            go build -ldflags "-X main.Version=${{ github.ref_name }}" \
+            -o dist/server ./cmd/server
+
+      - name: Build agent
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} \
+            go build -ldflags "-X main.Version=${{ github.ref_name }}" \
+            -o dist/agent ./cmd/agent
+
+      - name: Package server
+        run: |
+          mkdir -p pkg/server/bin pkg/server/web pkg/server/rules
+          cp dist/server pkg/server/bin/
+          cp -r web/* pkg/server/web/
+          cp rules/ACL4SSR_Online.ini pkg/server/rules/
+          (cd pkg/server && tar -czf ../../nodepilot-server-linux-${{ matrix.arch }}.tar.gz bin web rules)
+
+      - name: Package agent
+        run: |
+          mkdir -p pkg/agent
+          cp dist/agent pkg/agent/nodepilot-agent
+          (cd pkg/agent && tar -czf ../../nodepilot-agent-linux-${{ matrix.arch }}.tar.gz nodepilot-agent)
+
+      - name: Verify archive layout
+        run: |
+          echo "=== server ==="
+          tar -tzf nodepilot-server-linux-${{ matrix.arch }}.tar.gz
+          echo "=== agent ==="
+          tar -tzf nodepilot-agent-linux-${{ matrix.arch }}.tar.gz
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            nodepilot-server-linux-${{ matrix.arch }}.tar.gz
+            nodepilot-agent-linux-${{ matrix.arch }}.tar.gz
