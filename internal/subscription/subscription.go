@@ -66,11 +66,11 @@ func vmessLink(it ExportItem) string {
 // BuildClash 生成 Clash 配置（YAML，裸订阅：仅节点，无路由规则）
 func BuildClash(items []ExportItem) (string, error) {
 	cfg := clashConfig{
-		Port:             7890,
-		SocksPort:        7891,
-		AllowLan:         false,
-		Mode:             "rule",
-		LogLevel:         "info",
+		Port:               7890,
+		SocksPort:          7891,
+		AllowLan:           false,
+		Mode:               "rule",
+		LogLevel:           "info",
 		ExternalController: "127.0.0.1:9090",
 	}
 	groupMembers := []string{}
@@ -351,8 +351,8 @@ func BuildSIP008(items []ExportItem) (string, error) {
 			Region:   it.Region,
 			Settings: map[string]interface{}{"uuid": it.UUID, "alterId": 0, "security": "auto"},
 			StreamSettings: map[string]interface{}{
-				"network":  it.Transport,
-				"security": ternary(it.TLSEnabled, "tls", "none"),
+				"network":    it.Transport,
+				"security":   ternary(it.TLSEnabled, "tls", "none"),
 				"wsSettings": map[string]interface{}{"path": path},
 			},
 		}
@@ -372,11 +372,11 @@ func BuildSIP008(items []ExportItem) (string, error) {
 // rulesBaseURL 为 ACL4SSR 规则源基址（默认 GitHub raw，可被 Setting acl4ssr_base 覆盖）。
 func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) {
 	cfg := clashConfig{
-		Port:             7890,
-		SocksPort:        7891,
-		AllowLan:         false,
-		Mode:             "rule",
-		LogLevel:         "info",
+		Port:               7890,
+		SocksPort:          7891,
+		AllowLan:           false,
+		Mode:               "rule",
+		LogLevel:           "info",
 		ExternalController: "127.0.0.1:9090",
 	}
 	proxyNames := []string{}
@@ -386,7 +386,9 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 		proxyNames = append(proxyNames, pr.Name)
 	}
 
-	// rule-providers：每个 ACL4SSR 列表一个，URL 指向 ACL4SSR 规则源（classical 格式，无需 yaml 包装）
+	// rule-providers：每个 ACL4SSR 列表一个，URL 指向规则源（默认本面板 /api/v1/rules 镜像）。
+	// behavior=classical + format=text：ACL4SSR .list 为纯文本规则行，Clash.Meta 需显式声明 text，
+	// 否则缺省按 yaml 解析可能告警/异常。
 	base := strings.TrimRight(rulesBaseURL, "/")
 	rps := map[string]clashRuleProvider{}
 	for _, r := range acl4ssrRules {
@@ -396,6 +398,7 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 		rps[r.List] = clashRuleProvider{
 			Type:     "http",
 			Behavior: "classical",
+			Format:   "text",
 			URL:      base + "/" + r.List + ".list",
 			Path:     "./ruleset/" + r.List + ".yaml",
 			Interval: 86400,
@@ -427,13 +430,14 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 // rulesBaseURL 非空（即选择了 ACL4SSR 规则预设）时输出完整分组与分流规则：
 // Loon 原生用 [Rule](内置规则) + [Remote Rule](远程列表 url,组) 指向 ACL4SSR 规则源；
 // 否则退化为裸订阅（仅节点选择 + FINAL）。
-func BuildLoon(items []ExportItem, subURL, rulesBaseURL string) (string, error) {
+// geoipURL 为 Loon [General] 的 geoip-url（Country.mmdb），默认 DefaultLoonGeoIPURL，可被 Setting loon_geoip_url 覆盖。
+func BuildLoon(items []ExportItem, subURL, rulesBaseURL, geoipURL string) (string, error) {
 	var sb strings.Builder
 	if subURL != "" {
 		sb.WriteString(fmt.Sprintf("#!MANAGED-CONFIG %s interval=86400 strict=false\n", subURL))
 	}
 	// [General]：DNS / 局域网绕过 / geoip 库等基础设置（对齐 Loon 原生订阅样式）
-	sb.WriteString(loonGeneralBlock())
+	sb.WriteString(loonGeneralBlock(geoipURL))
 	sb.WriteString("[Proxy]\n")
 	// DIRECT 是 Loon 内置策略；显式声明为 direct，与 Surfboard 订阅保持一致（分组可指向 DIRECT）。
 	sb.WriteString("DIRECT = direct\n")
@@ -481,8 +485,17 @@ func surfboardGeneralBlock() string {
 		"ipv6 = false\n\n"
 }
 
+// DefaultLoonGeoIPURL Loon [General] geoip-url 的默认值。
+// 原实现指向第三方 GitLab 源（gitlab.com/Masaiki/GeoIP2-CN），存在失效/限流风险；
+// 改用社区主流稳定的 Loyalsoldier/geoip 镜像（jsDelivr CDN），可用 Setting loon_geoip_url 覆盖。
+const DefaultLoonGeoIPURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/geoip@release/Country.mmdb"
+
 // loonGeneralBlock 返回 Loon 的 [General] 基础设置（字段与风格对齐官方模板 LoonExampleConfig/example.conf）。
-func loonGeneralBlock() string {
+// geoipURL 允许外部注入可配置的 mmdb 源。
+func loonGeneralBlock(geoipURL string) string {
+	if geoipURL == "" {
+		geoipURL = DefaultLoonGeoIPURL
+	}
 	return "[General]\n" +
 		"skip-proxy = 192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,localhost,*.local\n" +
 		"bypass-tun = 10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.0.0.0/24,192.0.2.0/24,192.88.99.0/24,192.168.0.0/16,198.18.0.0/15,198.51.100.0/24,203.0.113.0/24,224.0.0.0/4,255.255.255.255/32\n" +
@@ -494,7 +507,7 @@ func loonGeneralBlock() string {
 		"proxy-test-url = http://www.gstatic.com/generate_204\n" +
 		"test-timeout = 2\n" +
 		"real-ip = *.apple.com, *apple.com\n" +
-		"geoip-url = https://gitlab.com/Masaiki/GeoIP2-CN/-/raw/release/Country.mmdb\n" +
+		"geoip-url = " + geoipURL + "\n" +
 		"ipv6 = false\n\n"
 }
 
@@ -624,21 +637,22 @@ type clashProxy struct {
 }
 
 type clashConfig struct {
-	Port             int            `yaml:"port"`
-	SocksPort        int            `yaml:"socks-port"`
-	AllowLan         bool           `yaml:"allow-lan"`
-	Mode             string         `yaml:"mode"`
-	LogLevel         string         `yaml:"log-level"`
-	ExternalController string       `yaml:"external-controller"`
-	Proxies          []clashProxy   `yaml:"proxies"`
-	ProxyGroups      []map[string]interface{} `yaml:"proxy-groups"`
-	RuleProviders    map[string]clashRuleProvider `yaml:"rule-providers,omitempty"`
-	Rules            []string       `yaml:"rules,omitempty"`
+	Port               int                          `yaml:"port"`
+	SocksPort          int                          `yaml:"socks-port"`
+	AllowLan           bool                         `yaml:"allow-lan"`
+	Mode               string                       `yaml:"mode"`
+	LogLevel           string                       `yaml:"log-level"`
+	ExternalController string                       `yaml:"external-controller"`
+	Proxies            []clashProxy                 `yaml:"proxies"`
+	ProxyGroups        []map[string]interface{}     `yaml:"proxy-groups"`
+	RuleProviders      map[string]clashRuleProvider `yaml:"rule-providers,omitempty"`
+	Rules              []string                     `yaml:"rules,omitempty"`
 }
 
 type clashRuleProvider struct {
 	Type     string `yaml:"type"`
 	Behavior string `yaml:"behavior"`
+	Format   string `yaml:"format"`
 	URL      string `yaml:"url"`
 	Path     string `yaml:"path"`
 	Interval int    `yaml:"interval"`

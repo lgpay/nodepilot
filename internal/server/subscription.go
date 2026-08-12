@@ -211,7 +211,9 @@ func GetSubscription(c *gin.Context) {
 	subURL := schemeHost(c) + "/api/v1/sub/" + token
 	var rulesBaseURL string
 	if useRules {
-		rulesBaseURL = subscription.ACL4SSRBaseURL
+		// 默认走本面板自托管规则镜像（/api/v1/rules/:name，服务端从 ACL4SSR 源拉取并缓存），
+		// 避免客户端直连 GitHub 慢/不稳；可用 Setting acl4ssr_base 指向自定义镜像或上游源覆盖。
+		rulesBaseURL = schemeHost(c) + "/api/v1/rules"
 		if v, err := store.GetSetting("acl4ssr_base"); err == nil && v != "" {
 			rulesBaseURL = v
 		}
@@ -223,7 +225,11 @@ func GetSubscription(c *gin.Context) {
 		content, err = subscription.BuildSurfboard(items, subURL, rulesBaseURL)
 		ctype = "text/plain; charset=utf-8"
 	case "loon":
-		content, err = subscription.BuildLoon(items, subURL, rulesBaseURL)
+		geoipURL := subscription.DefaultLoonGeoIPURL
+		if v, err := store.GetSetting("loon_geoip_url"); err == nil && v != "" {
+			geoipURL = v
+		}
+		content, err = subscription.BuildLoon(items, subURL, rulesBaseURL, geoipURL)
 		ctype = "text/plain; charset=utf-8"
 	case "clash":
 		if useRules {

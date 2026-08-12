@@ -10,6 +10,11 @@ import (
 // 注意：GoogleFCM / SteamCN 实际位于 Clash/Ruleset/ 子目录下（见 acl4ssrRules）。
 const ACL4SSRBaseURL = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/"
 
+// 快照说明：下述 aclGroup / aclRule 是对 ACL4SSR 上游 master 分支
+// ACL4SSR_Online.ini（及 Clash/ 目录下 .list）的静态复刻，核对时间 2026-08-12。
+// 上游规则集持续更新，本快照可能滞后（新增/移除规则列表、分组调整），
+// 建议定期核对，或后续改为运行时拉取上游 ini 解析生成。
+
 // aclGroup 对应 ACL4SSR_Online.ini 的 custom_proxy_group（标准分组集）。
 // Members 中 "*" 表示展开为全部节点名；其余为字面策略/分组名（DIRECT/REJECT/♻️ 自动选择 等）。
 type aclGroup struct {

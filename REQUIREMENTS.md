@@ -225,6 +225,7 @@ Setting(key="default_port_range"|"panel_base_url"|"acl4ssr_base", value="10000-6
 - `loon`=.conf（`[Proxy]`/`[Proxy Group]`，`mode=acl4ssr` 时附加内置最小规则 `GEOIP,CN,DIRECT` + `FINAL,NodePilot`）；
 - `sip008`=JSON（`mode=acl4ssr` 退化为裸 servers）。
 订阅端口取自 client 所属 inbound 当前 `port`（自愈改端口后自动同步）；xray stats/email 键固定为 client UUID，别名仅作展示（ps）。
+订阅规则源（Clash rule-provider / Surge/Loon RULE-SET）**默认指向本面板 `/api/v1/rules/:name` 自托管镜像**（服务端从 ACL4SSR 源拉取并缓存），避免客户端直连 GitHub 慢/不稳；可用 Setting `acl4ssr_base` 覆盖为自定义镜像或上游源。Clash rule-provider 声明 `behavior: classical, format: text`（ACL4SSR .list 为纯文本规则行）。Loon `[General]` 的 `geoip-url` 默认用 Loyalsoldier/geoip（jsDelivr CDN），可用 Setting `loon_geoip_url` 覆盖。
 - **精确选择**：入站表新增 `name`（别名）；订阅 `filters` 支持 `inbound_ids`（多选具体入站），UI 按节点分组勾选入站（标签显示别名或 protocol:port）；未指定 inbound_ids 时回退 `node_ids/protocol/tags`。
 - **二维码**：`GET /qr/:token`（公开，与 `/sub/:token` 同安全模型）用 go-qrcode 编码 `scheme://host/api/v1/sub/<token>` 返回 PNG；订阅详情页 `<img>` 展示。
 

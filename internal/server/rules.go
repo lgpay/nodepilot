@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 	"nodepilot/internal/store"
 	"nodepilot/internal/subscription"
 )
@@ -47,14 +47,16 @@ func GetRuleFile(c *gin.Context) {
 	}
 
 	if c.Query("fmt") == "yaml" {
+		// Clash classical rule-provider 的 YAML 格式为 payload 列表
 		lines := strings.Split(content, "\n")
 		payload := make([]string, 0, len(lines))
 		for _, l := range lines {
+			l = strings.TrimSpace(l)
 			if l != "" {
 				payload = append(payload, l)
 			}
 		}
-		b, err := json.Marshal(map[string]interface{}{"payload": payload})
+		b, err := yaml.Marshal(map[string]interface{}{"payload": payload})
 		if err != nil {
 			c.JSON(500, gin.H{"error": "internal error"})
 			return
