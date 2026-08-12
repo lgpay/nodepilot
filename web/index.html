@@ -44,7 +44,7 @@
 
   header { background: var(--header-bg); color: var(--header-fg); padding: 0 18px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; border-bottom: 1px solid var(--border); z-index: 5; }
   .brand { display: flex; align-items: center; gap: 10px; }
-  .brand .logo { width: 26px; height: 26px; border-radius: 6px; background: var(--header-accent); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; }
+  .brand .logo { width: 26px; height: 26px; border-radius: 6px; display: block; object-fit: contain; }
   header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: .2px; }
   header .right { display: flex; align-items: center; gap: 9px; }
   header .right .chk { color: var(--header-fg); }
@@ -213,7 +213,7 @@
 <header>
   <div class="brand">
     <button class="burger" id="burgerBtn" onclick="toggleSidebar()">☰</button>
-    <div class="logo">N</div>
+    <img class="logo" src="logo.png" alt="NodePilot">
     <h1>NodePilot 控制台</h1>
   </div>
   <div id="headerRight" class="right hidden">
@@ -232,7 +232,7 @@
 
 <div id="loginWrap" class="login-wrap hidden">
   <div id="login" class="card login-card">
-    <div class="brand"><div class="logo">N</div></div>
+    <div class="brand"><img class="logo" src="logo.png" alt="NodePilot"></div>
     <h2>管理员登录</h2>
     <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
     <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">

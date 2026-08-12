@@ -105,6 +105,10 @@ func NewRouter(webDir string) *gin.Engine {
 			r.StaticFile("/favicon.png", fp)
 			r.StaticFile("/favicon.ico", fp)
 		}
+		// 品牌 logo：页头 / 登录卡片品牌区引用（web/logo.png）
+		if fp := filepath.Join(webDir, "logo.png"); fileExists(fp) {
+			r.StaticFile("/logo.png", fp)
+		}
 	}
 
 	return r
