@@ -49,6 +49,7 @@ func main() {
 		}
 	}
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	agent.RegisterRoutes(r)
 	agent.StartHeartbeat(30 * time.Second)

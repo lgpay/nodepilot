@@ -17,6 +17,11 @@ import (
 	"nodepilot/internal/subscription"
 )
 
+// maxTrafficReportPerItem 单条流量上报上限（字节）。agent 每 60s 采集一次，
+// 按 12Gbps 级别带宽估算单次增量约 90GB，此处取 100GB 作宽松上限，
+// 超出即视为可疑（被攻破的 agent 灌入虚增），直接丢弃。
+const maxTrafficReportPerItem = 100 << 30
+
 // getNode 按 id 取节点（id 可为数字主键）
 func getNode(c *gin.Context, id string) (*model.Node, error) {
 	var node model.Node
@@ -106,13 +111,13 @@ func ChangePassword(c *gin.Context) {
 
 func CreateNode(c *gin.Context) {
 	var body struct {
-		Name      string `json:"name"`
-		Address   string `json:"address"`
-		Region    string `json:"region"`
-		City      string `json:"city"`
-		Tags      string `json:"tags"`
-		PortRange string `json:"port_range"`
-		MonthlyTrafficBytes int64 `json:"monthly_traffic_bytes"`
+		Name                string `json:"name"`
+		Address             string `json:"address"`
+		Region              string `json:"region"`
+		City                string `json:"city"`
+		Tags                string `json:"tags"`
+		PortRange           string `json:"port_range"`
+		MonthlyTrafficBytes int64  `json:"monthly_traffic_bytes"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -129,18 +134,18 @@ func CreateNode(c *gin.Context) {
 		return
 	}
 	node := model.Node{
-		Name:      strings.TrimSpace(body.Name),
-		Address:   strings.TrimSpace(body.Address),
-		Region:    strings.TrimSpace(body.Region),
-		City:      strings.TrimSpace(body.City),
-		Tags:      strings.TrimSpace(body.Tags),
-		PortRange: strings.TrimSpace(body.PortRange),
+		Name:                strings.TrimSpace(body.Name),
+		Address:             strings.TrimSpace(body.Address),
+		Region:              strings.TrimSpace(body.Region),
+		City:                strings.TrimSpace(body.City),
+		Tags:                strings.TrimSpace(body.Tags),
+		PortRange:           strings.TrimSpace(body.PortRange),
 		MonthlyTrafficBytes: body.MonthlyTrafficBytes,
-		TokenHash: auth.TokenHash(token),
-		TokenEnc:  tokenEnc,
-		Enabled:   true,
-		Status:    "offline",
-		Connectivity: "ok",
+		TokenHash:           auth.TokenHash(token),
+		TokenEnc:            tokenEnc,
+		Enabled:             true,
+		Status:              "offline",
+		Connectivity:        "ok",
 	}
 	if err := store.DB.Create(&node).Error; err != nil {
 		c.JSON(500, gin.H{"error": "internal error"})
@@ -153,7 +158,7 @@ func CreateNode(c *gin.Context) {
 func ListNodes(c *gin.Context) {
 	var nodes []model.Node
 	// 不返回 Token 字段
-	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,last_heartbeat,port_range,monthly_traffic_bytes,expires_at,created_at").
+	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,cpu,mem,last_heartbeat,port_range,monthly_traffic_bytes,expires_at,created_at").
 		Find(&nodes)
 	for i := range nodes {
 		nodes[i].Flag = subscription.FlagEmoji(nodes[i].Region)
@@ -212,12 +217,12 @@ func NodeInstall(c *gin.Context) {
 	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s bash <(curl -L %s)",
 		panelURL, token, node.ID, addr, scriptURL)
 	c.JSON(200, gin.H{
-		"node_id":   node.ID,
-		"token":     token,
-		"panel_url": panelURL,
+		"node_id":    node.ID,
+		"token":      token,
+		"panel_url":  panelURL,
 		"agent_addr": addr,
 		"script_url": scriptURL,
-		"command":   command,
+		"command":    command,
 	})
 }
 
@@ -229,14 +234,14 @@ func UpdateNode(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name      *string `json:"name"`
-		Region    *string `json:"region"`
-		City      *string `json:"city"`
-		Tags      *string `json:"tags"`
-		Enabled   *bool   `json:"enabled"`
-		PortRange *string `json:"port_range"`
-		MonthlyTrafficBytes *int64 `json:"monthly_traffic_bytes"`
-		ExpiresAt *string `json:"expires_at"` // RFC3339；空串=清除（长期有效）
+		Name                *string `json:"name"`
+		Region              *string `json:"region"`
+		City                *string `json:"city"`
+		Tags                *string `json:"tags"`
+		Enabled             *bool   `json:"enabled"`
+		PortRange           *string `json:"port_range"`
+		MonthlyTrafficBytes *int64  `json:"monthly_traffic_bytes"`
+		ExpiresAt           *string `json:"expires_at"` // RFC3339；空串=清除（长期有效）
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -384,6 +389,21 @@ func validPortRange(s string) bool {
 // Heartbeat agent 上报状态
 func Heartbeat(c *gin.Context) {
 	id := c.Param("id")
+	var node model.Node
+	if err := store.DB.First(&node, id).Error; err != nil {
+		c.JSON(404, gin.H{"error": "node not found"})
+		return
+	}
+	// 到期节点：拒绝心跳并停用，agent 端应停止服务
+	if node.ExpiresAt != nil && !node.ExpiresAt.IsZero() && time.Now().After(*node.ExpiresAt) {
+		store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
+			"enabled":      false,
+			"status":       "offline",
+			"connectivity": "offline",
+		})
+		c.JSON(403, gin.H{"error": "node expired", "expires_at": node.ExpiresAt.Format(time.RFC3339)})
+		return
+	}
 	var body struct {
 		AgentVersion string  `json:"agent_version"`
 		Cpu          float64 `json:"cpu"`
@@ -392,8 +412,10 @@ func Heartbeat(c *gin.Context) {
 	}
 	c.ShouldBindJSON(&body)
 	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"status":        "online",
-		"agent_version": body.AgentVersion,
+		"status":         "online",
+		"agent_version":  body.AgentVersion,
+		"cpu":            body.Cpu,
+		"mem":            body.Mem,
 		"last_heartbeat": time.Now(),
 	})
 	c.JSON(200, gin.H{"ok": true})
@@ -402,6 +424,10 @@ func Heartbeat(c *gin.Context) {
 // Traffic agent 上报按用户流量增量（已用 -reset 取得距上次采集的差值）。
 // body: {"stats":[{"email":"<uuid>","up":N,"down":N}]}。email 即 xray 统计键（=client UUID），
 // 按 uuid 解析 client/inbound/node，按天累加到 traffic_stats（唯一键已建复合唯一索引）。
+//
+// 校验与防篡改：
+//   - 负数、超上限（maxTrafficReportPerItem）的单条记录直接丢弃
+//   - client 必须归属于上报节点（uuid→client→inbound→node 归属校验），归属不到则记为该节点未归属流量
 func Traffic(c *gin.Context) {
 	id := c.Param("id")
 	node, err := getNode(c, id)
@@ -423,17 +449,22 @@ func Traffic(c *gin.Context) {
 	date := time.Now().UTC().Format("2006-01-02")
 
 	for _, s := range body.Stats {
-		if s.Email == "" {
+		if s.Email == "" || s.Up < 0 || s.Down < 0 {
+			continue
+		}
+		// 单条上限：按 60s 采集间隔 × 12Gbps 级别带宽估的宽松上限，防被攻破的 agent 灌入巨量虚增
+		if s.Up > maxTrafficReportPerItem || s.Down > maxTrafficReportPerItem {
+			log.Printf("[traffic] node=%d drop suspicious report email=%s up=%d down=%d", node.ID, s.Email, s.Up, s.Down)
 			continue
 		}
 		clientID, inboundID, nodeID := uint(0), uint(0), node.ID
 		var client model.Client
 		if store.DB.Where("uuid = ?", s.Email).First(&client).Error == nil {
-			clientID = client.ID
-			inboundID = client.InboundID
 			var in model.Inbound
-			if store.DB.First(&in, inboundID).Error == nil {
-				nodeID = in.NodeID
+			if store.DB.First(&in, client.InboundID).Error == nil && in.NodeID == node.ID {
+				// 仅当 client 归属于上报节点时才计入具体 client/inbound
+				clientID = client.ID
+				inboundID = client.InboundID
 			}
 		}
 		row := model.TrafficStat{

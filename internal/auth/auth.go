@@ -30,8 +30,7 @@ func CheckPassword(pw, hash string) bool {
 func GenToken() string {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		// 极不可能失败；失败则退回时间熵
-		return hex.EncodeToString([]byte(time.Now().String()))
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	return hex.EncodeToString(b)
 }

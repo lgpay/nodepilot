@@ -110,6 +110,21 @@ func probeAll() {
 	var nodes []model.Node
 	store.DB.Where("enabled = ?", true).Find(&nodes)
 	for _, node := range nodes {
+		// 到期节点：直接停用（enabled=false），不再下发配置与探测
+		if node.ExpiresAt != nil && !node.ExpiresAt.IsZero() && time.Now().After(*node.ExpiresAt) {
+			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
+				"enabled":      false,
+				"status":       "offline",
+				"connectivity": "offline",
+			})
+			log.Printf("[probe] node=%d expired at %s, disabled", node.ID, node.ExpiresAt.Format(time.RFC3339))
+			key := fmt.Sprintf("%d:expired:%s", node.ID, node.ExpiresAt.Format("2006-01-02"))
+			if markAlerted(key) {
+				notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点 #%d (%s) 已于 %s 到期，已自动停用",
+					node.ID, node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
+			}
+			continue
+		}
 		// 整体失联（心跳超时）：直接下线，不改端口
 		if time.Since(node.LastHeartbeat) > offlineThreshold {
 			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
@@ -190,7 +205,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 
 	oldPort := in.Port
 	store.DB.Model(&model.Inbound{}).Where("id = ?", in.ID).Updates(map[string]interface{}{
-		"port":           newPort,
+		"port":            newPort,
 		"port_auto_fixed": true,
 	})
 	log.Printf("[probe] node=%d inbound=%d self-heal: port %d -> %d", node.ID, in.ID, oldPort, newPort)
@@ -241,17 +256,39 @@ func parseRanges(s string) []portRange {
 	return out
 }
 
+// pickPort 在端口范围内随机采样一个未被占用的端口。
+// 先按总端口数做均匀随机映射，冲突时重试；极端情况（池小/高度占用）回退顺序扫描。
 func pickPort(ranges []portRange, used map[int]bool) (int, bool) {
-	candidates := []int{}
+	total := 0
+	for _, r := range ranges {
+		total += r.hi - r.lo + 1
+	}
+	if total == 0 {
+		return 0, false
+	}
+	// 把随机序号映射到具体端口
+	portAt := func(n int) (int, bool) {
+		for _, r := range ranges {
+			size := r.hi - r.lo + 1
+			if n < size {
+				return r.lo + n, true
+			}
+			n -= size
+		}
+		return 0, false
+	}
+	for i := 0; i < 64; i++ {
+		if p, ok := portAt(rand.Intn(total)); ok && !used[p] {
+			return p, true
+		}
+	}
+	// 重试未命中（池小且近满）：顺序扫描兜底
 	for _, r := range ranges {
 		for p := r.lo; p <= r.hi; p++ {
 			if !used[p] {
-				candidates = append(candidates, p)
+				return p, true
 			}
 		}
 	}
-	if len(candidates) == 0 {
-		return 0, false
-	}
-	return candidates[rand.Intn(len(candidates))], true
+	return 0, false
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/skip2/go-qrcode"
 	"nodepilot/internal/auth"
 	"nodepilot/internal/model"
+	"nodepilot/internal/secret"
 	"nodepilot/internal/store"
 	"nodepilot/internal/subscription"
 )
@@ -36,9 +37,15 @@ func CreateSubscription(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "filters 不是合法 JSON"})
 		return
 	}
+	token := auth.GenToken()
+	tokenEnc, err := secret.Encrypt(token)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	g := model.SubscriptionGroup{
 		Name:    body.Name,
-		Token:   auth.GenToken(),
+		Token:   tokenEnc, // 密文存储，仅创建时明文返回一次
 		Format:  body.Format,
 		Mode:    body.Mode,
 		Filters: body.Filters,
@@ -48,12 +55,18 @@ func CreateSubscription(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	c.JSON(201, gin.H{"id": g.ID, "token": g.Token})
+	c.JSON(201, gin.H{"id": g.ID, "token": token})
 }
 
 func ListSubscriptions(c *gin.Context) {
 	var groups []model.SubscriptionGroup
 	store.DB.Find(&groups)
+	// token 以密文存储，返回给前端前解密为明文（用于拼订阅链接）
+	for i := range groups {
+		if t, err := secret.Decrypt(groups[i].Token); err == nil {
+			groups[i].Token = t
+		}
+	}
 	c.JSON(200, groups)
 }
 
@@ -63,6 +76,9 @@ func GetSubscriptionDetail(c *gin.Context) {
 	if err := store.DB.First(&g, id).Error; err != nil {
 		c.JSON(404, gin.H{"error": "not found"})
 		return
+	}
+	if t, err := secret.Decrypt(g.Token); err == nil {
+		g.Token = t
 	}
 	items, _ := aggregate(g)
 	c.JSON(200, gin.H{"group": g, "members": items})
@@ -130,10 +146,28 @@ func schemeHost(c *gin.Context) string {
 	return scheme + "://" + c.Request.Host
 }
 
+// findSubscriptionByToken 按明文 token 查找订阅分组：token 以密文存储，
+// 逐个解密比对（订阅组数量少，遍历成本可忽略）。
+func findSubscriptionByToken(token string) (model.SubscriptionGroup, bool) {
+	var groups []model.SubscriptionGroup
+	store.DB.Find(&groups)
+	for _, g := range groups {
+		// 兼容旧库：能解密则比对明文；解密失败（历史明文 token）直接比对存储值
+		if t, err := secret.Decrypt(g.Token); err == nil {
+			if t == token {
+				return g, true
+			}
+		} else if g.Token == token {
+			return g, true
+		}
+	}
+	return model.SubscriptionGroup{}, false
+}
+
 func GetSubscription(c *gin.Context) {
 	token := c.Param("token")
-	var g model.SubscriptionGroup
-	if err := store.DB.Where("token = ?", token).First(&g).Error; err != nil {
+	g, ok := findSubscriptionByToken(token)
+	if !ok {
 		c.JSON(404, gin.H{"error": "not found"})
 		return
 	}
@@ -215,8 +249,8 @@ func GetSubscription(c *gin.Context) {
 // GetSubscriptionQR 公开端点：返回订阅链接的二维码 PNG（与 /sub/:token 同安全模型，以 token 鉴权）
 func GetSubscriptionQR(c *gin.Context) {
 	token := c.Param("token")
-	var g model.SubscriptionGroup
-	if err := store.DB.Where("token = ?", token).First(&g).Error; err != nil {
+	g, ok := findSubscriptionByToken(token)
+	if !ok {
 		c.JSON(404, gin.H{"error": "not found"})
 		return
 	}

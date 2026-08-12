@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
@@ -15,6 +14,13 @@ import (
 // agent 端流量采集器须使用同一地址（internal/agent/traffic.go 的 collectTraffic）。
 const xrayStatsAddr = "127.0.0.1:10085"
 
+// agentCertFile / agentKeyFile 与 agent 侧落盘路径（internal/agent/cert.go）保持一致，
+// 入站启用 TLS 但未关联证书时的兜底路径。
+const (
+	agentCertFile = "/opt/nodepilot-agent/certs/fullchain.pem"
+	agentKeyFile  = "/opt/nodepilot-agent/certs/privkey.pem"
+)
+
 // BuildXrayConfig 将节点下的入站与用户拼装为 xray config.json 字符串
 func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound map[uint][]model.Client) (string, error) {
 	cfg := map[string]interface{}{
@@ -23,8 +29,8 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		// policy 开启 per-user 上下行计数（计数键为 client 的 UUID）。
 		"stats": map[string]interface{}{},
 		"api": map[string]interface{}{
-			"tag":     "api",
-			"listen":  xrayStatsAddr,
+			"tag":      "api",
+			"listen":   xrayStatsAddr,
 			"services": []string{"StatsService"},
 		},
 		"policy": map[string]interface{}{
@@ -93,7 +99,8 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		}
 		if in.TLSEnabled {
 			stream["security"] = "tls"
-			certFile, keyFile := "/root/cert/fullchain.pem", "/root/cert/privkey.pem"
+			// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
+			certFile, keyFile := agentCertFile, agentKeyFile
 			if in.TLSCertID > 0 {
 				var cert model.Certificate
 				if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
@@ -154,7 +161,7 @@ func buildClient(protocol, uuid string) map[string]interface{} {
 func GenUUID() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("%d", time.Now().UnixNano())
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80

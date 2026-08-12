@@ -47,6 +47,8 @@ func Init(dbPath string) error {
 	}
 	// 旧版明文 token 迁移到 hash+enc（幂等，可重复执行）
 	migrateNodeTokens()
+	// 旧版明文订阅 token 迁移为 AES 密文（幂等）
+	migrateSubscriptionTokens()
 	return nil
 }
 
@@ -127,6 +129,32 @@ func migrateNodeTokens() {
 			"token":      "",
 		}).Error; err != nil {
 			log.Printf("[store] 节点 #%d token 迁移失败: %v", r.ID, err)
+		}
+	}
+}
+
+// migrateSubscriptionTokens 将历史明文订阅 token 迁移为 AES 密文。
+// 兼容 v0.1.0 之前直接存明文的库；能正常解密的视为已加密，跳过。
+func migrateSubscriptionTokens() {
+	var groups []model.SubscriptionGroup
+	if err := DB.Find(&groups).Error; err != nil {
+		return
+	}
+	for _, g := range groups {
+		if g.Token == "" {
+			continue
+		}
+		// 已加密（可解密）则跳过；解密失败说明是历史明文
+		if _, err := secret.Decrypt(g.Token); err == nil {
+			continue
+		}
+		enc, err := secret.Encrypt(g.Token)
+		if err != nil {
+			log.Printf("[store] 订阅 #%d token 加密失败，跳过迁移: %v", g.ID, err)
+			continue
+		}
+		if err := DB.Model(&model.SubscriptionGroup{}).Where("id = ?", g.ID).Update("token", enc).Error; err != nil {
+			log.Printf("[store] 订阅 #%d token 迁移失败: %v", g.ID, err)
 		}
 	}
 }

@@ -64,9 +64,10 @@ func BuildSender(ch model.NotificationChannel) (Sender, error) {
 
 // NotifyEvents 全部可订阅的通知事件 key（与前端勾选项一一对应）。
 var NotifyEvents = []string{
-	"node_offline",       // 节点离线
-	"node_recovered",     // 节点恢复在线
-	"node_healed",        // 节点自愈
+	"node_offline",           // 节点离线
+	"node_recovered",         // 节点恢复在线
+	"node_healed",            // 节点自愈
+	"node_expired",           // 节点到期（自动停用）
 	"node_traffic_exhausted", // 节点月流量耗尽(自动停用)
 	"node_traffic_warning",   // 节点月流量预警
 	"client_traffic_over",    // 客户端流量超额
@@ -218,9 +219,9 @@ type wecomConfig struct {
 type WeComSender struct{ cfg wecomConfig }
 
 var (
-	wecomTokenCache   string
-	wecomTokenExpire  time.Time
-	wecomTokenMu      sync.Mutex
+	wecomTokenCache  string
+	wecomTokenExpire time.Time
+	wecomTokenMu     sync.Mutex
 )
 
 func (s *WeComSender) getToken() (string, error) {

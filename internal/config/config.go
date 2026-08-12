@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // JWTSecret JWT HS256 签名密钥。
@@ -59,16 +58,12 @@ func loadOrGenerate(envKey, dbPath, fileName string) []byte {
 	}
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
-		// 极不可能失败；退回时间熵（仅作最后兜底）
-		return []byte(hex.EncodeToString([]byte(generateFallback())))
+		// 密码学随机源不可用是致命错误，不能静默降级到可预测熵
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	s := hex.EncodeToString(buf)
 	_ = os.WriteFile(path, []byte(s), 0600)
 	return []byte(s)
-}
-
-func generateFallback() string {
-	return time.Now().Format(time.RFC3339Nano)
 }
 
 // deriveMasterKey 统一为 32 字节（AES-256）：截断或补零。

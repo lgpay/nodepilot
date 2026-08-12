@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	ctrlCertDir = "/opt/nodepilot/certs" // 管理端 lego 签发产物目录
-	legoBin     = "/usr/local/bin/lego"
+	ctrlCertDir   = "/opt/nodepilot/certs" // 管理端 lego 签发产物目录
+	legoBin       = "/usr/local/bin/lego"
 	agentCertFile = "/opt/nodepilot-agent/certs/fullchain.pem"
 	agentKeyFile  = "/opt/nodepilot-agent/certs/privkey.pem"
 	agentCaFile   = "/opt/nodepilot-agent/certs/ca.pem"
@@ -173,6 +173,9 @@ func issueCert(domain, cfEmail, cfToken string) (time.Time, error) {
 	if err := cmd.Run(); err != nil {
 		return time.Time{}, fmt.Errorf("lego 执行失败: %v", err)
 	}
+	// 签发产物含私钥（lego 默认落盘权限偏宽），统一收紧为 0600
+	_ = os.Chmod(base, 0600)
+	_ = os.Chmod(strings.Replace(base, ".crt", ".key", 1), 0600)
 	data, err := os.ReadFile(base)
 	if err != nil {
 		return time.Time{}, err

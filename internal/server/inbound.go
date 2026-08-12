@@ -42,48 +42,56 @@ func ListInbounds(c *gin.Context) {
 
 // InboundView 含节点名的入站视图（供订阅分组选择器）
 type InboundView struct {
-	ID          uint   `json:"id"`
-	NodeID      uint   `json:"node_id"`
-	NodeName    string `json:"node_name"`
-	Name        string `json:"name"`
-	Protocol    string `json:"protocol"`
-	Port        int    `json:"port"`
-	Transport   string `json:"transport"`
-	TLSEnabled  bool   `json:"tls_enabled"`
-	Enabled     bool   `json:"enabled"`
-	AutoHeal    bool   `json:"auto_heal"`
-	AutoHealInterval int `json:"auto_heal_interval"`
-	PortAutoFixed bool `json:"port_auto_fixed"`
+	ID               uint   `json:"id"`
+	NodeID           uint   `json:"node_id"`
+	NodeName         string `json:"node_name"`
+	Name             string `json:"name"`
+	Protocol         string `json:"protocol"`
+	Port             int    `json:"port"`
+	Transport        string `json:"transport"`
+	TLSEnabled       bool   `json:"tls_enabled"`
+	Enabled          bool   `json:"enabled"`
+	AutoHeal         bool   `json:"auto_heal"`
+	AutoHealInterval int    `json:"auto_heal_interval"`
+	PortAutoFixed    bool   `json:"port_auto_fixed"`
 }
 
 // ListAllInbounds 列出全部入站并附带所属节点名（供订阅分组精确选择）
 func ListAllInbounds(c *gin.Context) {
 	var inbounds []model.Inbound
 	store.DB.Order("node_id, id").Find(&inbounds)
+	// 批量加载节点名，避免 N+1 查询
 	nodeNames := map[uint]string{}
+	nodeIDs := map[uint]bool{}
 	for _, in := range inbounds {
-		if _, ok := nodeNames[in.NodeID]; !ok {
-			var n model.Node
-			if err := store.DB.First(&n, in.NodeID).Error; err == nil {
-				nodeNames[in.NodeID] = n.Name
-			}
+		nodeIDs[in.NodeID] = true
+	}
+	if len(nodeIDs) > 0 {
+		ids := make([]uint, 0, len(nodeIDs))
+		for id := range nodeIDs {
+			ids = append(ids, id)
+		}
+		var nodes []model.Node
+		store.DB.Where("id IN ?", ids).Find(&nodes)
+		for _, n := range nodes {
+			nodeNames[n.ID] = n.Name
 		}
 	}
 	views := make([]InboundView, 0, len(inbounds))
 	for _, in := range inbounds {
 		views = append(views, InboundView{
-			ID:         in.ID,
-			NodeID:     in.NodeID,
-			NodeName:   nodeNames[in.NodeID],
-			Name:       in.Name,
-			Protocol:   in.Protocol,
-			Port:       in.Port,
-			Transport:  in.Transport,
-			TLSEnabled: in.TLSEnabled,
-			Enabled:    in.Enabled,
-			AutoHeal:   in.AutoHeal,
+			ID:               in.ID,
+			NodeID:           in.NodeID,
+			NodeName:         nodeNames[in.NodeID],
+			Name:             in.Name,
+			Protocol:         in.Protocol,
+			Port:             in.Port,
+			Transport:        in.Transport,
+			TLSEnabled:       in.TLSEnabled,
+			Enabled:          in.Enabled,
+			AutoHeal:         in.AutoHeal,
 			AutoHealInterval: in.AutoHealInterval,
-			PortAutoFixed: in.PortAutoFixed,
+			PortAutoFixed:    in.PortAutoFixed,
 		})
 	}
 	c.JSON(200, views)
@@ -92,33 +100,33 @@ func ListAllInbounds(c *gin.Context) {
 func CreateInbound(c *gin.Context) {
 	nodeID := c.Param("id")
 	var body struct {
-		Name           *string `json:"name"`
-		Protocol       string  `json:"protocol"`
-		Port           int     `json:"port"`
-		Transport      string  `json:"transport"`
-		TLSEnabled     bool    `json:"tls_enabled"`
-		TLSCertID      uint    `json:"cert_id"`
-		StreamSettings string  `json:"stream_settings"` // JSON 字符串
-		Fallback       string  `json:"fallback"`        // JSON 字符串
-		AutoHeal       *bool   `json:"auto_heal"`       // 端口不通时自动换端口（默认 true）
-		AutoHealInterval int   `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
+		Name             *string `json:"name"`
+		Protocol         string  `json:"protocol"`
+		Port             int     `json:"port"`
+		Transport        string  `json:"transport"`
+		TLSEnabled       bool    `json:"tls_enabled"`
+		TLSCertID        uint    `json:"cert_id"`
+		StreamSettings   string  `json:"stream_settings"`    // JSON 字符串
+		Fallback         string  `json:"fallback"`           // JSON 字符串
+		AutoHeal         *bool   `json:"auto_heal"`          // 端口不通时自动换端口（默认 true）
+		AutoHealInterval int     `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 	in := model.Inbound{
-		NodeID:         uint(atoiSafe(nodeID)),
-		Name:           derefStr(body.Name),
-		Protocol:       body.Protocol,
-		Port:           body.Port,
-		Transport:      body.Transport,
-		TLSEnabled:     body.TLSEnabled,
-		TLSCertID:      body.TLSCertID,
-		StreamSettings: body.StreamSettings,
-		Fallback:       body.Fallback,
-		Enabled:        true,
-		AutoHeal:       derefBool(body.AutoHeal, true),
+		NodeID:           uint(atoiSafe(nodeID)),
+		Name:             derefStr(body.Name),
+		Protocol:         body.Protocol,
+		Port:             body.Port,
+		Transport:        body.Transport,
+		TLSEnabled:       body.TLSEnabled,
+		TLSCertID:        body.TLSCertID,
+		StreamSettings:   body.StreamSettings,
+		Fallback:         body.Fallback,
+		Enabled:          true,
+		AutoHeal:         derefBool(body.AutoHeal, true),
 		AutoHealInterval: body.AutoHealInterval,
 	}
 	if err := validateInbound(in.Protocol, in.TLSEnabled, in.TLSCertID); err != nil {
@@ -141,17 +149,17 @@ func UpdateInbound(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name           *string `json:"name"`
-		Protocol       *string `json:"protocol"`
-		Port           *int    `json:"port"`
-		Transport      *string `json:"transport"`
-		TLSEnabled     *bool   `json:"tls_enabled"`
-		TLSCertID      *uint   `json:"cert_id"`
-		StreamSettings *string `json:"stream_settings"`
-		Fallback       *string `json:"fallback"`
-		Enabled        *bool   `json:"enabled"`
-		AutoHeal       *bool   `json:"auto_heal"`
-		AutoHealInterval *int   `json:"auto_heal_interval"`
+		Name             *string `json:"name"`
+		Protocol         *string `json:"protocol"`
+		Port             *int    `json:"port"`
+		Transport        *string `json:"transport"`
+		TLSEnabled       *bool   `json:"tls_enabled"`
+		TLSCertID        *uint   `json:"cert_id"`
+		StreamSettings   *string `json:"stream_settings"`
+		Fallback         *string `json:"fallback"`
+		Enabled          *bool   `json:"enabled"`
+		AutoHeal         *bool   `json:"auto_heal"`
+		AutoHealInterval *int    `json:"auto_heal_interval"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
