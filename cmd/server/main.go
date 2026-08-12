@@ -17,6 +17,11 @@ import (
 	"nodepilot/internal/store"
 )
 
+// Version 构建版本号，可由构建期注入：
+//
+//	go build -ldflags "-X main.Version=$(git describe --tags 2>/dev/null || echo dev)" ./cmd/server
+var Version = "0.1.0"
+
 func main() {
 	dbPath := flag.String("db", "nodepilot.db", "sqlite db file path (relative to working dir)")
 	webDir := flag.String("web-dir", "web", "directory containing web/index.html to serve at /")
@@ -26,6 +31,7 @@ func main() {
 
 	// 结构化日志（文本格式，带时间/级别/调用点）
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	slog.Info("[server] NodePilot control plane starting", "version", Version)
 
 	// 密钥必须在 store.Init 之前就绪（token 迁移、AES 加解密依赖）
 	config.Init(*dbPath)

@@ -5,6 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,6 +89,7 @@ func CreateCert(c *gin.Context) {
 	if err := distributeCert(cert); err != nil {
 		log.Printf("[cert] distribute warning: %v", err)
 	}
+	slog.Info("audit", "action", "cert_create", "id", cert.ID, "domain", cert.Domain)
 	c.JSON(200, cert)
 }
 
@@ -110,6 +112,7 @@ func DeleteCert(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "cert_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -137,6 +140,7 @@ func RenewCert(c *gin.Context) {
 	if err := distributeCert(cert); err != nil {
 		log.Printf("[cert] distribute warning: %v", err)
 	}
+	slog.Info("audit", "action", "cert_renew", "id", cert.ID, "domain", cert.Domain)
 	c.JSON(200, gin.H{"ok": true, "expires_at": exp})
 }
 
@@ -153,6 +157,7 @@ func DistributeCert(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "证书分发失败，详见服务端日志"})
 		return
 	}
+	slog.Info("audit", "action", "cert_distribute", "id", cert.ID, "domain", cert.Domain)
 	c.JSON(200, gin.H{"ok": true})
 }
 

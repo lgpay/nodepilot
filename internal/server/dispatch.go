@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -33,6 +34,7 @@ func SyncNode(c *gin.Context) {
 		c.JSON(502, gin.H{"error": "dispatch failed"})
 		return
 	}
+	slog.Info("audit", "action", "node_config_sync", "id", node.ID, "version", version)
 	c.JSON(200, gin.H{"ok": true, "version": version})
 }
 

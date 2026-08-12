@@ -12,6 +12,7 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // DB 全局数据库连接（MVP 单管理端 SQLite）
@@ -157,6 +158,20 @@ func migrateSubscriptionTokens() {
 			log.Printf("[store] 订阅 #%d token 迁移失败: %v", g.ID, err)
 		}
 	}
+}
+
+// UpsertTrafficStat 按天累加上报流量（复合唯一键 node+inbound+client+date，冲突则增量累加）。
+// db 参数便于测试注入内存库；生产调用传全局 DB。
+func UpsertTrafficStat(db *gorm.DB, stat model.TrafficStat) error {
+	return db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "node_id"}, {Name: "inbound_id"}, {Name: "client_id"}, {Name: "date"},
+		},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"up_bytes":   gorm.Expr("up_bytes + ?", stat.UpBytes),
+			"down_bytes": gorm.Expr("down_bytes + ?", stat.DownBytes),
+		}),
+	}).Create(&stat).Error
 }
 
 // Now 便于统一时间来源

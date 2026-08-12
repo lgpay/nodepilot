@@ -13,6 +13,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Version 构建版本号，可由构建期注入：
+//
+//	go build -ldflags "-X main.Version=$(git describe --tags 2>/dev/null || echo dev)"
+var Version = "0.1.0"
+
 func main() {
 	token := flag.String("token", "", "node token (from control plane registration)")
 	addr := flag.String("addr", ":54321", "agent listen address")
@@ -27,6 +32,7 @@ func main() {
 		log.Fatal("--token and --node-id are required")
 	}
 	config.InitAgent()
+	agent.SetVersion(Version)
 
 	agent.SetCertDir(*certDir)
 	agent.SetConfig(agent.AgentConfig{

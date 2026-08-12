@@ -3,13 +3,13 @@ package server
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"nodepilot/internal/auth"
 	"nodepilot/internal/model"
 	"nodepilot/internal/secret"
@@ -45,14 +45,16 @@ func LoginHandler(c *gin.Context) {
 	var admin model.Admin
 	if err := store.DB.Where("username = ?", body.Username).First(&admin).Error; err != nil ||
 		!auth.CheckPassword(body.Password, admin.PasswordHash) {
+		slog.Info("audit", "action", "admin_login_failed", "username", body.Username)
 		c.JSON(401, gin.H{"error": "invalid credentials"})
 		return
 	}
-	token, err := auth.IssueJWT(admin.Username)
+	token, err := auth.IssueJWT(admin.Username, admin.TokenVersion)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "admin_login", "username", admin.Username)
 	c.JSON(200, gin.H{"token": token, "must_change_pwd": admin.MustChangePwd})
 }
 
@@ -100,10 +102,12 @@ func ChangePassword(c *gin.Context) {
 	if err := store.DB.Model(&admin).Updates(map[string]interface{}{
 		"password_hash":   hash,
 		"must_change_pwd": false,
+		"token_version":   gorm.Expr("token_version + 1"), // 递增使已签发旧 token 失效
 	}).Error; err != nil {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "admin_change_password", "username", admin.Username)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -152,6 +156,7 @@ func CreateNode(c *gin.Context) {
 		return
 	}
 	// token 仅在创建时明文返回一次，用于部署 agent（之后再获取请走 /nodes/:id/install）
+	slog.Info("audit", "action", "node_create", "id", node.ID, "name", node.Name)
 	c.JSON(201, gin.H{"id": node.ID, "token": token, "address": node.Address})
 }
 
@@ -290,6 +295,7 @@ func UpdateNode(c *gin.Context) {
 		}
 	}
 	store.DB.Model(&node).Updates(updates)
+	slog.Info("audit", "action", "node_update", "id", node.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -321,6 +327,7 @@ func DeleteNode(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "node_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -475,15 +482,7 @@ func Traffic(c *gin.Context) {
 			UpBytes:   s.Up,
 			DownBytes: s.Down,
 		}
-		if err := store.DB.Clauses(clause.OnConflict{
-			Columns: []clause.Column{
-				{Name: "node_id"}, {Name: "inbound_id"}, {Name: "client_id"}, {Name: "date"},
-			},
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				"up_bytes":   gorm.Expr("up_bytes + ?", s.Up),
-				"down_bytes": gorm.Expr("down_bytes + ?", s.Down),
-			}),
-		}).Create(&row).Error; err != nil {
+		if err := store.UpsertTrafficStat(store.DB, row); err != nil {
 			log.Printf("[traffic] node=%d upsert failed: %v", node.ID, err)
 		}
 	}

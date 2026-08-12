@@ -109,64 +109,81 @@ func StartProbeScheduler() {
 func probeAll() {
 	var nodes []model.Node
 	store.DB.Where("enabled = ?", true).Find(&nodes)
+	// 各节点并行探测（节点间无共享可变状态，ps 状态表已由互斥锁保护）
+	var wg sync.WaitGroup
 	for _, node := range nodes {
-		// 到期节点：直接停用（enabled=false），不再下发配置与探测
-		if node.ExpiresAt != nil && !node.ExpiresAt.IsZero() && time.Now().After(*node.ExpiresAt) {
-			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
-				"enabled":      false,
-				"status":       "offline",
-				"connectivity": "offline",
-			})
-			log.Printf("[probe] node=%d expired at %s, disabled", node.ID, node.ExpiresAt.Format(time.RFC3339))
-			key := fmt.Sprintf("%d:expired:%s", node.ID, node.ExpiresAt.Format("2006-01-02"))
-			if markAlerted(key) {
-				notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点 #%d (%s) 已于 %s 到期，已自动停用",
-					node.ID, node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
-			}
-			continue
-		}
-		// 整体失联（心跳超时）：直接下线，不改端口
-		if time.Since(node.LastHeartbeat) > offlineThreshold {
-			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
-				"status":       "offline",
-				"connectivity": "offline",
-			})
-			log.Printf("[probe] node=%d heartbeat timeout, marked offline", node.ID)
-			ps.setOffline(node.ID, true)
-			notifyOffline(node)
-			continue
-		}
+		wg.Add(1)
+		go func(n model.Node) {
+			defer wg.Done()
+			probeNode(n)
+		}(node)
+	}
+	wg.Wait()
+}
 
-		var inbounds []model.Inbound
-		store.DB.Where("node_id = ? AND enabled = ?", node.ID, true).Find(&inbounds)
-		allOK := true
-		host := hostOf(node.Address)
-		for _, in := range inbounds {
-			addr := net.JoinHostPort(host, strconv.Itoa(in.Port))
-			conn, err := net.DialTimeout("tcp", addr, dialTimeout)
-			if err != nil {
-				ps.incFail(in.ID)
-				allOK = false
-				log.Printf("[probe] node=%d inbound=%d port=%d unreachable (fails=%d)", node.ID, in.ID, in.Port, ps.getFail(in.ID))
-				// 仅当自动修复间隔>0（分钟）且连续失败达阈值、且距上次自愈已过最小间隔时才换端口
-				if in.AutoHealInterval > 0 && ps.getFail(in.ID) >= failThreshold {
-					if last, ok := ps.getLastHeal(node.ID); !ok || time.Since(last) >= time.Duration(in.AutoHealInterval)*time.Minute {
-						selfHeal(node, in)
-					}
-				}
-			} else {
-				conn.Close()
-				ps.resetFail(in.ID)
-			}
+// isNodeExpired 判断节点是否已到期（纯函数，便于单测）
+func isNodeExpired(n model.Node) bool {
+	return n.ExpiresAt != nil && !n.ExpiresAt.IsZero() && time.Now().After(*n.ExpiresAt)
+}
+
+// probeNode 对单个节点执行一轮探测：到期停用 → 心跳超时下线 → 端口连通性探测/自愈。
+func probeNode(node model.Node) {
+	// 到期节点：直接停用（enabled=false），不再下发配置与探测
+	if isNodeExpired(node) {
+		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
+			"enabled":      false,
+			"status":       "offline",
+			"connectivity": "offline",
+		})
+		log.Printf("[probe] node=%d expired at %s, disabled", node.ID, node.ExpiresAt.Format(time.RFC3339))
+		key := fmt.Sprintf("%d:expired:%s", node.ID, node.ExpiresAt.Format("2006-01-02"))
+		if markAlerted(key) {
+			notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点 #%d (%s) 已于 %s 到期，已自动停用",
+				node.ID, node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
 		}
-		if allOK {
-			prev := node.Connectivity
-			store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Update("connectivity", "ok")
-			// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
-			if ps.wasOfflineNow(node.ID) && prev != "ok" {
-				ps.setOffline(node.ID, false)
-				notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点 #%d (%s) 代理端口已恢复可达", node.ID, node.Name))
+		return
+	}
+	// 整体失联（心跳超时）：直接下线，不改端口
+	if time.Since(node.LastHeartbeat) > offlineThreshold {
+		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
+			"status":       "offline",
+			"connectivity": "offline",
+		})
+		log.Printf("[probe] node=%d heartbeat timeout, marked offline", node.ID)
+		ps.setOffline(node.ID, true)
+		notifyOffline(node)
+		return
+	}
+
+	var inbounds []model.Inbound
+	store.DB.Where("node_id = ? AND enabled = ?", node.ID, true).Find(&inbounds)
+	allOK := true
+	host := hostOf(node.Address)
+	for _, in := range inbounds {
+		addr := net.JoinHostPort(host, strconv.Itoa(in.Port))
+		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
+		if err != nil {
+			ps.incFail(in.ID)
+			allOK = false
+			log.Printf("[probe] node=%d inbound=%d port=%d unreachable (fails=%d)", node.ID, in.ID, in.Port, ps.getFail(in.ID))
+			// 仅当自动修复间隔>0（分钟）且连续失败达阈值、且距上次自愈已过最小间隔时才换端口
+			if in.AutoHealInterval > 0 && ps.getFail(in.ID) >= failThreshold {
+				if last, ok := ps.getLastHeal(node.ID); !ok || time.Since(last) >= time.Duration(in.AutoHealInterval)*time.Minute {
+					selfHeal(node, in)
+				}
 			}
+		} else {
+			conn.Close()
+			ps.resetFail(in.ID)
+		}
+	}
+	if allOK {
+		prev := node.Connectivity
+		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Update("connectivity", "ok")
+		// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
+		if ps.wasOfflineNow(node.ID) && prev != "ok" {
+			ps.setOffline(node.ID, false)
+			notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点 #%d (%s) 代理端口已恢复可达", node.ID, node.Name))
 		}
 	}
 }

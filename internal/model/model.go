@@ -8,6 +8,7 @@ type Admin struct {
 	Username      string    `gorm:"uniqueIndex;size:64" json:"username"`
 	PasswordHash  string    `json:"-"`
 	MustChangePwd bool      `gorm:"default:true" json:"must_change_pwd"` // 首次启动随机密码，要求登录后立即修改
+	TokenVersion  int       `gorm:"default:0" json:"-"`                  // JWT 版本号：改密时递增，使已签发旧 token 立即失效
 	CreatedAt     time.Time `json:"created_at"`
 }
 

@@ -267,7 +267,7 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 	return sb.String(), nil
 }
 
-// buildSurgeProxyLine 生成单条 Surge 风格代理定义行。ok=false 表示该协议不被 Surfboard 支持。
+// buildSurgeProxyLine 生成单条 Surge 风格代理定义行。ok=false 表示该协议/传输不被 Surfboard 支持。
 func buildSurgeProxyLine(it ExportItem) (string, bool) {
 	name := displayName(it)
 	path := it.WsPath
@@ -275,6 +275,10 @@ func buildSurgeProxyLine(it ExportItem) (string, bool) {
 		path = "/v2ray"
 	}
 	host := it.Host
+	// Surfboard 不支持 gRPC 传输（vless/ssr 已在 switch 外被排除）
+	if it.Transport == "grpc" {
+		return "", false
+	}
 	switch it.Protocol {
 	case "vmess":
 		// vmess, server, port, username=uuid, vmess-aead=true, tls=true, sni=host, ws=true, ws-path=, ws-headers=Host:host

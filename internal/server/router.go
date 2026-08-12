@@ -131,9 +131,17 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 		if username, _ := claims["sub"].(string); username != "" {
 			var admin model.Admin
-			if store.DB.Where("username = ?", username).First(&admin).Error == nil && admin.MustChangePwd {
-				c.AbortWithStatusJSON(403, gin.H{"error": "please change password first", "must_change_pwd": true})
-				return
+			if store.DB.Where("username = ?", username).First(&admin).Error == nil {
+				if admin.MustChangePwd {
+					c.AbortWithStatusJSON(403, gin.H{"error": "please change password first", "must_change_pwd": true})
+					return
+				}
+				// JWT 版本校验：改密后 Admin.TokenVersion 递增，旧 token（ver 缺失或不匹配）立即失效
+				ver, ok := claims["ver"].(float64)
+				if !ok || int(ver) != admin.TokenVersion {
+					c.AbortWithStatusJSON(401, gin.H{"error": "token revoked, please login again"})
+					return
+				}
 			}
 		}
 		c.Next()

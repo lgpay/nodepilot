@@ -53,10 +53,12 @@ func CheckNodeToken(bearer, expectedHash string) bool {
 	return subtle.ConstantTimeCompare([]byte(hh), []byte(expectedHash)) == 1
 }
 
-// IssueJWT 签发管理员 JWT（24h）
-func IssueJWT(username string) (string, error) {
+// IssueJWT 签发管理员 JWT（24h）。tokenVersion 为 Admin.TokenVersion，
+// 改密后版本递增使已签发的旧 token 失效（配合 AuthMiddleware 校验 ver claim）。
+func IssueJWT(username string, tokenVersion int) (string, error) {
 	claims := jwt.MapClaims{
 		"sub": username,
+		"ver": tokenVersion,
 		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

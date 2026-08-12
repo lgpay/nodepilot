@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -138,6 +139,7 @@ func CreateInbound(c *gin.Context) {
 		return
 	}
 	afterInboundSave(in)
+	slog.Info("audit", "action", "inbound_create", "id", in.ID, "node_id", in.NodeID, "protocol", in.Protocol, "port", in.Port)
 	c.JSON(201, gin.H{"id": in.ID})
 }
 
@@ -221,6 +223,7 @@ func UpdateInbound(c *gin.Context) {
 	in.TLSEnabled = effTLS
 	in.TLSCertID = effCert
 	afterInboundSave(in)
+	slog.Info("audit", "action", "inbound_update", "id", in.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -293,6 +296,7 @@ func DeleteInbound(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "inbound_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -379,6 +383,7 @@ func CreateClient(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "client_create", "id", client.ID, "inbound_id", client.InboundID, "alias", client.Alias)
 	c.JSON(201, gin.H{"id": client.ID, "uuid": client.UUID})
 }
 
@@ -419,6 +424,7 @@ func UpdateClient(c *gin.Context) {
 		}
 	}
 	store.DB.Model(&client).Updates(updates)
+	slog.Info("audit", "action", "client_update", "id", client.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -428,6 +434,7 @@ func DeleteClient(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "client_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
 }
 

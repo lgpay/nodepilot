@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net"
 	"strings"
 
@@ -55,6 +56,7 @@ func CreateSubscription(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "subscription_create", "id", g.ID, "name", g.Name, "format", g.Format)
 	c.JSON(201, gin.H{"id": g.ID, "token": token})
 }
 
@@ -123,6 +125,7 @@ func UpdateSubscription(c *gin.Context) {
 		updates["enabled"] = *body.Enabled
 	}
 	store.DB.Model(&g).Updates(updates)
+	slog.Info("audit", "action", "subscription_update", "id", g.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -132,6 +135,7 @@ func DeleteSubscription(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "subscription_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
 }
 

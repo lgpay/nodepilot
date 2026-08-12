@@ -101,7 +101,7 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 			stream["security"] = "tls"
 			// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
 			certFile, keyFile := agentCertFile, agentKeyFile
-			if in.TLSCertID > 0 {
+			if in.TLSCertID > 0 && store.DB != nil {
 				var cert model.Certificate
 				if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
 					certFile, keyFile = cert.CertPath, cert.KeyPath

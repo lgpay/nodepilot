@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -70,6 +71,7 @@ func CreateNotifier(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "notifier_create", "id", ch.ID, "type", ch.Type, "name", ch.Name)
 	c.JSON(201, ch)
 }
 
@@ -125,6 +127,7 @@ func UpdateNotifier(c *gin.Context) {
 		updates["events"] = ev
 	}
 	store.DB.Model(&ch).Updates(updates)
+	slog.Info("audit", "action", "notifier_update", "id", ch.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
 
@@ -133,6 +136,7 @@ func DeleteNotifier(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
+	slog.Info("audit", "action", "notifier_delete", "id", c.Param("id"))
 	c.JSON(200, gin.H{"ok": true})
 }
 

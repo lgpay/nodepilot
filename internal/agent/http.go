@@ -18,6 +18,16 @@ import (
 // cfg 保存 agent 运行配置
 var cfg AgentConfig
 
+// version agent 版本号，由 cmd/agent 通过 ldflags 注入（见 main.go）
+var version = "0.1.0"
+
+// SetVersion 设置 agent 版本号（构建期 -ldflags "-X nodepilot/internal/agent.version=..."）。
+func SetVersion(v string) {
+	if v != "" {
+		version = v
+	}
+}
+
 // AgentConfig agent 启动参数
 type AgentConfig struct {
 	Token     string
@@ -97,7 +107,21 @@ func PutConfig(c *gin.Context) {
 		return
 	}
 	path := filepath.Join(cfg.ConfigDir, "config.json")
-	if err := os.WriteFile(path, body.XrayConfig, 0644); err != nil {
+	// 先写临时文件并校验，通过后才落正式路径，避免坏配置留在磁盘并在重启后拉起
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, body.XrayConfig, 0644); err != nil {
+		log.Printf("[agent] write temp config failed: %v", err)
+		c.JSON(500, gin.H{"error": "failed to write config"})
+		return
+	}
+	if err := Validate(tmpPath); err != nil {
+		_ = os.Remove(tmpPath)
+		log.Printf("[agent] config validation failed: %v", err)
+		c.JSON(400, gin.H{"error": "config validation failed", "detail": err.Error(), "version": body.Version})
+		return
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		log.Printf("[agent] write config failed: %v", err)
 		c.JSON(500, gin.H{"error": "failed to write config"})
 		return
@@ -113,18 +137,19 @@ func PutConfig(c *gin.Context) {
 // GetStatus 返回 agent / xray 状态
 func GetStatus(c *gin.Context) {
 	c.JSON(200, gin.H{
-		"agent_version": "0.1.0",
+		"agent_version": version,
 		"xray_running":  IsXrayRunning(),
 		"config_path":   configPath,
 	})
 }
 
-// StartHeartbeat 周期向管理端上报心跳
+// StartHeartbeat 周期向管理端上报心跳，同时做 xray 进程看护（崩溃自动拉起）。
 func StartHeartbeat(interval time.Duration) {
 	go func() {
 		t := time.NewTicker(interval)
 		defer t.Stop()
 		for range t.C {
+			EnsureXrayRunning()
 			postHeartbeat()
 		}
 	}()
@@ -132,7 +157,7 @@ func StartHeartbeat(interval time.Duration) {
 
 func postHeartbeat() {
 	body, _ := json.Marshal(map[string]interface{}{
-		"agent_version": "0.1.0",
+		"agent_version": version,
 		"cpu":           0.0,
 		"mem":           0.0,
 		"xray_running":  IsXrayRunning(),
