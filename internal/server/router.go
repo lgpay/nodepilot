@@ -100,6 +100,11 @@ func NewRouter(webDir string) *gin.Engine {
 		if idx := filepath.Join(webDir, "index.html"); fileExists(idx) {
 			r.StaticFile("/", idx)
 		}
+		// favicon：从 webDir 提供；浏览器自动请求 /favicon.ico，双别名兜底
+		if fp := filepath.Join(webDir, "favicon.png"); fileExists(fp) {
+			r.StaticFile("/favicon.png", fp)
+			r.StaticFile("/favicon.ico", fp)
+		}
 	}
 
 	return r
