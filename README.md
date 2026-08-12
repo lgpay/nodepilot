@@ -2,10 +2,6 @@
   <img src="assets/lockup.png" alt="NodePilot" width="420">
 </p>
 
-<p align="center">
-  <img src="assets/logo.png" alt="NodePilot logo" width="80">
-</p>
-
 # NodePilot
 
 > 多节点代理集中管理系统（控制面 + 数据面）
