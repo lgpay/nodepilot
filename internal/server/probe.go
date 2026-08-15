@@ -32,6 +32,7 @@ type probeState struct {
 	lastHeal     map[uint]time.Time
 	wasOffline   map[uint]bool
 	connState    map[uint]string // 入站ID → ok|fail（最近一次端口连通探测结果）
+	lastProbe    map[uint]time.Time // 入站ID → 最近一次探测时间（探测按自动修复间隔调度）
 }
 
 var ps = &probeState{
@@ -40,6 +41,7 @@ var ps = &probeState{
 	lastHeal:     map[uint]time.Time{},
 	wasOffline:   map[uint]bool{},
 	connState:    map[uint]string{},
+	lastProbe:    map[uint]time.Time{},
 }
 
 func (s *probeState) incFail(id uint) {
@@ -73,6 +75,19 @@ func (s *probeState) getConn(id uint) string {
 		return v
 	}
 	return ""
+}
+
+func (s *probeState) getLastProbe(id uint) (time.Time, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.lastProbe[id]
+	return t, ok
+}
+
+func (s *probeState) setLastProbe(id uint, t time.Time) {
+	s.mu.Lock()
+	s.lastProbe[id] = t
+	s.mu.Unlock()
 }
 
 func (s *probeState) getHeal(id uint) int {
@@ -182,7 +197,23 @@ func probeNode(node model.Node) {
 	store.DB.Where("node_id = ? AND enabled = ?", node.ID, true).Find(&inbounds)
 	allOK := true
 	host := hostOf(node.Address)
+	now := time.Now()
 	for _, in := range inbounds {
+		// 探测间隔跟随自动修复间隔：AutoHealInterval(分钟) 即探测周期；
+		// 0=不自动修复 仍按默认周期检测连通状态，但不换端口。
+		interval := probeInterval
+		if in.AutoHealInterval > 0 {
+			interval = time.Duration(in.AutoHealInterval) * time.Minute
+		}
+		if last, ok := ps.getLastProbe(in.ID); ok && now.Sub(last) < interval {
+			// 未到探测时间：用最近连通状态参与节点整体判断，本次不重复探测
+			if ps.getConn(in.ID) != "ok" {
+				allOK = false
+			}
+			continue
+		}
+		ps.setLastProbe(in.ID, now)
+
 		addr := net.JoinHostPort(host, strconv.Itoa(in.Port))
 		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 		if err != nil {
@@ -259,7 +290,8 @@ func selfHeal(node model.Node, in model.Inbound) {
 		"port":            newPort,
 		"port_auto_fixed": true,
 	})
-	ps.setConn(in.ID, "fail") // 新端口待下一轮探测确认
+	ps.setConn(in.ID, "fail")       // 新端口待下一轮探测确认
+	ps.setLastProbe(in.ID, time.Time{}) // 重置探测调度，下一轮立即探测新端口
 	log.Printf("[probe] node=%d inbound=%d self-heal: port %d -> %d", node.ID, in.ID, oldPort, newPort)
 
 	notifyHealed(node, in, oldPort, newPort)
