@@ -76,9 +76,10 @@
   .btnrow button { margin-top: 0; }
   .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
   .chk input { width: auto; margin: 0; accent-color: var(--primary); }
-  .inblist { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 16px; align-items: start; }
-  .inblist .subgrp { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); margin: 8px 0 0; }
-  .inblist .subgrp:first-child { margin-top: 0; }
+  .inblist { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 16px; align-items: start; }
+  .inblist .chk { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .inblist .chk span, .inblist .chk b { white-space: nowrap; }
+  .inblist .chk b { color: var(--text); font-weight: 600; }
   .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 6px; }
   .row { display: flex; gap: 14px; }
@@ -948,10 +949,10 @@ function subInboundChecklist(selected) {
   let h = '';
   Object.keys(byNode).forEach(nid => {
     const n = nodesData.find(x => x.id == nid);
-    h += '<div class="subgrp">' + esc(n ? n.name : '节点#' + nid) + '</div>';
+    const nodeName = n ? n.name : '节点#' + nid;
     byNode[nid].forEach(inb => {
       const chk = selected.includes(inb.id) ? 'checked' : '';
-      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
+      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
     });
   });
   return h;
