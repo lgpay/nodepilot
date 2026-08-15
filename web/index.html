@@ -272,8 +272,6 @@ let notifData = [];
 let inboundCatalog = [];
 let subFiltersBase = ''; // 当前订阅已有的 filters JSON(合并基础,避免保存时丢失)
 let currentNotifType = 'email';
-let expandedNodes = new Set();
-let expandedInbounds = new Set();
 let autoSync = localStorage.getItem('np_autosync') === '1';
 let dark = localStorage.getItem('np_dark') === '1';
 let refreshTimer = null;
@@ -454,19 +452,9 @@ function renderSidebar() {
   let h = '<div class="sb-head">节点<span><button class="sm" onclick="loadNodes()">刷新</button><button class="sm" onclick="syncAllNodes()">全部下发</button><button class="sm" onclick="showCreateNode()">+ 添加</button></span></div>';
   nodesData.forEach(n => {
     const dot = dotOf(n);
-    const open = expandedNodes.has(n.id);
     h += '<div class="ti ' + (sel.type === 'node' && sel.id === n.id ? 'active' : '') + '" onclick="selectNode(' + n.id + ')">' +
-      '<span class="caret" onclick="event.stopPropagation();toggleNode(' + n.id + ')">' + (open ? '▾' : '▸') + '</span>' +
       '<span class="dot ' + dot + '"></span>' +
       '<span class="lbl">' + esc(n.name) + (regionLabel(n) && regionLabel(n) !== '识别中…' ? ' <span class="muted">' + esc(regionLabel(n)) + '</span>' : '') + '</span></div>';
-    if (open) {
-      const ins = inboundsCache[n.id] || [];
-      if (!ins.length) h += '<div class="ti leaf muted">（暂无入站）</div>';
-      ins.forEach(inb => {
-        h += '<div class="ti indent ' + (sel.type === 'inbound' && sel.id === inb.id ? 'active' : '') + '" onclick="selectInbound(' + inb.id + ',' + n.id + ')">' +
-          '<span class="lbl">' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + (inb.port_auto_fixed ? ' *' : '') + '</span></div>';
-      });
-    }
   });
   h += '<div class="sb-head">订阅<button class="sm" onclick="showCreateSub()">+ 新建</button></div>';
   if (!subsData.length) h += '<div class="ti leaf muted">（暂无订阅）</div>';
@@ -489,15 +477,10 @@ function renderSidebar() {
 // ---- 选中 ----
 async function selectNode(id) {
   sel = { type: 'node', id, parentId: null };
-  expandedNodes.add(id);
   await ensureInbounds(id);
   renderSidebar(); renderMain();
 }
-function toggleNode(id) {
-  if (expandedNodes.has(id)) { expandedNodes.delete(id); renderSidebar(); }
-  else { expandedNodes.add(id); ensureInbounds(id); renderSidebar(); }
-}
-// 确保某节点入站已加载；未加载则异步拉取并刷新侧边栏（展开时避免一直显示"暂无入站"）
+// 确保某节点入站已加载
 async function ensureInbounds(id) {
   if (!inboundsCache[id]) {
     inboundsCache[id] = await api('GET', '/nodes/' + id + '/inbounds') || [];
@@ -506,20 +489,15 @@ async function ensureInbounds(id) {
 }
 async function selectInbound(id, nodeId) {
   sel = { type: 'inbound', id, parentId: nodeId };
-  expandedNodes.add(nodeId); expandedInbounds.add(id);
   await ensureClients(id);
   renderSidebar(); renderMain();
 }
-// 确保某入站客户端已加载；未加载则异步拉取并刷新侧边栏（展开时避免一直显示"暂无客户端"）
+// 确保某入站客户端已加载
 async function ensureClients(id) {
   if (!clientsCache[id]) {
     clientsCache[id] = await api('GET', '/inbounds/' + id + '/clients') || [];
     renderSidebar();
   }
-}
-function toggleInbound(id) {
-  if (expandedInbounds.has(id)) { expandedInbounds.delete(id); renderSidebar(); }
-  else { expandedInbounds.add(id); ensureClients(id); renderSidebar(); }
 }
 function selectClient(id, inboundId) { sel = { type: 'client', id, parentId: inboundId }; renderSidebar(); renderMain(); }
 function selectSub(id) { sel = { type: 'sub', id, parentId: null }; renderSidebar(); renderMain(); }
@@ -764,7 +742,7 @@ async function copyInstall() { const t = document.getElementById('installCmd'); 
 async function delNode(id) {
   if (!await confirmModal('确认删除节点「' + (nodesData.find(x=>x.id===id)||{}).name + '」？其入站和客户端将一并失效')) return;
   const d = await api('DELETE', '/nodes/' + id);
-  if (d) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); expandedNodes.delete(id); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
+  if (d) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
 async function createInbound(nodeId) {
   const tls = chk('m_i_tls');
@@ -816,7 +794,7 @@ function showCreateInbound(nodeId) {
 async function delInbound(id, nodeId) {
   if (!await confirmModal('确认删除入站 #' + id + '？')) return;
   const d = await api('DELETE', '/inbounds/' + id);
-  if (d) { delete clientsCache[id]; expandedInbounds.delete(id); inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
+  if (d) { delete clientsCache[id]; inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
 }
 
 // ---- 到期时间转换 ----
