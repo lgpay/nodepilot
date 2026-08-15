@@ -917,7 +917,7 @@ async function renderSubDetail(id) {
     '<div class="card"><h2>节点列表（' + (d.members || []).length + '）</h2>' +
     (d.members || []).length ?
       '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>地址</th><th>协议</th></tr></thead><tbody>' +
-      (d.members || []).map(m => '<tr><td>' + esc(m.alias || m.uuid) + '</td><td class="muted">' + esc(m.host + ':' + m.port) + '</td><td>' + esc(m.protocol || '') + '</td></tr>').join('') +
+      (d.members || []).map(m => '<tr><td>' + esc(m.Alias || m.UUID) + '</td><td class="muted">' + esc(m.Host + ':' + m.Port) + '</td><td>' + esc(m.Protocol || '') + '</td></tr>').join('') +
       '</tbody></table></div>' : '<div class="empty"><div class="em-ic">🔗</div>暂无节点</div>' +
     '</div>';
 }
