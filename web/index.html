@@ -84,7 +84,8 @@
   .inblist .chk { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .inblist .chk span, .inblist .chk b { white-space: nowrap; }
   .inblist .chk b { color: var(--text); font-weight: 600; }
-  .subcli { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 2px 0 4px 22px; border-bottom: 1px dashed var(--border); margin-bottom: 2px; }
+  .subinb { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .subcli { display: flex; flex-wrap: wrap; gap: 2px 12px; padding-left: 22px; }
   .subcli .chk { font-size: 12px; color: var(--muted); }
   .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 6px; }
@@ -655,8 +656,7 @@ function renderStatsView() {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody id="stats_clients_tb">';
     d.clients.forEach(c => {
       const total = (Number(c.up) || 0) + (Number(c.down) || 0);
-      const pct = (c.traffic_limit_bytes && c.traffic_limit_bytes > 0) ? Math.min(100, (total / c.traffic_limit_bytes) * 100) : 0;
-      const usage = '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' + pct.toFixed(1) + '%';
+      const usage = (c.traffic_limit_bytes && c.traffic_limit_bytes > 0) ? Math.min(100, (total / c.traffic_limit_bytes) * 100).toFixed(1) + '%' : '无限制';
       h += '<tr><td>' + esc(c.alias || ('#' + c.client_id)) + '</td><td>' + fmtBytes(c.up) + '</td><td>' + fmtBytes(c.down) + '</td><td>' + fmtBytes(total) + '</td><td>' + usage + '</td></tr>';
     });
     h += '</tbody></table></div>';
@@ -1011,14 +1011,13 @@ function subInboundChecklist(selected) {
     const nodeName = n ? n.name : '节点#' + nid;
     byNode[nid].forEach(inb => {
       const chk = selected.includes(inb.id) ? 'checked' : '';
-      h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
-      // 该入站下的客户端：精确到客户端选择
       const cls = clientsCache[inb.id] || [];
-      if (cls.length) {
-        h += '<div class="subcli">' + cls.map(c =>
+      h += '<div class="subinb">' +
+        '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>' +
+        (cls.length ? '<div class="subcli">' + cls.map(c =>
           '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + '> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
-        ).join('') + '</div>';
-      }
+        ).join('') + '</div>' : '') +
+        '</div>';
     });
   });
   return h;
