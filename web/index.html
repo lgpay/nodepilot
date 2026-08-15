@@ -1382,8 +1382,8 @@ async function doCreateNode() {
     const cmd = (inst && inst.command) || '';
     setModal('<h2>接入方式</h2>' +
       '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
-      '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
-      '<div class="btnrow"><button onclick="copyInstall()">复制命令</button><button class="secondary" onclick="closeModal()">完成</button></div>');
+      '<textarea id="installCmd" readonly rows="4" style="width:100%;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto;box-sizing:border-box">' + esc(cmd) + '</textarea>' +
+      '<div class="btnrow"><button onclick="copyInstall()">复制命令</button><button class="secondary" onclick="closeModal()">完成</button></div>', 'wide');
     showToast('节点已注册', 'ok');
   }
 }
