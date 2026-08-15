@@ -483,10 +483,20 @@ function renderSidebar() {
 async function selectNode(id) {
   sel = { type: 'node', id, parentId: null };
   expandedNodes.add(id);
-  if (!inboundsCache[id]) inboundsCache[id] = await api('GET', '/nodes/' + id + '/inbounds') || [];
+  await ensureInbounds(id);
   renderSidebar(); renderMain();
 }
-function toggleNode(id) { if (expandedNodes.has(id)) expandedNodes.delete(id); else expandedNodes.add(id); renderSidebar(); }
+function toggleNode(id) {
+  if (expandedNodes.has(id)) { expandedNodes.delete(id); renderSidebar(); }
+  else { expandedNodes.add(id); ensureInbounds(id); renderSidebar(); }
+}
+// 确保某节点入站已加载；未加载则异步拉取并刷新侧边栏（展开时避免一直显示"暂无入站"）
+async function ensureInbounds(id) {
+  if (!inboundsCache[id]) {
+    inboundsCache[id] = await api('GET', '/nodes/' + id + '/inbounds') || [];
+    renderSidebar();
+  }
+}
 async function selectInbound(id, nodeId) {
   sel = { type: 'inbound', id, parentId: nodeId };
   expandedNodes.add(nodeId); expandedInbounds.add(id);
@@ -1219,7 +1229,16 @@ async function loadNodes() { const ns = await api('GET', '/nodes'); if (ns) { no
 async function loadSubs() { const s = await api('GET', '/subscriptions'); if (s) { subsData = s; renderSidebar(); } }
 async function loadCerts() { const c = await api('GET', '/certs'); if (c) { certsData = c; renderSidebar(); } }
 async function loadNotifiers() { const n = await api('GET', '/notifiers'); if (n) { notifData = n; renderSidebar(); } }
-async function loadAllInbounds() { const v = await api('GET', '/inbounds'); if (v) { inboundCatalog = v; } }
+async function loadAllInbounds() {
+  const v = await api('GET', '/inbounds');
+  if (v) {
+    inboundCatalog = v;
+    // 同步填充按节点分组的侧边栏缓存，展开节点时立即可显示入站
+    inboundsCache = {};
+    v.forEach(inb => { (inboundsCache[inb.node_id] = inboundsCache[inb.node_id] || []).push(inb); });
+    renderSidebar();
+  }
+}
 
 function enterApp() {
   document.getElementById('loginWrap').classList.add('hidden');
