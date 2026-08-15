@@ -1,16 +1,44 @@
-# 运行时数据
+# ===== 运行时数据(绝不提交,与发布代码严格隔离) =====
+# 数据库
 nodepilot.db
 *.db
+*.db-shm
+*.db-wal
+*.db.bak*
+*.fullbak*
 
-# 构建产物（二进制不入库）
-/bin/
+# 密钥文件(生产 master key / JWT secret,泄露即严重安全事故)
+.nodepilot_*
+*.master_key
+*.jwt_secret
 
-# 本地日志
+# 证书与 ACME 账号(Let's Encrypt 私钥)
+certs/
+certificates/
+accounts/
+
+# 运行时规则缓存(ACL4SSR 拆分产物)
+data/rules/
+/rules/data/
+
+# 日志
 *.log
+logs/
 
-# OS / 编辑器
+# 迁移/回滚备份
+migration_backup_*/
+*.bak
+*.bak.*
+
+# ===== 构建产物(二进制不入库) =====
+/bin/
+/server
+/agent
+dist/
+build/
+
+# ===== OS / 编辑器 / 临时 =====
 .DS_Store
 *.swp
-
-# 根目录构建产物（控制面二进制）
-/server
+*.tmp
+*.bak~
