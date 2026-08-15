@@ -186,6 +186,11 @@ func probeNode(node model.Node) {
 	if allOK {
 		prev := node.Connectivity
 		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Update("connectivity", "ok")
+		// 端口全部恢复可达：重置自愈次数与入站失败计数，保证下次故障时自愈流程从零开始完整执行
+		ps.setHeal(node.ID, 0)
+		for _, in := range inbounds {
+			ps.resetFail(in.ID)
+		}
 		// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
 		if ps.wasOfflineNow(node.ID) && prev != "ok" {
 			ps.setOffline(node.ID, false)
@@ -253,7 +258,12 @@ func notifyOffline(node model.Node) {
 }
 
 // notifyHealed 节点自愈成功（换端口后恢复）
+// 天级去重：同一节点当天只通知一次，避免端口反复故障时自愈连发刷屏。
 func notifyHealed(node model.Node, in model.Inbound, oldPort, newPort int) {
+	key := fmt.Sprintf("%d:healed:%s", node.ID, time.Now().UTC().Format("2006-01-02"))
+	if !markAlerted(key) {
+		return
+	}
 	notify.Dispatch("node_healed", "🟡 节点已自愈", fmt.Sprintf("节点 #%d (%s) 入站 #%d 端口 %d → %d 已切换并恢复", node.ID, node.Name, in.ID, oldPort, newPort))
 }
 
