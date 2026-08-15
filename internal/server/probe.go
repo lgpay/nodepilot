@@ -176,7 +176,14 @@ func probeNode(node model.Node) {
 		return
 	}
 	// 整体失联（心跳超时）：直接下线，不改端口
-	if time.Since(node.LastHeartbeat) > offlineThreshold {
+	// 离线阈值跟随节点心跳间隔：至少 2 次心跳未到才判离线（避免心跳间隔 > 固定阈值导致误判）
+	offlineFor := offlineThreshold
+	if node.HeartbeatInterval > 0 {
+		if t := time.Duration(node.HeartbeatInterval) * time.Second * 2; t > offlineFor {
+			offlineFor = t
+		}
+	}
+	if time.Since(node.LastHeartbeat) > offlineFor {
 		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
 			"status":       "offline",
 			"connectivity": "offline",
