@@ -76,6 +76,10 @@
   .btnrow button { margin-top: 0; }
   .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
   .chk input { width: auto; margin: 0; accent-color: var(--primary); }
+  .mbar { width: 100%; height: 10px; border-radius: var(--radius-pill); background: var(--input-border); overflow: hidden; }
+  .mbar-fill { height: 100%; border-radius: var(--radius-pill); background: var(--primary); transition: width .4s ease; }
+  .mbar-fill.warn { background: var(--warn); }
+  .mbar-fill.danger { background: var(--danger); }
   .inblist { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 16px; align-items: start; }
   .inblist .chk { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .inblist .chk span, .inblist .chk b { white-space: nowrap; }
@@ -687,13 +691,12 @@ async function renderNodeDetail(id) {
     '<div><label>客户端版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
     '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
-    '<div><label>本月已用</label><input id="n_mused" value="加载中…" disabled></div>' +
+    '<div><label>本月已用</label><div class="mbar"><div class="mbar-fill" id="n_mused_fill" style="width:0%"></div></div><div class="muted" id="n_mused" style="margin-top:4px;font-size:12px">加载中…</div></div>' +
     '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
-    '<button class="secondary" onclick="showNodeToken(' + n.id + ')">显示 token</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
     '<div class="card"><h2>接入方式</h2>' +
     '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
@@ -730,20 +733,19 @@ async function saveNode(id) {
     showToast('节点已保存', 'ok'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id);
   }
 }
-// 节点本月流量：显示已用 / 上限（字节）及占比
+// 节点本月流量：显示已用 / 上限（字节）、占比与进度条
 async function loadNodeTraffic(id) {
   const el = document.getElementById('n_mused'); if (!el) return;
+  const fill = document.getElementById('n_mused_fill');
   const t = await api('GET', '/nodes/' + id + '/traffic');
-  if (!t) { el.value = '-'; return; }
+  if (!t) { el.textContent = '-'; if (fill) fill.style.width = '0%'; return; }
   const used = t.used_bytes || 0, limit = t.limit_bytes || 0;
-  let s = fmtBytesJS(used);
-  if (limit > 0) {
-    const pct = (used * 100 / limit);
-    s += ' / ' + fmtBytesJS(limit) + ' (' + pct.toFixed(1) + '%)';
-  } else {
-    s += ' / 不限';
+  const pct = limit > 0 ? (used * 100 / limit) : 0;
+  el.textContent = fmtBytesJS(used) + (limit > 0 ? ' / ' + fmtBytesJS(limit) + '（' + pct.toFixed(1) + '%）' : ' / 不限');
+  if (fill) {
+    fill.style.width = Math.min(pct, 100) + '%';
+    fill.className = 'mbar-fill' + (pct >= 100 ? ' danger' : (pct >= 80 ? ' warn' : ''));
   }
-  el.value = s;
 }
 async function syncNode(id) {
   const d = await api('POST', '/nodes/' + id + '/config/sync');
@@ -759,7 +761,6 @@ async function syncAllNodes() {
   showToast('下发完成：' + ok + ' 成功' + (fail ? '，' + fail + ' 失败' : ''), fail ? (ok ? 'warn' : 'err') : 'ok');
   loadNodes();
 }
-async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id + '/install'); if (d && d.token) { copyText(d.token); } }
 async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); } }
 async function delNode(id) {
   if (!await confirmModal('确认删除节点「' + (nodesData.find(x=>x.id===id)||{}).name + '」？其入站和客户端将一并失效')) return;
