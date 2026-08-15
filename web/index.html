@@ -349,6 +349,7 @@ function confirmModal(msg) {
 function confirmOk() { if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } hideModal(); }
 function setModal(html) { document.getElementById('modalBody').innerHTML = html; document.getElementById('modal').classList.remove('hidden'); }
 function hideModal() { document.getElementById('modal').classList.add('hidden'); }
+function modalOpen() { return !document.getElementById('modal').classList.contains('hidden'); }
 function closeModal() { hideModal(); if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } }
 
 // ---- 认证 ----
@@ -456,15 +457,8 @@ function renderSidebar() {
       const ins = inboundsCache[n.id] || [];
       if (!ins.length) h += '<div class="ti leaf muted">（暂无入站）</div>';
       ins.forEach(inb => {
-        const iopen = expandedInbounds.has(inb.id);
         h += '<div class="ti indent ' + (sel.type === 'inbound' && sel.id === inb.id ? 'active' : '') + '" onclick="selectInbound(' + inb.id + ',' + n.id + ')">' +
-          '<span class="caret" onclick="event.stopPropagation();toggleInbound(' + inb.id + ')">' + (iopen ? '▾' : '▸') + '</span>' +
           '<span class="lbl">' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + (inb.port_auto_fixed ? ' *' : '') + '</span></div>';
-        if (iopen) {
-          const cls = clientsCache[inb.id] || [];
-          if (!cls.length) h += '<div class="ti leaf2 muted">（暂无客户端）</div>';
-          cls.forEach(c => { h += '<div class="ti indent2 ' + (sel.type === 'client' && sel.id === c.id ? 'active' : '') + '" onclick="selectClient(' + c.id + ',' + inb.id + ')"><span class="lbl">' + esc(c.alias || c.uuid) + '</span></div>'; });
-        }
       });
     }
   });
@@ -711,7 +705,7 @@ async function renderNodeDetail(id) {
     '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>状态</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
     '<div class="card"><h2>下发记录</h2>' +
@@ -857,6 +851,52 @@ function fmtBytesJS(b) {
 }
 
 // ---- 入站详情 ----
+// 弹窗编辑入站：入站信息 + 客户端列表（节点详情"编辑"按钮调用）
+async function showEditInbound(id, nodeId) {
+  const inb = (inboundsCache[nodeId] || []).find(x => x.id === id);
+  if (!inb) return;
+  await ensureClients(id);
+  const cls = clientsCache[id] || [];
+  const node = nodesData.find(x => x.id === nodeId);
+  setModal(
+    '<div style="min-width:640px;max-width:90vw"><h2>编辑入站：' + esc(inboundLabel(inb)) + '</h2>' +
+    '<div class="field-grid">' +
+    '<div><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
+    '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
+    '<div><label>端口</label><input id="ib_port" type="number" value="' + inb.port + '"></div>' +
+    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
+    '<div><label>协议</label><select id="ib_proto">' + protoOptions(inb.protocol) + '</select></div>' +
+    '<div><label>传输</label><select id="ib_trans">' + transOptions(inb.transport) + '</select></div>' +
+    '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div>' +
+    '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '"><label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
+    '</div>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveInboundModal(' + id + ',' + nodeId + '))">保存入站</button>' +
+    '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
+    '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div>' +
+    '<h3>客户端（' + cls.length + '）</h3>' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody>' +
+    (cls.length ? cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">（暂无客户端）</td></tr>') +
+    '</tbody></table></div>' +
+    '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div>' +
+    '</div>');
+  toggleCertRow();
+}
+// 弹窗内保存入站后刷新弹窗
+async function saveInboundModal(id, nodeId) {
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  if (d) {
+    const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); await showEditInbound(id, nodeId);
+  }
+}
+function protoOptions(cur) {
+  return ['vmess','vless','trojan','ss','socks','http'].map(p => '<option ' + (cur === p ? 'selected' : '') + '>' + p + '</option>').join('');
+}
+function transOptions(cur) {
+  return ['tcp','ws','grpc'].map(t => '<option ' + (cur === t || (!cur && t === 'tcp') ? 'selected' : '') + '>' + t + '</option>').join('');
+}
 async function renderInboundDetail(id) {
   setLoading('加载入站中…');
   const nodeId = sel.parentId;
@@ -886,7 +926,7 @@ async function renderInboundDetail(id) {
     '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
-    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
+    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }
@@ -901,7 +941,7 @@ async function saveInbound(id) {
 }
 async function createClient(inboundId) {
   const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('m_c_alias'), traffic_limit_bytes: +(val('m_c_traffic') || 0), expire_time: fromDTLocal(val('m_c_expire')) });
-  if (d) { closeModal(); clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
+  if (d) { closeModal(); clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); if (modalOpen()) { const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId); }
 }
 // 添加客户端：弹窗填写（别名/流量上限/到期时间）
 function showCreateClient(inboundId) {
@@ -916,10 +956,36 @@ function showCreateClient(inboundId) {
 async function delClient(id, inboundId) {
   if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
   const d = await api('DELETE', '/clients/' + id);
-  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); renderInboundDetail(inboundId); }
+  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); if (modalOpen()) { const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId); }
 }
 
 // ---- 客户端详情 ----
+// 弹窗编辑客户端（入站编辑弹窗内"编辑"按钮调用）
+async function showEditClient(id, inboundId) {
+  await ensureClients(inboundId);
+  const c = (clientsCache[inboundId] || []).find(x => x.id === id);
+  if (!c) return;
+  setModal('<h2>编辑客户端</h2>' +
+    '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
+    '<div class="row">' +
+    '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
+    '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
+    '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
+    '<div class="row"><div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div><div></div><div></div></div>' +
+    '<div class="btnrow">' +
+    '<button onclick="withBusy(this, () => saveClientModal(' + id + ',' + inboundId + '))">保存</button>' +
+    '<button class="danger" onclick="delClient(' + id + ',' + inboundId + ')">删除</button>' +
+    '<button class="secondary" onclick="closeModal()">取消</button></div>');
+}
+// 弹窗内保存客户端后刷新编辑入站弹窗
+async function saveClientModal(id, inboundId) {
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
+  if (d) {
+    const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2') };
+    showToast('客户端已保存', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId);
+  }
+}
 async function renderClientDetail(id) {
   setLoading('加载客户端中…');
   const inbId = sel.parentId;
