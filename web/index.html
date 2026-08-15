@@ -858,21 +858,19 @@ async function renderInboundDetail(id) {
   const node = nodesData.find(x => x.id === nodeId);
   document.getElementById('main').innerHTML =
     '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
-    '<div class="card">' +
-    '<div class="row">' +
-    '<div style="flex:2"><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
-    '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div></div>' +
-    '<div class="row">' +
+    '<div class="card"><h2>入站信息</h2>' +
+    '<div class="field-grid">' +
+    '<div><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
+    '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
     '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
     '<div><label>端口</label><input id="ib_port" type="number" value="' + inb.port + '"></div>' +
     '<div><label>传输</label><select id="ib_trans"><option ' + (inb.transport === 'tcp' || !inb.transport ? 'selected' : '') + '>tcp</option><option ' + (inb.transport === 'ws' ? 'selected' : '') + '>ws</option><option ' + (inb.transport === 'grpc' ? 'selected' : '') + '>grpc</option></select></div>' +
-    '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div></div>' +
+    '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div>' +
+    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
+    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '<span></span>') + '</div>' +
+    '</div>' +
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '">' +
     '<label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
-    '<div class="row">' +
-    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
-    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '') + '</div>' +
-    '<div></div></div>' +
     '<p class="muted" style="margin-top:10px">停用的入站不会下发给节点；修改后请点击「下发配置」生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
@@ -883,12 +881,7 @@ async function renderInboundDetail(id) {
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
     cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
-    '<h3>添加客户端</h3>' +
-    '<div class="row">' +
-    '<div><label>别名</label><input id="c_alias" placeholder="如 hk01-iphone"></div>' +
-    '<div><label>流量上限（0=不限）</label><input id="c_traffic" value="0" type="number" min="0"></div>' +
-    '<div><label>到期时间</label><input id="c_expire" type="datetime-local"></div></div>' +
-    '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + id + '))">添加客户端</button></div></div>';
+    '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }
 async function saveInbound(id) {
   const nodeId = sel.parentId;
@@ -900,8 +893,18 @@ async function saveInbound(id) {
   }
 }
 async function createClient(inboundId) {
-  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || 0), expire_time: fromDTLocal(val('c_expire')) });
-  if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
+  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('m_c_alias'), traffic_limit_bytes: +(val('m_c_traffic') || 0), expire_time: fromDTLocal(val('m_c_expire')) });
+  if (d) { closeModal(); clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
+}
+// 添加客户端：弹窗填写（别名/流量上限/到期时间）
+function showCreateClient(inboundId) {
+  setModal('<h2>添加客户端</h2>' +
+    '<label>别名</label><input id="m_c_alias" placeholder="如 hk01-iphone">' +
+    '<div class="row">' +
+    '<div><label>流量上限（0=不限）</label><input id="m_c_traffic" value="0" type="number" min="0"></div>' +
+    '<div><label>到期时间</label><input id="m_c_expire" type="datetime-local"></div></div>' +
+    '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + inboundId + '))">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
+  const el = document.getElementById('m_c_alias'); if (el) el.focus();
 }
 async function delClient(id, inboundId) {
   if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
