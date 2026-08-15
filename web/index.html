@@ -714,10 +714,10 @@ async function renderNodeDetail(id) {
     ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
-    '<div class="card"><details class="adv"><summary><h2 style="display:inline">下发记录</h2></summary>' +
+    '<div class="card"><h2>下发记录</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>时间</th><th>错误</th></tr></thead><tbody>' +
     (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">已应用</span>' : (v.status === 'failed' ? '<span class="pill off">失败</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
-    '</tbody></table></div></details></div>';
+    '</tbody></table></div></div>';
   detectRegion(id);
   loadNodeTraffic(id);
 }
