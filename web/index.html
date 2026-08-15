@@ -909,9 +909,10 @@ function transOptions(cur) {
 }
 async function renderInboundDetail(id) {
   setLoading('加载入站中…');
-  const nodeId = sel.parentId;
+  let nodeId = sel.parentId;
+  if (!nodeId) nodeId = inboundNodeId(id); // 弹窗场景 sel 可能是节点类型
   const inb = (inboundsCache[nodeId] || []).find(x => x.id === id);
-  if (!inb) { renderNodeDetail(nodeId); return; }
+  if (!inb) { if (nodeId) renderNodeDetail(nodeId); return; }
   const cls = clientsCache[id] || [];
   const node = nodesData.find(x => x.id === nodeId);
   document.getElementById('main').innerHTML =
@@ -941,7 +942,8 @@ async function renderInboundDetail(id) {
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }
 async function saveInbound(id) {
-  const nodeId = sel.parentId;
+  let nodeId = sel.parentId;
+  if (!nodeId) nodeId = inboundNodeId(id);
   const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
