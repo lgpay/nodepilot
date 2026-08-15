@@ -558,10 +558,13 @@ function regionLabel(n) {
   const r = n.region || '', c = n.city || '';
   return (r || c) ? (r + (c ? '·' + c : '')) : '识别中…';
 }
-// 节点详情：打开即按地址自动识别区域（国家+城市），并持久化供订阅旗帜/精确显示
+// 节点详情：打开时若已保存过区域则直接显示（IP 固定，无需重复实时查询）；
+// 仅当节点无区域信息时才调用 /geo 识别一次并持久化
 async function detectRegion(id) {
   const n = nodesData.find(x => x.id === id); if (!n || !n.address) return;
   const el = document.getElementById('n_region'); if (el) el.value = regionLabel(n);
+  // 已有存库区域：直接使用，不请求外部服务
+  if (n.region || n.city) return;
   const d = await api('GET', '/geo?host=' + encodeURIComponent(n.address));
   if (!d) { if (el) el.value = regionLabel(n); return; }
   const name = d.country || d.country_code || '';
