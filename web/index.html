@@ -859,20 +859,17 @@ async function renderInboundDetail(id) {
   document.getElementById('main').innerHTML =
     '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
     '<div class="card"><h2>入站信息</h2>' +
-    '<div class="row">' +
-    '<div style="flex:2"><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
+    '<div class="field-grid">' +
+    '<div><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
-    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
-    '</div>' +
-    '<div class="row">' +
-    '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
     '<div><label>端口</label><input id="ib_port" type="number" value="' + inb.port + '"></div>' +
+    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
+    '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
     '<div><label>传输</label><select id="ib_trans"><option ' + (inb.transport === 'tcp' || !inb.transport ? 'selected' : '') + '>tcp</option><option ' + (inb.transport === 'ws' ? 'selected' : '') + '>ws</option><option ' + (inb.transport === 'grpc' ? 'selected' : '') + '>grpc</option></select></div>' +
     '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div>' +
+    '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '"><label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
+    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '<span></span>') + '</div>' +
     '</div>' +
-    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '') + '</div>' +
-    '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '">' +
-    '<label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<p class="muted" style="margin-top:10px">停用的入站不会下发给节点；修改后请点击「下发配置」生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
