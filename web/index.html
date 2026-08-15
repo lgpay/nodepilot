@@ -172,12 +172,12 @@
   .kl { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .bar { display: inline-block; width: 90px; height: 8px; background: var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
   .bar span { display: block; height: 100%; background: var(--primary); }
-  .trend { margin-top: 8px; }
-  .trow { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12px; }
-  .tdate { width: 46px; color: var(--muted); flex: 0 0 auto; }
-  .tbar { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
-  .tbar span { display: block; height: 100%; background: var(--primary); }
-  .tval { width: 84px; text-align: right; color: var(--text); flex: 0 0 auto; }
+  .barchart { display: flex; align-items: flex-end; gap: 4px; height: 220px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .bcol { flex: 1 0 28px; min-width: 28px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .bval { font-size: 10px; color: var(--muted); white-space: nowrap; transform: scale(.9); margin-bottom: 2px; }
+  .bar-v { width: 70%; max-width: 30px; height: 180px; background: var(--border); border-radius: 4px 4px 0 0; overflow: hidden; display: flex; align-items: flex-end; }
+  .bar-v span { display: block; width: 100%; background: var(--primary); border-radius: 4px 4px 0 0; }
+  .bdate { font-size: 10px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
 
   .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
   .qcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); transition: border-color .14s; }
@@ -628,7 +628,7 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h2>按客户端</h2>';
+  h += '<div class="card"><details class="adv"><summary><h2 style="display:inline">按客户端</h2></summary>';
   if (!d.clients || !d.clients.length) h += '<div class="empty"><div class="em-ic">👥</div>暂无客户端流量数据</div>';
   else {
     h += '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'stats_clients_tb\', this.value)">';
@@ -644,18 +644,21 @@ function renderStatsView() {
     });
     h += '</tbody></table></div>';
   }
-  h += '</div>';
+  h += '</details></div>';
 
   h += '<div class="card"><h2>近 30 天趋势</h2>';
   if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
   else {
     let max = 1;
     d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
-    h += '<div class="trend">';
+    h += '<div class="barchart">';
     d.daily.forEach(x => {
       const t = (Number(x.up) || 0) + (Number(x.down) || 0);
-      const w = Math.max(2, (t / max) * 100);
-      h += '<div class="trow"><span class="tdate">' + x.date.slice(5) + '</span><div class="tbar"><span style="width:' + w + '%"></span></div><span class="tval">' + fmtBytes(t) + '</span></div>';
+      const hh = Math.max(3, (t / max) * 100);
+      h += '<div class="bcol" title="' + x.date + ' ' + fmtBytes(t) + '">' +
+        '<div class="bval">' + fmtBytes(t) + '</div>' +
+        '<div class="bar-v"><span style="height:' + hh + '%"></span></div>' +
+        '<div class="bdate">' + x.date.slice(5) + '</div></div>';
     });
     h += '</div>';
   }
