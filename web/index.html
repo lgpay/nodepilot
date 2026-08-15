@@ -1019,21 +1019,26 @@ function subInboundChecklist(selected) {
       const chk = selected.includes(inb.id) ? 'checked' : '';
       const cls = clientsCache[inb.id] || [];
       h += '<div class="subinb">' +
-        '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>' +
+        '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + ' onchange="toggleInbClients(this,' + inb.id + ')"> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>' +
         (cls.length ? '<div class="subcli">' + cls.map(c =>
-          '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + '> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
+          '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" data-inb="' + inb.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + '> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
         ).join('') + '</div>' : '') +
         '</div>';
     });
   });
   return h;
 }
-// 客户端是否在订阅筛选中被选中（精确到客户端）
+// 勾选/取消入站时联动其全部客户端（勾选入站=全选客户端；取消=全不选）
+function toggleInbClients(inbChk, inbId) {
+  document.querySelectorAll('input[name=sub_cli][data-inb="' + inbId + '"]').forEach(cb => { cb.checked = inbChk.checked; });
+}
+// 客户端是否在订阅筛选中被选中（精确到客户端；未配置 client_ids 视为该入站全部选中）
 function subClientSelected(inbId, cliId) {
   try {
     const f = JSON.parse(subFiltersBase || '{}');
-    return (f.client_ids || []).includes(cliId);
-  } catch (e) { return false; }
+    const cids = f.client_ids || [];
+    return cids.length ? cids.includes(cliId) : true; // 未精确指定=全选
+  } catch (e) { return true; }
 }
 function buildSubFilters(base) {
   const ids = Array.from(document.querySelectorAll('input[name=sub_inb]:checked')).map(e => +e.value);
@@ -1041,7 +1046,9 @@ function buildSubFilters(base) {
   let f = {};
   if (base && base.trim()) { try { f = JSON.parse(base); } catch (e) { showToast('已有筛选解析失败', 'err'); return null; } }
   f.inbound_ids = ids;
-  if (cliIds.length) f.client_ids = cliIds; else delete f.client_ids;
+  // 仅当勾选客户端数量小于其所属入站的客户端总数时写 client_ids（表示精确到部分客户端）
+  const totalCli = Array.from(document.querySelectorAll('input[name=sub_cli]')).length;
+  if (cliIds.length && cliIds.length < totalCli) f.client_ids = cliIds; else delete f.client_ids;
   return JSON.stringify(f);
 }
 function subFmtOptions(cur) {
