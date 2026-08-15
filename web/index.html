@@ -52,27 +52,27 @@
   header .right button:hover { background: var(--sidebar-hover); border-color: var(--muted); color: var(--header-fg); }
   .burger { display: none; background: transparent; color: var(--header-fg); border: 0; font-size: 20px; cursor: pointer; padding: 0 6px; }
 
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 16px; box-shadow: var(--shadow); }
   .card > h2:first-child, .card > h3:first-child { margin-top: 0; }
-  .card h2 { font-size: 16px; margin: 0 0 14px; font-weight: 650; }
+  .card h2 { font-size: 15px; margin: 0 0 16px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
   .card h3 { font-size: 13px; margin: 18px 0 10px; color: var(--muted); font-weight: 600; }
   .card h3:first-child { margin-top: 0; }
-  label { display: block; font-size: 12.5px; margin: 10px 0 4px; color: var(--muted); font-weight: 500; }
+  label { display: block; font-size: 12.5px; margin: 12px 0 5px; color: var(--muted); font-weight: 500; }
   input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--input-border); border-radius: var(--radius-sm); background: var(--input-bg); color: var(--text); font-size: 13px; transition: border-color .15s, box-shadow .15s; font-family: inherit; }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
   input:disabled { background: var(--input-dis); color: var(--muted); cursor: default; }
-  button { background: var(--primary); color: #fff; border: 0; padding: 9px 16px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 12px; font-size: 13px; font-weight: 600; transition: background .15s, opacity .15s, transform .08s; }
-  button:hover { background: var(--primary-strong); }
+  button { background: var(--primary); color: #fff; border: 0; padding: 9px 18px; border-radius: var(--radius-sm); cursor: pointer; margin-top: 12px; font-size: 13px; font-weight: 600; transition: background .15s, opacity .15s, transform .08s, box-shadow .15s; box-shadow: 0 1px 2px rgba(16,24,40,.06); }
+  button:hover { background: var(--primary-strong); box-shadow: 0 2px 6px rgba(16,24,40,.12); }
   button:active { transform: translateY(1px); }
-  button:disabled { opacity: .55; cursor: not-allowed; }
-  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--input-border); }
-  button.secondary:hover { background: var(--bg); border-color: var(--muted); }
+  button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--input-border); box-shadow: none; }
+  button.secondary:hover { background: var(--bg); border-color: var(--muted); box-shadow: none; }
   [data-theme="dark"] button.secondary { color: var(--text); }
   button.danger { background: var(--danger); }
   button.danger:hover { background: var(--danger-strong); }
-  button.small { padding: 5px 11px; font-size: 12px; margin-top: 0; }
-  button.sm { padding: 2px 8px; font-size: 11px; margin: 0 0 0 6px; }
-  .btnrow { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 14px; }
+  button.small { padding: 5px 12px; font-size: 12px; margin-top: 0; box-shadow: none; }
+  button.sm { padding: 2px 9px; font-size: 11px; margin: 0 0 0 6px; box-shadow: none; }
+  .btnrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
   .btnrow button { margin-top: 0; }
   .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
   .chk input { width: auto; margin: 0; accent-color: var(--primary); }
@@ -95,8 +95,8 @@
 
   .tblwrap { overflow: auto; max-height: 460px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .tbl th, .tbl td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  .tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; background: var(--card); z-index: 1; }
+  .tbl th, .tbl td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tbl th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; position: sticky; top: 0; background: var(--bg); z-index: 1; }
   .tbl tbody tr { transition: background .12s; }
   .tbl tbody tr:last-child td { border-bottom: 0; }
   .tbl tbody tr:hover { background: var(--primary-soft); }
@@ -243,7 +243,7 @@
 <div id="loginWrap" class="login-wrap hidden">
   <div id="login" class="card login-card">
     <div class="brand"><img class="login-logo" src="lockup.png" alt="NodePilot"></div>
-    <h2>登录</h2>
+    <h2 style="text-align:center">登录控制台</h2>
     <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
     <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">
     <button onclick="login()" style="width:100%">登录</button>
@@ -560,13 +560,13 @@ function renderMain() {
 function setLoading(tip) { document.getElementById('main').innerHTML = '<div class="loading"><span class="spinner"></span><span>' + (tip || '加载中…') + '</span></div>'; }
 function renderWelcome() {
   document.getElementById('main').innerHTML =
-    '<div class="card"><h2>欢迎使用 NodePilot</h2><p class="muted" style="margin:0">从左侧选择节点、订阅、证书或通知进行管理。</p></div>' +
+    '<div class="card"><h2>👋 欢迎使用 NodePilot</h2><p class="muted" style="margin:0">集中管理代理节点：从左侧进入节点、订阅、证书或通知。</p></div>' +
     '<div class="qgrid">' +
-    quickCard('📊', '流量统计', '查看节点与客户端用量、30 天趋势', 'selectStats()') +
-    quickCard('🖥', '添加节点', '接入新节点并获取安装命令', 'showCreateNode()') +
-    quickCard('🔗', '新建订阅', '创建订阅分组、生成导入链接', 'showCreateSub()') +
+    quickCard('📊', '流量统计', '查看节点与客户端用量、近 30 天趋势', 'selectStats()') +
+    quickCard('🖥', '添加节点', '接入新节点并复制安装命令', 'showCreateNode()') +
+    quickCard('🔗', '新建订阅', '创建订阅分组，生成导入链接与二维码', 'showCreateSub()') +
     quickCard('🔐', '申请证书', '为节点签发泛域名 TLS 证书', 'showCreateCert()') +
-    quickCard('📢', '新建通知', '通过邮件 / 企业微信 / Telegram 告警', 'showCreateNotifier()') +
+    quickCard('📢', '新建通知', '通过邮件 / 企业微信 / Telegram 接收告警', 'showCreateNotifier()') +
     '</div>';
 }
 function quickCard(ic, tt, ds, fn) {
@@ -631,12 +631,12 @@ function renderStatsView() {
   const today = d.today || { up: 0, down: 0 };
   const total = d.total || { up: 0, down: 0 };
   let h = '<div class="card"><h2>📊 流量统计</h2><div class="kpis">' +
-    '<div class="kpi"><div class="kv">' + fmtBytes(today.up) + '</div><div class="kl">今日上行</div></div>' +
-    '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
-    '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div>' +
-    '<div class="kpi"><div class="kv">' + fmtBytes(total.up + total.down) + '</div><div class="kl">累计合计</div></div></div></div>';
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.up) + '</div><div class="kl">📤 今日上行</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">📥 今日下行</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">📊 今日合计</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(total.up + total.down) + '</div><div class="kl">🗄 累计合计</div></div></div></div>';
 
-  h += '<div class="card"><h2>近 30 天趋势</h2>';
+  h += '<div class="card"><h2>📈 近 30 天趋势</h2>';
   if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
   else {
     let max = 1;
@@ -654,7 +654,7 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h2>按节点（当月）</h2>';
+  h += '<div class="card"><h2>🖥 按节点（当月）</h2>';
   if (!d.nodes || !d.nodes.length) h += '<div class="empty"><div class="em-ic">📡</div>暂无节点流量数据</div>';
   else {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody>';
@@ -667,7 +667,7 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h2>按客户端</h2>';
+  h += '<div class="card"><h2>👥 按客户端</h2>';
   if (!d.clients || !d.clients.length) h += '<div class="empty"><div class="em-ic">👥</div>暂无客户端流量数据</div>';
   else {
     h += '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'stats_clients_tb\', this.value)">';
@@ -710,7 +710,7 @@ async function renderNodeDetail(id) {
   if (seq !== renderSeq) return;
   main.innerHTML =
     '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> ' + onlinePill(n) + '</div>' +
-    '<div class="card"><h2>基本信息</h2>' +
+    '<div class="card"><h2>📋 基本信息</h2>' +
     '<div class="field-grid">' +
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
@@ -727,12 +727,12 @@ async function renderNodeDetail(id) {
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
     '<button onclick="copyInstall()">复制命令</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
-    '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
+    '<div class="card"><h2>🌐 入站（' + ins.length + '）</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>启用</th><th>状态</th><th>客户端</th><th>修复间隔</th><th>修复次数</th><th></th></tr></thead><tbody>' +
     ins.map((inb, i) => '<tr><td>' + (i + 1) + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td>' + (clientsCache[inb.id] ? clientsCache[inb.id].length : '—') + '</td><td>' + (inb.auto_heal_interval > 0 ? inb.auto_heal_interval + ' 分' : '不修复') + '</td><td>' + (inb.heal_count || 0) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删除</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
-    '<div class="card"><h2>下发记录</h2>' +
+    '<div class="card"><h2>📜 下发记录</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>时间</th><th>错误</th></tr></thead><tbody>' +
     (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">已应用</span>' : (v.status === 'failed' ? '<span class="pill off">失败</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
     '</tbody></table></div></div>';
@@ -952,7 +952,7 @@ async function renderInboundDetail(id) {
   const node = nodesData.find(x => x.id === nodeId);
   document.getElementById('main').innerHTML =
     '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
-    '<div class="card"><h2>入站信息</h2>' +
+    '<div class="card"><h2>⚙️ 入站信息</h2>' +
     '<div class="field-grid">' +
     '<div><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
@@ -964,12 +964,12 @@ async function renderInboundDetail(id) {
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '"><label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '<span></span>') + '</div>' +
     '</div>' +
-    '<p class="muted" style="margin-top:10px">停用的入站不会下发给节点；修改后请点击「下发配置」生效。</p>' +
+    '<p class="muted" style="margin-top:12px">💡 停用的入站不会下发给节点；修改后记得点击「下发配置」让改动生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
     '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div></div>' +
-    '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
+    '<div class="card"><h2>👥 客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
     cls.map((c, i) => '<tr><td>' + (i + 1) + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleClient(' + c.id + ',' + id + ')"></td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删除</button></td></tr>').join('') +
@@ -1161,7 +1161,7 @@ async function renderSubDetail(id) {
   const selectedIds = cur.inbound_ids || [];
   document.getElementById('main').innerHTML =
     '<div class="crumb">订阅 / <b>' + esc(g.name) + '</b></div>' +
-    '<div class="card">' +
+    '<div class="card"><h2>🔗 订阅配置</h2>' +
     '<div class="row">' +
     '<div><label>名称</label><input id="s_name2" value="' + esc(g.name) + '"></div>' +
     '<div><label>格式</label><select id="s_fmt2">' + subFmtOptions(g.format) + '</select></div>' +
@@ -1175,10 +1175,10 @@ async function renderSubDetail(id) {
     '<button class="secondary" onclick="copySubContent(\'' + g.token + '\')">复制配置</button>' +
     '<button class="danger" onclick="delSub(' + g.id + ')">删除</button></div>' +
     '<div class="qr">' +
-    '<div>订阅二维码</div>' +
+    '<h3 style="margin:0">订阅二维码</h3>' +
     '<img src="' + API + '/qr/' + g.token + '" width="160" height="160" alt="订阅二维码">' +
     '<div class="muted link">' + esc(url) + '</div></div></div>' +
-    '<div class="card"><h2>节点列表（' + (d.members || []).length + '）</h2>' +
+    '<div class="card"><h2>📋 节点列表（' + (d.members || []).length + '）</h2>' +
     ((d.members || []).length ?
       '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>地址</th><th>协议</th></tr></thead><tbody>' +
       (d.members || []).map(m => '<tr><td>' + esc(m.Alias || m.UUID) + '</td><td class="muted">' + esc(m.Host + ':' + m.Port) + '</td><td>' + esc(m.Protocol || '') + '</td></tr>').join('') +
@@ -1437,11 +1437,11 @@ async function doCreateNotifier() {
 // ---- 新建节点 / 新建订阅 / 新建证书 ----
 function showCreateNode() {
   setModal('<h2>添加节点</h2>' +
-    '<label>名称</label><input id="m_n_name" placeholder="如 hk-01">' +
-    '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321" onblur="detectRegionNew()">' +
-    '<label>区域</label><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)">' +
+    '<label>节点名称</label><input id="m_n_name" placeholder="如 hk-01">' +
+    '<label>节点地址（ip:port）</label><input id="m_n_addr" placeholder="127.0.0.1:54321" onblur="detectRegionNew()">' +
+    '<label>区域（自动识别）</label><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)">' +
     '<input type="hidden" id="m_n_country"><input type="hidden" id="m_n_city">' +
-    '<label>端口范围</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
+    '<label>端口范围（留空用全局默认）</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 // 端口范围严格校验：空=用全局默认；非空须为 逗号分隔的 "N" 或 "N-M"，每段端口 1-65535 且 lo<=hi
