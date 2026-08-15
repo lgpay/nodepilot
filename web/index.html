@@ -775,7 +775,7 @@ function randomPortForNode(nodeId) {
   if (!rng) return '';
   const used = new Set((inboundsCache[nodeId] || []).map(inb => inb.port));
   const ranges = [];
-  for (const part of rng.split(',')) {
+  for (let part of rng.split(',')) {
     part = part.trim();
     if (!part) continue;
     if (part.includes('-')) {
