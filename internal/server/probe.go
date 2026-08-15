@@ -170,8 +170,8 @@ func probeNode(node model.Node) {
 		log.Printf("[probe] node=%d expired at %s, disabled", node.ID, node.ExpiresAt.Format(time.RFC3339))
 		key := fmt.Sprintf("%d:expired:%s", node.ID, node.ExpiresAt.Format("2006-01-02"))
 		if markAlerted(key) {
-			notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点 #%d (%s) 已于 %s 到期，已自动停用",
-				node.ID, node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
+			notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点「%s」已于 %s 到期，已自动停用",
+				node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
 		}
 		return
 	}
@@ -262,7 +262,7 @@ func probeNode(node model.Node) {
 		// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
 		if ps.wasOfflineNow(node.ID) && prev != "ok" {
 			ps.setOffline(node.ID, false)
-			notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点 #%d (%s) 代理端口已恢复可达", node.ID, node.Name))
+			notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点「%s」代理端口已恢复可达", node.Name))
 		}
 	}
 }
