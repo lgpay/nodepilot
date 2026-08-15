@@ -145,6 +145,7 @@ func regionCode(upper string) string {
 		"俄罗斯": "RU", "RUSSIA": "RU",
 		"加拿大": "CA", "CANADA": "CA",
 		"澳大利亚": "AU", "澳洲": "AU", "AUSTRALIA": "AU",
+		"奥地利": "AT", "AUSTRIA": "AT",
 		"印度": "IN", "INDIA": "IN",
 		"荷兰": "NL", "NETHERLANDS": "NL",
 		"意大利": "IT", "ITALY": "IT",
