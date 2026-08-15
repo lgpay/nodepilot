@@ -617,10 +617,12 @@ async function renderStats() {
 function renderStatsView() {
   const d = statsData; if (!d) return;
   const today = d.today || { up: 0, down: 0 };
+  const total = d.total || { up: 0, down: 0 };
   let h = '<div class="card"><h2>📊 流量统计</h2><div class="kpis">' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up) + '</div><div class="kl">今日上行</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
-    '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div></div></div>';
+    '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div>' +
+    '<div class="kpi"><div class="kv">' + fmtBytes(total.up + total.down) + '</div><div class="kl">累计合计</div></div></div></div>';
 
   h += '<div class="card"><h2>近 30 天趋势</h2>';
   if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';

@@ -23,7 +23,16 @@ func StatsOverview(c *gin.Context) {
 		Select("COALESCE(SUM(up_bytes),0) AS up, COALESCE(SUM(down_bytes),0) AS down").
 		Where("date = ?", today).Scan(&todayAgg)
 
-	// 各节点累计
+	// 全站累计总量（所有节点全部历史流量）
+	var totalAgg struct {
+		Up   int64 `gorm:"column:up"`
+		Down int64 `gorm:"column:down"`
+	}
+	store.DB.Model(&model.TrafficStat{}).
+		Select("COALESCE(SUM(up_bytes),0) AS up, COALESCE(SUM(down_bytes),0) AS down").Scan(&totalAgg)
+
+	// 各节点当月流量（与 monthly_limit_bytes 同口径，用量百分比准确）
+	month := time.Now().UTC().Format("2006-01")
 	type kv struct {
 		NodeID uint  `gorm:"column:node_id"`
 		Up     int64 `gorm:"column:up"`
@@ -32,6 +41,7 @@ func StatsOverview(c *gin.Context) {
 	var nodeRows []kv
 	store.DB.Model(&model.TrafficStat{}).
 		Select("node_id, SUM(up_bytes) AS up, SUM(down_bytes) AS down").
+		Where("date LIKE ?", month+"%").
 		Group("node_id").Scan(&nodeRows)
 	nameByNode := map[uint]string{}
 	limitByNode := map[uint]int64{}
@@ -118,6 +128,7 @@ func StatsOverview(c *gin.Context) {
 
 	c.JSON(200, gin.H{
 		"today":   gin.H{"up": todayAgg.Up, "down": todayAgg.Down},
+		"total":   gin.H{"up": totalAgg.Up, "down": totalAgg.Down},
 		"nodes":   nodeStats,
 		"clients": clientStats,
 		"daily":   daily,
