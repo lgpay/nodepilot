@@ -876,7 +876,7 @@ async function showEditInbound(id, nodeId) {
     '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div>' +
     '<h3>客户端（' + cls.length + '）</h3>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody>' +
-    (cls.length ? cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">（暂无客户端）</td></tr>') +
+    (cls.length ? cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><button class="secondary small" onclick="toggleClient(' + c.id + ',' + id + ')">' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</button></td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">（暂无客户端）</td></tr>') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div>' +
     '</div>');
@@ -926,7 +926,7 @@ async function renderInboundDetail(id) {
     '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
-    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
+    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><button class="secondary small" onclick="toggleClient(' + c.id + ',' + id + ')">' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</button></td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }
@@ -971,19 +971,31 @@ async function showEditClient(id, inboundId) {
     '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
     '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
-    '<div class="row"><div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div><div></div><div></div></div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveClientModal(' + id + ',' + inboundId + '))">保存</button>' +
     '<button class="danger" onclick="delClient(' + id + ',' + inboundId + ')">删除</button>' +
     '<button class="secondary" onclick="closeModal()">取消</button></div>');
 }
-// 弹窗内保存客户端后刷新编辑入站弹窗
+// 弹窗内保存客户端后刷新编辑入站弹窗（启用状态由客户端列表切换，编辑弹窗不改）
 async function saveClientModal(id, inboundId) {
-  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
+  const cur = (clientsCache[inboundId] || []).find(x => x.id === id);
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: cur ? cur.enabled : true, expire_time: fromDTLocal(val('c_expire2')) });
   if (d) {
     const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2') };
+    if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: cur ? cur.enabled : true };
     showToast('客户端已保存', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId);
+  }
+}
+// 切换客户端启用状态（客户端列表状态列点击）
+async function toggleClient(id, inboundId) {
+  const cur = (clientsCache[inboundId] || []).find(x => x.id === id);
+  if (!cur) return;
+  const next = !cur.enabled;
+  const d = await api('PUT', '/clients/' + id, { enabled: next });
+  if (d) {
+    const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], enabled: next };
+    showToast(next ? '客户端已启用' : '客户端已停用', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); if (modalOpen()) { const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId);
   }
 }
 async function renderClientDetail(id) {
