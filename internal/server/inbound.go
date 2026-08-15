@@ -60,7 +60,8 @@ type InboundView struct {
 	AutoHeal         bool   `json:"auto_heal"`
 	AutoHealInterval int    `json:"auto_heal_interval"`
 	PortAutoFixed    bool   `json:"port_auto_fixed"`
-	Connectivity     string `json:"connectivity"` // 入站端口连通状态(ok/fail/空=未知)
+	HealCount        int    `json:"heal_count"`      // 自动修复次数
+	Connectivity     string `json:"connectivity"`    // 入站端口连通状态(ok/fail/空=未知)
 }
 
 // ListAllInbounds 列出全部入站并附带所属节点名（供订阅分组精确选择）
@@ -100,6 +101,7 @@ func ListAllInbounds(c *gin.Context) {
 			AutoHeal:         in.AutoHeal,
 			AutoHealInterval: in.AutoHealInterval,
 			PortAutoFixed:    in.PortAutoFixed,
+			HealCount:        in.HealCount,
 			Connectivity:     ps.getConn(in.ID),
 		})
 	}

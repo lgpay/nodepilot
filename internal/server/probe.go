@@ -300,6 +300,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 	store.DB.Model(&model.Inbound{}).Where("id = ?", in.ID).Updates(map[string]interface{}{
 		"port":            newPort,
 		"port_auto_fixed": true,
+		"heal_count":      in.HealCount + 1,
 	})
 	ps.setConn(in.ID, "fail")       // 新端口待下一轮探测确认
 	ps.setLastProbe(in.ID, time.Time{}) // 重置探测调度，下一轮立即探测新端口

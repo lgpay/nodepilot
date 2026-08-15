@@ -219,8 +219,8 @@ func NodeInstall(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s bash <(curl -L %s)",
-		panelURL, token, node.ID, addr, scriptURL)
+	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s NP_HEARTBEAT=%s bash <(curl -L %s)",
+		panelURL, token, node.ID, addr, hbInterval(), scriptURL)
 	c.JSON(200, gin.H{
 		"node_id":    node.ID,
 		"token":      token,
@@ -229,6 +229,14 @@ func NodeInstall(c *gin.Context) {
 		"script_url": scriptURL,
 		"command":    command,
 	})
+}
+
+// hbInterval 读取控制面设置的心跳间隔(秒)，默认 30
+func hbInterval() string {
+	if v, err := store.GetSetting("agent_heartbeat_interval"); err == nil && v != "" {
+		return v
+	}
+	return "30"
 }
 
 func UpdateNode(c *gin.Context) {
@@ -412,19 +420,28 @@ func Heartbeat(c *gin.Context) {
 		return
 	}
 	var body struct {
-		AgentVersion string  `json:"agent_version"`
-		Cpu          float64 `json:"cpu"`
-		Mem          float64 `json:"mem"`
-		XrayRunning  bool    `json:"xray_running"`
+		AgentVersion       string  `json:"agent_version"`
+		Cpu                float64 `json:"cpu"`
+		Mem                float64 `json:"mem"`
+		XrayRunning        bool    `json:"xray_running"`
+		HeartbeatInterval  int     `json:"heartbeat_interval"`
 	}
 	c.ShouldBindJSON(&body)
-	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
+	hb := body.HeartbeatInterval
+	if hb < 5 || hb > 86400 {
+		hb = 0 // 无效值不更新，保留原值
+	}
+	updates := map[string]interface{}{
 		"status":         "online",
 		"agent_version":  body.AgentVersion,
 		"cpu":            body.Cpu,
 		"mem":            body.Mem,
 		"last_heartbeat": time.Now(),
-	})
+	}
+	if hb > 0 {
+		updates["heartbeat_interval"] = hb
+	}
+	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(updates)
 	c.JSON(200, gin.H{"ok": true})
 }
 

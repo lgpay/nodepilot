@@ -26,6 +26,7 @@ func main() {
 	configDir := flag.String("config-dir", "/usr/local/xray", "directory to store xray config.json")
 	certDir := flag.String("cert-dir", "/opt/nodepilot-agent/certs", "directory to store TLS certificates")
 	xrayBin := flag.String("xray", "/usr/local/bin/xray", "path to xray binary")
+	heartbeat := flag.Int("heartbeat", 30, "heartbeat interval in seconds")
 	flag.Parse()
 
 	if *token == "" || *nodeID == "" {
@@ -58,7 +59,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	agent.RegisterRoutes(r)
-	agent.StartHeartbeat(30 * time.Second)
+	agent.StartHeartbeat(time.Duration(*heartbeat) * time.Second)
 	agent.StartTrafficCollector(60 * time.Second)
 
 	log.Printf("[agent] NodePilot node-agent listening on %s (node=%s)", *addr, *nodeID)

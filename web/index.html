@@ -674,7 +674,7 @@ async function renderNodeDetail(id) {
     '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
     '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '<div><label>客户端版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
-    '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
+    '<div><label>心跳间隔</label><input value="' + (n.heartbeat_interval > 0 ? n.heartbeat_interval + ' 秒' : '—') + '" disabled></div>' +
     '<div><label>本月已用</label><div class="mbar"><div class="mbar-fill" id="n_mused_fill" style="width:0%"></div></div><div class="muted" id="n_mused" style="margin-top:4px;font-size:12px">加载中…</div></div>' +
     '</div>' +
     '<div class="btnrow">' +
@@ -686,8 +686,8 @@ async function renderNodeDetail(id) {
     '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
     '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th>状态</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>修复间隔</th><th>修复次数</th><th>启用</th><th>状态</th><th></th></tr></thead><tbody>' +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.auto_heal_interval > 0 ? inb.auto_heal_interval + ' 分' : '不修复') + '</td><td>' + (inb.heal_count || 0) + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
     '<div class="card"><h2>下发记录</h2>' +

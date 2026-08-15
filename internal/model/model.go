@@ -34,6 +34,7 @@ type Node struct {
 	CPU                 float64    `json:"cpu"` // 最近心跳上报的 CPU 使用率(%)
 	Mem                 float64    `json:"mem"` // 最近心跳上报的内存使用率(%)
 	LastHeartbeat       time.Time  `json:"last_heartbeat"`
+	HeartbeatInterval   int        `gorm:"default:30" json:"heartbeat_interval"` // agent 心跳间隔(秒)，由 agent 上报
 	PortRange           string     `gorm:"size:64" json:"port_range"`              // 如 10000-65535 或 10000-20000,30000-40000；空=全局默认
 	MonthlyTrafficBytes int64      `gorm:"default:0" json:"monthly_traffic_bytes"` // 月流量上限(字节)，0=不限
 	ExpiresAt           *time.Time `json:"expires_at"`                             // 服务器有效期（到期时间），空=长期有效
@@ -56,6 +57,7 @@ type Inbound struct {
 	PortAutoFixed    bool   `gorm:"default:false" json:"port_auto_fixed"` // 当前端口是否由自愈换过（诊断标记）
 	AutoHeal         bool   `gorm:"default:true" json:"auto_heal"`        // 端口不通时是否允许自动换端口（已由间隔控制，此字段保留兼容）
 	AutoHealInterval int    `gorm:"default:10" json:"auto_heal_interval"` // 自动修复最小间隔(分钟)，0=不自动修复
+	HealCount        int    `gorm:"default:0" json:"heal_count"`          // 自动修复次数(累计换端口次数)
 
 	// Connectivity 入站端口连通状态(ok/fail/空=未知)，由控制面探测维护，不入库
 	Connectivity string `gorm:"-" json:"connectivity"`

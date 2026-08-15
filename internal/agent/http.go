@@ -18,6 +18,9 @@ import (
 // cfg 保存 agent 运行配置
 var cfg AgentConfig
 
+// heartbeatInterval 心跳间隔(秒)，由 StartHeartbeat 设置，上报给控制面用于展示
+var heartbeatInterval = 30
+
 // version agent 版本号，由 cmd/agent 通过 ldflags 注入（见 main.go）
 var version = "0.1.0"
 
@@ -145,6 +148,7 @@ func GetStatus(c *gin.Context) {
 
 // StartHeartbeat 周期向管理端上报心跳，同时做 xray 进程看护（崩溃自动拉起）。
 func StartHeartbeat(interval time.Duration) {
+	heartbeatInterval = int(interval / time.Second)
 	go func() {
 		t := time.NewTicker(interval)
 		defer t.Stop()
@@ -157,11 +161,12 @@ func StartHeartbeat(interval time.Duration) {
 
 func postHeartbeat() {
 	body, _ := json.Marshal(map[string]interface{}{
-		"agent_version": version,
-		"cpu":           0.0,
-		"mem":           0.0,
-		"xray_running":  IsXrayRunning(),
-		"timestamp":     time.Now().Format(time.RFC3339),
+		"agent_version":       version,
+		"cpu":                 0.0,
+		"mem":                 0.0,
+		"xray_running":        IsXrayRunning(),
+		"heartbeat_interval":  heartbeatInterval,
+		"timestamp":           time.Now().Format(time.RFC3339),
 	})
 	url := strings.TrimRight(cfg.ServerURL, "/") + "/api/v1/nodes/" + cfg.NodeID + "/heartbeat"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))

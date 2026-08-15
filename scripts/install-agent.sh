@@ -11,6 +11,7 @@
 #   NP_NODE_ID     节点 id（必填）
 #   NP_ADDR        agent 监听地址，默认 :8081（需与注册节点时 address 端口一致）
 #   NP_XRAY        xray 二进制路径，默认 /usr/local/bin/xray
+#   NP_HEARTBEAT   心跳间隔(秒)，默认 30
 #   NP_CONFIG_DIR  xray 配置目录，默认 /opt/nodepilot-agent/xray
 #   NP_CERT_DIR    TLS 证书存放目录，默认 /opt/nodepilot-agent/certs
 #   NP_INSTALL_DIR 安装目录，默认 /opt/nodepilot-agent
@@ -35,6 +36,7 @@ CONFIG_DIR="${NP_CONFIG_DIR:-$INSTALL_DIR/xray}"
 CERT_DIR="${NP_CERT_DIR:-$INSTALL_DIR/certs}"
 ADDR="${NP_ADDR:-:8081}"
 XRAY_BIN="${NP_XRAY:-/usr/local/bin/xray}"
+HEARTBEAT="${NP_HEARTBEAT:-30}"
 SERVICE_NAME="nodepilot-agent"
 BINARY_NAME="nodepilot-agent"
 
@@ -186,7 +188,8 @@ ExecStart=$INSTALL_DIR/bin/$BINARY_NAME \
   --addr $ADDR \
   --config-dir $CONFIG_DIR \
   --cert-dir $CERT_DIR \
-  --xray $XRAY_BIN
+  --xray $XRAY_BIN \
+  --heartbeat $HEARTBEAT
 Restart=on-failure
 RestartSec=3
 
@@ -224,6 +227,7 @@ install_agent() {
   nohup "$INSTALL_DIR/bin/$BINARY_NAME" \
     --token "$NP_TOKEN" --node-id "$NP_NODE_ID" --server "$NP_SERVER" \
     --addr "$ADDR" --config-dir "$CONFIG_DIR" --cert-dir "$CERT_DIR" --xray "$XRAY_BIN" \
+    --heartbeat "$HEARTBEAT" \
     >/var/log/nodepilot-agent.log 2>&1 &
   echo $! > /var/run/nodepilot-agent.pid
   sleep 2
