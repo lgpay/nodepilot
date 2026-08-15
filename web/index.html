@@ -682,11 +682,9 @@ async function renderNodeDetail(id) {
     '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
+    '<button onclick="copyInstall()">复制命令</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
-    '<div class="card"><h2>接入方式</h2>' +
-    '<p class="muted">复制命令后到节点服务器上执行即可完成接入。</p>' +
-    '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>修复间隔</th><th>修复次数</th><th>启用</th><th>状态</th><th></th></tr></thead><tbody>' +
     ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.auto_heal_interval > 0 ? inb.auto_heal_interval + ' 分' : '不修复') + '</td><td>' + (inb.heal_count || 0) + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
