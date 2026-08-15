@@ -762,16 +762,43 @@ async function createInbound(nodeId) {
   const tls = chk('m_i_tls');
   const certId = val('m_i_cert') ? +val('m_i_cert') : 0;
   if (tls && !certId) return showToast('启用 TLS 需选择证书', 'err');
-  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('m_i_name'), protocol: val('m_i_proto'), port: +val('m_i_port'), transport: val('m_i_trans'), tls_enabled: tls, cert_id: certId });
+  const port = parseInt(val('m_i_port'), 10);
+  if (!port || port < 1 || port > 65535) return showToast('请填写有效端口（1-65535）', 'err');
+  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('m_i_name'), protocol: val('m_i_proto'), port, transport: val('m_i_trans'), tls_enabled: tls, cert_id: certId });
   if (d) { closeModal(); inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; showToast('入站已创建', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId); }
 }
-// 添加入站：弹窗填写（名称/协议/端口/传输/TLS/证书）
+// 在节点端口范围内随机选一个未占用端口（已用端口=该节点已有入站端口）。
+// 范围空=返回空（由用户手填）；返回 '' 表示无法生成（范围耗尽）。
+function randomPortForNode(nodeId) {
+  const n = nodesData.find(x => x.id === nodeId);
+  const rng = (n && n.port_range || '').trim();
+  if (!rng) return '';
+  const used = new Set((inboundsCache[nodeId] || []).map(inb => inb.port));
+  const ranges = [];
+  for (const part of rng.split(',')) {
+    part = part.trim();
+    if (!part) continue;
+    if (part.includes('-')) {
+      const [a, b] = part.split('-').map(Number);
+      if (a >= 1 && b <= 65535 && a <= b) ranges.push([a, b]);
+    } else {
+      const v = Number(part);
+      if (v >= 1 && v <= 65535) ranges.push([v, v]);
+    }
+  }
+  const candidates = [];
+  for (const [lo, hi] of ranges) for (let p = lo; p <= hi; p++) if (!used.has(p)) candidates.push(p);
+  if (!candidates.length) return '';
+  return String(candidates[Math.floor(Math.random() * candidates.length)]);
+}
+// 添加入站：弹窗填写（名称/协议/端口/传输/TLS/证书），端口预填范围内随机值
 function showCreateInbound(nodeId) {
+  const preset = randomPortForNode(nodeId);
   setModal('<h2>添加入站</h2>' +
     '<label>名称（可选）</label><input id="m_i_name" placeholder="如 hk-tg-ws">' +
     '<div class="row">' +
     '<div><label>协议</label><select id="m_i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select></div>' +
-    '<div><label>端口</label><input id="m_i_port" type="number" placeholder="10086"></div>' +
+    '<div><label>端口</label><input id="m_i_port" type="number" placeholder="10086" value="' + preset + '"></div>' +
     '<div><label>传输</label><select id="m_i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select></div>' +
     '<div><label>TLS</label><input id="m_i_tls" type="checkbox" onchange="toggleInboundCert()"></div></div>' +
     '<div id="i_cert_wrap" style="display:none"><label>证书（TLS 必选）</label><select id="m_i_cert"><option value="">未选择</option>' + (certsData || []).map(c => '<option value="' + c.id + '">' + esc(c.domain) + '</option>').join('') + '</select></div>' +
