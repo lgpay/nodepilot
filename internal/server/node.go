@@ -442,7 +442,14 @@ func Heartbeat(c *gin.Context) {
 		updates["heartbeat_interval"] = hb
 	}
 	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(updates)
-	c.JSON(200, gin.H{"ok": true})
+	// 响应中携带控制面配置的心跳间隔(秒)，agent 据此动态调整，无需重启
+	want := 30
+	if v, err := store.GetSetting("agent_heartbeat_interval"); err == nil && v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 5 && n <= 86400 {
+			want = n
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "heartbeat_interval": want})
 }
 
 // Traffic agent 上报按用户流量增量（已用 -reset 取得距上次采集的差值）。

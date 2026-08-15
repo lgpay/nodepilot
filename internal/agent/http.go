@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,21 @@ import (
 // cfg 保存 agent 运行配置
 var cfg AgentConfig
 
-// heartbeatInterval 心跳间隔(秒)，由 StartHeartbeat 设置，上报给控制面用于展示
+// heartbeatInterval 心跳间隔(秒)，可被控制面动态调整
 var heartbeatInterval = 30
+var heartbeatIntervalMu sync.RWMutex
+
+func getHeartbeatInterval() int {
+	heartbeatIntervalMu.RLock()
+	defer heartbeatIntervalMu.RUnlock()
+	return heartbeatInterval
+}
+
+func setHeartbeatInterval(v int) {
+	heartbeatIntervalMu.Lock()
+	heartbeatInterval = v
+	heartbeatIntervalMu.Unlock()
+}
 
 // version agent 版本号，由 cmd/agent 通过 ldflags 注入（见 main.go）
 var version = "0.1.0"
@@ -147,12 +161,14 @@ func GetStatus(c *gin.Context) {
 }
 
 // StartHeartbeat 周期向管理端上报心跳，同时做 xray 进程看护（崩溃自动拉起）。
+// 控制面可在心跳响应中下发新的间隔，这里动态调整，无需重启 agent。
 func StartHeartbeat(interval time.Duration) {
-	heartbeatInterval = int(interval / time.Second)
+	setHeartbeatInterval(int(interval / time.Second))
 	go func() {
-		t := time.NewTicker(interval)
-		defer t.Stop()
-		for range t.C {
+		EnsureXrayRunning()
+		postHeartbeat()
+		for {
+			time.Sleep(time.Duration(getHeartbeatInterval()) * time.Second)
 			EnsureXrayRunning()
 			postHeartbeat()
 		}
@@ -165,7 +181,7 @@ func postHeartbeat() {
 		"cpu":                 0.0,
 		"mem":                 0.0,
 		"xray_running":        IsXrayRunning(),
-		"heartbeat_interval":  heartbeatInterval,
+		"heartbeat_interval":  getHeartbeatInterval(),
 		"timestamp":           time.Now().Format(time.RFC3339),
 	})
 	url := strings.TrimRight(cfg.ServerURL, "/") + "/api/v1/nodes/" + cfg.NodeID + "/heartbeat"
@@ -182,5 +198,17 @@ func postHeartbeat() {
 		log.Printf("[agent] heartbeat failed: %v", err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	// 控制面在响应中返回期望的心跳间隔，动态调整本地定时（无需重启）
+	var r struct {
+		HeartbeatInterval int `json:"heartbeat_interval"`
+	}
+	if resp.StatusCode == 200 {
+		if dec := json.NewDecoder(resp.Body); dec.Decode(&r) == nil && r.HeartbeatInterval >= 5 && r.HeartbeatInterval <= 86400 {
+			if r.HeartbeatInterval != getHeartbeatInterval() {
+				log.Printf("[agent] heartbeat interval adjusted to %ds by control plane", r.HeartbeatInterval)
+				setHeartbeatInterval(r.HeartbeatInterval)
+			}
+		}
+	}
 }

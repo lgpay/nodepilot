@@ -663,6 +663,8 @@ async function renderNodeDetail(id) {
   const inst = await api('GET', '/nodes/' + id + '/install');
   if (inst) cmd = inst.command || '';
   const tp = trafficParts(n.monthly_traffic_bytes);
+  let hbGlobal = 30;
+  try { const s = await api('GET', '/settings'); if (s) hbGlobal = s.agent_heartbeat_interval || 30; } catch (e) {}
   main.innerHTML =
     '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span> ' + onlinePill(n) + '</div>' +
     '<div class="card"><h2>基本信息</h2>' +
@@ -674,7 +676,7 @@ async function renderNodeDetail(id) {
     '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
     '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '<div><label>客户端版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
-    '<div><label>心跳间隔</label><input value="' + (n.heartbeat_interval > 0 ? n.heartbeat_interval + ' 秒' : '—') + '" disabled></div>' +
+    '<div><label>心跳间隔（秒）</label><input id="n_hbinterval" type="number" min="5" max="86400" value="' + hbGlobal + '"></div>' +
     '<div><label>本月已用</label><div class="mbar"><div class="mbar-fill" id="n_mused_fill" style="width:0%"></div></div><div class="muted" id="n_mused" style="margin-top:4px;font-size:12px">加载中…</div></div>' +
     '</div>' +
     '<div class="btnrow">' +
@@ -704,6 +706,11 @@ async function saveNode(id) {
   const ex = (val('n_expire') || '').trim();
   const d = await api('PATCH', '/nodes/' + id, { name: val('n_name'), port_range: pr, monthly_traffic_bytes: mtBytes, expires_at: ex ? fromDTLocal(ex) : '' });
   if (d) {
+    // 保存心跳间隔(全局设置)；agent 下次心跳会自动调整，无需重新部署
+    const hb = parseInt(val('n_hbinterval'), 10);
+    if (hb && hb >= 5 && hb <= 86400) {
+      try { await api('PUT', '/settings', { agent_heartbeat_interval: hb }); } catch (e) {}
+    }
     const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData[i] = { ...nodesData[i], name: val('n_name'), port_range: pr, monthly_traffic_bytes: mtBytes };
     showToast('节点已保存', 'ok'); if (autoSync) await syncNode(id); renderSidebar(); renderNodeDetail(id);
   }
