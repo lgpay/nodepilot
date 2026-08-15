@@ -271,6 +271,7 @@ let certsData = [];
 let notifData = [];
 let inboundCatalog = [];
 let subFiltersBase = ''; // 当前订阅已有的 filters JSON(合并基础,避免保存时丢失)
+let installCmdCache = ''; // 当前节点接入命令缓存(复制按钮用)
 let currentNotifType = 'email';
 let autoSync = localStorage.getItem('np_autosync') === '1';
 let dark = localStorage.getItem('np_dark') === '1';
@@ -661,7 +662,7 @@ async function renderNodeDetail(id) {
   const ins = inboundsCache[id] || [];
   let cmd = '';
   const inst = await api('GET', '/nodes/' + id + '/install');
-  if (inst) cmd = inst.command || '';
+  if (inst) { cmd = inst.command || ''; installCmdCache = cmd; }
   const tp = trafficParts(n.monthly_traffic_bytes);
   let hbGlobal = 30;
   try { const s = await api('GET', '/settings'); if (s) hbGlobal = s.agent_heartbeat_interval || 30; } catch (e) {}
@@ -684,8 +685,7 @@ async function renderNodeDetail(id) {
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
     '<div class="card"><h2>接入方式</h2>' +
-    '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
-    '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
+    '<p class="muted">复制命令后到节点服务器上执行即可完成接入。</p>' +
     '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>修复间隔</th><th>修复次数</th><th>启用</th><th>状态</th><th></th></tr></thead><tbody>' +
@@ -743,7 +743,7 @@ async function syncAllNodes() {
   showToast('下发完成：' + ok + ' 成功' + (fail ? '，' + fail + ' 失败' : ''), fail ? (ok ? 'warn' : 'err') : 'ok');
   loadNodes();
 }
-async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); } }
+async function copyInstall() { if (installCmdCache) copyText(installCmdCache); }
 async function delNode(id) {
   if (!await confirmModal('确认删除节点「' + (nodesData.find(x=>x.id===id)||{}).name + '」？其入站和客户端将一并失效')) return;
   const d = await api('DELETE', '/nodes/' + id);
@@ -1377,7 +1377,17 @@ async function doCreateNode() {
   const rawRegion = val('m_n_region');
   const region = (rawRegion && !rawRegion.includes('识别') && !rawRegion.includes('失败')) ? val('m_n_country') : '';
   const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: region, city: val('m_n_city'), port_range: pr });
-  if (d) { closeModal(); showToast('节点已注册', 'ok'); copyText(d.token); await loadNodes(); }
+  if (d && d.id) {
+    await loadNodes();
+    // 创建成功后弹窗展示接入方式（复制命令）
+    const inst = await api('GET', '/nodes/' + d.id + '/install');
+    const cmd = (inst && inst.command) || '';
+    setModal('<h2>接入方式</h2>' +
+      '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
+      '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
+      '<div class="btnrow"><button onclick="copyInstall()">复制命令</button><button class="secondary" onclick="closeModal()">完成</button></div>');
+    showToast('节点已注册', 'ok');
+  }
 }
 async function showCreateSub() {
   if (!inboundCatalog.length) await loadAllInbounds();
