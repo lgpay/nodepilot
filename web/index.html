@@ -156,7 +156,7 @@
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
 
-  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(8px); background: var(--header-bg); color: var(--header-fg); padding: 11px 20px; border-radius: 10px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 99; font-size: 13px; max-width: 84vw; box-shadow: var(--shadow-lg); font-weight: 500; }
+  .toast { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(8px); background: var(--header-bg); color: var(--header-fg); padding: 11px 20px; border-radius: 10px; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; z-index: 1100; font-size: 13px; max-width: 84vw; box-shadow: var(--shadow-lg); font-weight: 500; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.ok { background: var(--ok); color: #fff; }
   .toast.err { background: var(--danger); color: #fff; }
@@ -981,7 +981,15 @@ function showCreateClient(inboundId) {
 async function delClient(id, inboundId) {
   if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
   const d = await api('DELETE', '/clients/' + id);
-  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); if (modalOpen()) { const nodeId = inboundNodeId(inboundId); await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId); }
+  if (d) {
+    clientsCache[inboundId] = (clientsCache[inboundId] || []).filter(x => x.id !== id);
+    if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId };
+    renderSidebar();
+    // 删除后统一关闭弹窗并刷新节点详情页，避免 confirmModal 覆盖后 modal 状态混乱
+    closeModal();
+    const nodeId = inboundNodeId(inboundId);
+    if (nodeId) renderNodeDetail(nodeId); else renderInboundDetail(inboundId);
+  }
 }
 
 // 编辑入站弹窗内：内联添加/编辑客户端（避免弹窗套弹窗）
