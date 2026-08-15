@@ -117,6 +117,7 @@
   .login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .login-card { width: 100%; max-width: 400px; margin: 0; border-radius: var(--radius); }
   .login-card .brand { justify-content: center; margin-bottom: 12px; }
+  .login-logo { width: 220px; max-width: 80%; height: auto; display: block; }
 
   .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 16px 8px 6px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
   .sb-head:first-child { margin-top: 4px; }
@@ -232,7 +233,7 @@
 
 <div id="loginWrap" class="login-wrap hidden">
   <div id="login" class="card login-card">
-    <div class="brand"><img class="logo" src="logo.png" alt="NodePilot"></div>
+    <div class="brand"><img class="login-logo" src="lockup.png" alt="NodePilot"></div>
     <h2>管理员登录</h2>
     <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
     <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">

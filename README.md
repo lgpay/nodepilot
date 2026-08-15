@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/lockup.png" alt="NodePilot" width="420">
+  <img src="web/lockup.png" alt="NodePilot" width="420">
 </p>
 
 # NodePilot

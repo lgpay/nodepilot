@@ -109,6 +109,10 @@ func NewRouter(webDir string) *gin.Engine {
 		if fp := filepath.Join(webDir, "logo.png"); fileExists(fp) {
 			r.StaticFile("/logo.png", fp)
 		}
+		// 品牌 lockup（横版图文）：登录卡片品牌区引用（web/lockup.png）
+		if fp := filepath.Join(webDir, "lockup.png"); fileExists(fp) {
+			r.StaticFile("/lockup.png", fp)
+		}
 	}
 
 	return r

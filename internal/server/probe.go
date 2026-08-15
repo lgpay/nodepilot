@@ -150,8 +150,14 @@ func probeNode(node model.Node) {
 			"connectivity": "offline",
 		})
 		log.Printf("[probe] node=%d heartbeat timeout, marked offline", node.ID)
+		// 仅当节点状态由在线切换为离线时发一次离线通知；持续离线期间不再重复推送。
+		// 判据结合内存态与 DB 状态：控制面重启后内存态丢失，但 DB 中 status 仍为 offline，
+		// 此时不重复通知；恢复在线后再离线会重新触发（与 node_recovered 的通知机制对称）。
+		alreadyOffline := ps.wasOfflineNow(node.ID) || node.Status == "offline"
 		ps.setOffline(node.ID, true)
-		notifyOffline(node)
+		if !alreadyOffline {
+			notifyOffline(node)
+		}
 		return
 	}
 
@@ -197,8 +203,12 @@ func selfHeal(node model.Node, in model.Inbound) {
 			"connectivity": "offline",
 		})
 		log.Printf("[probe] node=%d self-heal exhausted after %d attempts, marked offline", node.ID, att)
+		// 与心跳超时分支一致：仅在首次切换为离线时通知一次，避免持续离线刷屏
+		alreadyOffline := ps.wasOfflineNow(node.ID) || node.Status == "offline"
 		ps.setOffline(node.ID, true)
-		notifyOffline(node)
+		if !alreadyOffline {
+			notifyOffline(node)
+		}
 		return
 	}
 
