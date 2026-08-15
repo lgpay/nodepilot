@@ -234,7 +234,7 @@
 <div id="loginWrap" class="login-wrap hidden">
   <div id="login" class="card login-card">
     <div class="brand"><img class="login-logo" src="lockup.png" alt="NodePilot"></div>
-    <h2>管理员登录</h2>
+    <h2>登录</h2>
     <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
     <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">
     <button onclick="login()" style="width:100%">登录</button>
@@ -379,9 +379,9 @@ function showChangePw(forced) {
   const cancelBtn = forced
     ? '<button class="secondary" onclick="showToast(\'请先修改密码后再继续\',\'warn\')">稍后</button>'
     : '<button class="secondary" onclick="closeModal()">取消</button>';
-  setModal('<h2>修改管理员密码</h2>' +
-    (forced ? '<p class="muted" style="margin:2px 0 10px">系统检测到初始随机密码，使用前必须修改。</p>' : '') +
-    '<label>旧密码</label><input id="m_old" type="password">' +
+  setModal('<h2>修改密码</h2>' +
+    (forced ? '<p class="muted" style="margin:2px 0 10px">当前为初始密码，使用前需要修改。</p>' : '') +
+    '<label>当前密码</label><input id="m_old" type="password">' +
     '<label>新密码</label><input id="m_new" type="password">' +
     '<div class="btnrow"><button onclick="withBusy(this, doChangePw)">保存</button>' + cancelBtn + '</div>');
   const f = document.getElementById('m_old'); if (f) f.focus();
@@ -436,7 +436,7 @@ function certPill(c) {
 
 function renderSidebar() {
   const sb = document.getElementById('sidebar');
-  let h = '<div class="sb-head">节点<span><button class="sm" onclick="loadNodes()">刷新</button><button class="sm" onclick="syncAllNodes()">全部下发</button><button class="sm" onclick="showCreateNode()">+ 注册</button></span></div>';
+  let h = '<div class="sb-head">节点<span><button class="sm" onclick="loadNodes()">刷新</button><button class="sm" onclick="syncAllNodes()">全部下发</button><button class="sm" onclick="showCreateNode()">+ 添加</button></span></div>';
   nodesData.forEach(n => {
     const dot = dotOf(n);
     const open = expandedNodes.has(n.id);
@@ -446,7 +446,7 @@ function renderSidebar() {
       '<span class="lbl">' + esc(n.name) + (regionLabel(n) && regionLabel(n) !== '识别中…' ? ' <span class="muted">' + esc(regionLabel(n)) + '</span>' : '') + '</span></div>';
     if (open) {
       const ins = inboundsCache[n.id] || [];
-      if (!ins.length) h += '<div class="ti leaf muted">（无入站）</div>';
+      if (!ins.length) h += '<div class="ti leaf muted">（暂无入站）</div>';
       ins.forEach(inb => {
         const iopen = expandedInbounds.has(inb.id);
         h += '<div class="ti indent ' + (sel.type === 'inbound' && sel.id === inb.id ? 'active' : '') + '" onclick="selectInbound(' + inb.id + ',' + n.id + ')">' +
@@ -454,14 +454,14 @@ function renderSidebar() {
           '<span class="lbl">' + esc(inboundLabel(inb)) + (inb.tls_enabled ? ' 🔒' : '') + (inb.port_auto_fixed ? ' *' : '') + '</span></div>';
         if (iopen) {
           const cls = clientsCache[inb.id] || [];
-          if (!cls.length) h += '<div class="ti leaf2 muted">（无客户端）</div>';
+          if (!cls.length) h += '<div class="ti leaf2 muted">（暂无客户端）</div>';
           cls.forEach(c => { h += '<div class="ti indent2 ' + (sel.type === 'client' && sel.id === c.id ? 'active' : '') + '" onclick="selectClient(' + c.id + ',' + inb.id + ')"><span class="lbl">' + esc(c.alias || c.uuid) + '</span></div>'; });
         }
       });
     }
   });
   h += '<div class="sb-head">订阅<button class="sm" onclick="showCreateSub()">+ 新建</button></div>';
-  if (!subsData.length) h += '<div class="ti leaf muted">（无订阅）</div>';
+  if (!subsData.length) h += '<div class="ti leaf muted">（暂无订阅）</div>';
   subsData.forEach(s => {
     const mod = (s.mode === 'acl4ssr' || s.mode === 'acl4ssr_online') ? '<span class="badge blue">ACL4SSR</span>' : '<span class="badge">无规则</span>';
     h += '<div class="ti ' + (sel.type === 'sub' && sel.id === s.id ? 'active' : '') + '" onclick="selectSub(' + s.id + ')">' +
@@ -469,10 +469,10 @@ function renderSidebar() {
       '<button class="sm" title="复制订阅链接" onclick="event.stopPropagation();copyText(location.origin+\'/api/v1/sub/' + s.token + '\')">⧉</button></div>';
   });
   h += '<div class="sb-head">证书<button class="sm" onclick="showCreateCert()">+ 申请</button></div>';
-  if (!certsData.length) h += '<div class="ti leaf muted">（未申请）</div>';
+  if (!certsData.length) h += '<div class="ti leaf muted">（暂无证书）</div>';
   certsData.forEach(c => { h += '<div class="ti ' + (sel.type === 'cert' && sel.id === c.id ? 'active' : '') + '" onclick="selectCert(' + c.id + ')"><span class="lbl">' + esc(c.domain) + ' <span class="muted">' + certStatusLabel(c.status) + '</span></span></div>'; });
   h += '<div class="sb-head">通知<button class="sm" onclick="showCreateNotifier()">+ 新建</button></div>';
-  if (!notifData.length) h += '<div class="ti leaf muted">（无渠道）</div>';
+  if (!notifData.length) h += '<div class="ti leaf muted">（暂无渠道）</div>';
   notifData.forEach(n => { h += '<div class="ti ' + (sel.type === 'notifier' && sel.id === n.id ? 'active' : '') + '" onclick="selectNotifier(' + n.id + ')"><span class="lbl">' + esc(n.name) + ' <span class="muted">' + notifTypeLabel(n.type) + '</span></span></div>'; });
   h += '<div class="ti ' + (sel.type === 'stats' ? 'active' : '') + '" onclick="selectStats()"><span class="dot on"></span><span class="lbl">📊 统计</span></div>';
   sb.innerHTML = h;
@@ -520,13 +520,13 @@ function renderMain() {
 function setLoading(tip) { document.getElementById('main').innerHTML = '<div class="loading"><span class="spinner"></span><span>' + (tip || '加载中…') + '</span></div>'; }
 function renderWelcome() {
   document.getElementById('main').innerHTML =
-    '<div class="card"><h2>欢迎使用 NodePilot</h2></div>' +
+    '<div class="card"><h2>欢迎使用 NodePilot</h2><p class="muted" style="margin:0">从左侧选择节点、订阅、证书或通知进行管理。</p></div>' +
     '<div class="qgrid">' +
-    quickCard('📊', '流量统计', '节点与客户端用量、30 天趋势', 'selectStats()') +
-    quickCard('🖥', '注册节点', '添加节点并生成安装命令', 'showCreateNode()') +
-    quickCard('🔗', '新建订阅', '创建订阅分组、生成链接', 'showCreateSub()') +
-    quickCard('🔐', '申请证书', '泛域名证书托管', 'showCreateCert()') +
-    quickCard('📢', '新建通知', '邮件 / 企业微信 / Telegram', 'showCreateNotifier()') +
+    quickCard('📊', '流量统计', '查看节点与客户端用量、30 天趋势', 'selectStats()') +
+    quickCard('🖥', '添加节点', '接入新节点并获取安装命令', 'showCreateNode()') +
+    quickCard('🔗', '新建订阅', '创建订阅分组、生成导入链接', 'showCreateSub()') +
+    quickCard('🔐', '申请证书', '为节点签发泛域名 TLS 证书', 'showCreateCert()') +
+    quickCard('📢', '新建通知', '通过邮件 / 企业微信 / Telegram 告警', 'showCreateNotifier()') +
     '</div>';
 }
 function quickCard(ic, tt, ds, fn) {
@@ -591,7 +591,7 @@ function renderStatsView() {
     '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div></div></div>';
 
-  h += '<div class="card"><h3>按节点</h3>';
+  h += '<div class="card"><h2>按节点</h2>';
   if (!d.nodes || !d.nodes.length) h += '<div class="empty"><div class="em-ic">📡</div>暂无节点流量数据</div>';
   else {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th></tr></thead><tbody>';
@@ -600,7 +600,7 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h3>按客户端</h3>';
+  h += '<div class="card"><h2>按客户端</h2>';
   if (!d.clients || !d.clients.length) h += '<div class="empty"><div class="em-ic">👥</div>暂无客户端流量数据</div>';
   else {
     h += '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'stats_clients_tb\', this.value)">';
@@ -618,7 +618,7 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h3>近 30 天趋势</h3>';
+  h += '<div class="card"><h2>近 30 天趋势</h2>';
   if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
   else {
     let max = 1;
@@ -658,39 +658,39 @@ async function renderNodeDetail(id) {
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
     '<div><label>区域</label><input id="n_region" value="' + esc(regionLabel(n)) + '" disabled></div>' +
-    '<div><label>标签(逗号)</label><input id="n_tags" value="' + esc(n.tags || '') + '" placeholder="如 hk, ws"></div>' +
+    '<div><label>标签（逗号分隔）</label><input id="n_tags" value="' + esc(n.tags || '') + '" placeholder="如 hk, ws"></div>' +
     '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
-    '<div><label>Agent 版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
+    '<div><label>客户端版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
-    '<div><label>月流量上限(0=不限)</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
+    '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
     '<div><label>本月已用</label><input id="n_mused" value="加载中…" disabled></div>' +
-    '<div><label>服务器有效期</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
+    '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + n.id + '))">下发配置</button>' +
     '<button class="secondary" onclick="showNodeToken(' + n.id + ')">显示 token</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
-    '<div class="card"><h2>Agent 一键安装</h2>' +
-    '<p class="muted">在节点服务器执行以下命令安装接入：</p>' +
+    '<div class="card"><h2>接入方式</h2>' +
+    '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
     '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
-    '<div class="btnrow"><button onclick="copyInstall()">复制安装命令</button></div></div>' +
+    '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自愈改端口</th><th>启用</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '是' : '') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>状态</th><th></th></tr></thead><tbody>' +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectInbound(' + inb.id + ',' + n.id + ')">查看</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
-    '<h3>新建入站</h3>' +
-    '<label>名称/别名（可选）</label><input id="i_name" placeholder="如 hk-tg-ws">' +
+    '<h3>添加入站</h3>' +
+    '<label>名称（可选）</label><input id="i_name" placeholder="如 hk-tg-ws">' +
     '<div class="row">' +
     '<div><label>协议</label><select id="i_proto"><option>vmess</option><option>vless</option><option>trojan</option><option>ss</option><option>socks</option><option>http</option></select></div>' +
     '<div><label>端口</label><input id="i_port" type="number" placeholder="10086"></div>' +
     '<div><label>传输</label><select id="i_trans"><option>tcp</option><option>ws</option><option>grpc</option></select></div>' +
     '<div><label>TLS</label><input id="i_tls" type="checkbox" onchange="toggleInboundCert()"></div></div>' +
     '<div id="i_cert_wrap" style="display:none"><label>证书（TLS 必选）</label><select id="i_cert"><option value="">未选择</option>' + (certsData || []).map(c => '<option value="' + c.id + '">' + esc(c.domain) + '</option>').join('') + '</select></div>' +
-    '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + n.id + '))">新建入站</button></div></div>' +
-    '<div class="card"><h2>配置版本</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>应用时间</th><th>错误</th></tr></thead><tbody>' +
-    (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">' + esc(v.status) + '</span>' : (v.status === 'failed' ? '<span class="pill off">' + esc(v.status) + '</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
+    '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + n.id + '))">添加入站</button></div></div>' +
+    '<div class="card"><h2>下发记录</h2>' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>时间</th><th>错误</th></tr></thead><tbody>' +
+    (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">已应用</span>' : (v.status === 'failed' ? '<span class="pill off">失败</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
     '</tbody></table></div></div>';
   detectRegion(id);
   loadNodeTraffic(id);
@@ -738,7 +738,7 @@ async function syncAllNodes() {
 async function showNodeToken(id) { const d = await api('GET', '/nodes/' + id + '/install'); if (d && d.token) { copyText(d.token); } }
 async function copyInstall() { const t = document.getElementById('installCmd'); if (t) { copyText(t.value); } }
 async function delNode(id) {
-  if (!await confirmModal('确认删除节点 #' + id + '？其入站/客户端也会失效')) return;
+  if (!await confirmModal('确认删除节点「' + (nodesData.find(x=>x.id===id)||{}).name + '」？其入站和客户端将一并失效')) return;
   const d = await api('DELETE', '/nodes/' + id);
   if (d) { delete inboundsCache[id]; const i = nodesData.findIndex(x => x.id === id); if (i >= 0) nodesData.splice(i, 1); expandedNodes.delete(id); if (sel.type === 'node' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
@@ -750,7 +750,7 @@ async function createInbound(nodeId) {
   if (d) { inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; showToast('入站已创建', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId); }
 }
 async function delInbound(id, nodeId) {
-  if (!await confirmModal('删除入站 #' + id + '？')) return;
+  if (!await confirmModal('确认删除入站 #' + id + '？')) return;
   const d = await api('DELETE', '/inbounds/' + id);
   if (d) { delete clientsCache[id]; expandedInbounds.delete(id); inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
 }
@@ -804,7 +804,7 @@ async function renderInboundDetail(id) {
     '<div class="crumb">节点 / <b>' + esc(node ? node.name : '#' + nodeId) + '</b> › 入站 / <b>' + esc(inboundLabel(inb)) + '</b></div>' +
     '<div class="card">' +
     '<div class="row">' +
-    '<div style="flex:2"><label>名称/别名（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
+    '<div style="flex:2"><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div></div>' +
     '<div class="row">' +
     '<div><label>协议</label><select id="ib_proto"><option ' + (inb.protocol === 'vmess' ? 'selected' : '') + '>vmess</option><option ' + (inb.protocol === 'vless' ? 'selected' : '') + '>vless</option><option ' + (inb.protocol === 'trojan' ? 'selected' : '') + '>trojan</option><option ' + (inb.protocol === 'ss' ? 'selected' : '') + '>ss</option><option ' + (inb.protocol === 'socks' ? 'selected' : '') + '>socks</option><option ' + (inb.protocol === 'http' ? 'selected' : '') + '>http</option></select></div>' +
@@ -814,25 +814,25 @@ async function renderInboundDetail(id) {
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '">' +
     '<label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div class="row">' +
-    '<div><label>自动修复间隔(分钟,0=不修复)</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
-    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自愈改端口</span>' : '') + '</div>' +
+    '<div><label>自动修复间隔（分钟，0=不修复）</label><input id="ib_ahinterval" type="number" min="0" value="' + (inb.auto_heal_interval || 0) + '"></div>' +
+    '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '') + '</div>' +
     '<div></div></div>' +
-    '<p class="muted" style="margin-top:10px">停用的入站不生成到节点配置；修改后需「下发配置」生效。</p>' +
+    '<p class="muted" style="margin-top:10px">停用的入站不会下发给节点；修改后请点击「下发配置」生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
     '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div></div>' +
     '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
     cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td>' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="selectClient(' + c.id + ',' + id + ')">查看</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
-    '<h3>新建客户端</h3>' +
+    '<h3>添加客户端</h3>' +
     '<div class="row">' +
-    '<div><label>别名/备注(ps)</label><input id="c_alias" placeholder="如 hk01-iphone"></div>' +
-    '<div><label>流量上限(字节,0不限)</label><input id="c_traffic" value="0" type="number" min="0"></div>' +
+    '<div><label>别名</label><input id="c_alias" placeholder="如 hk01-iphone"></div>' +
+    '<div><label>流量上限（0=不限）</label><input id="c_traffic" value="0" type="number" min="0"></div>' +
     '<div><label>到期时间</label><input id="c_expire" type="datetime-local"></div></div>' +
-    '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + id + '))">新建客户端</button></div></div>';
+    '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + id + '))">添加客户端</button></div></div>';
 }
 async function saveInbound(id) {
   const nodeId = sel.parentId;
@@ -845,10 +845,10 @@ async function saveInbound(id) {
 }
 async function createClient(inboundId) {
   const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('c_alias'), traffic_limit_bytes: +(val('c_traffic') || 0), expire_time: fromDTLocal(val('c_expire')) });
-  if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已建: ' + d.uuid, 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
+  if (d) { clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || []; showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); renderInboundDetail(inboundId); }
 }
 async function delClient(id, inboundId) {
-  if (!await confirmModal('删除客户端 #' + id + '？')) return;
+  if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
   const d = await api('DELETE', '/clients/' + id);
   if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); renderInboundDetail(inboundId); }
 }
@@ -864,8 +864,8 @@ async function renderClientDetail(id) {
     '<div class="card">' +
     '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
     '<div class="row">' +
-    '<div><label>别名/备注(ps)</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
-    '<div><label>流量上限(字节,0不限)</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
+    '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
+    '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
     '<div class="row">' +
     '<div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div>' +
@@ -903,7 +903,7 @@ async function renderSubDetail(id) {
     '<div><label>格式</label><select id="s_fmt2">' + subFmtOptions(g.format) + '</select></div>' +
     '<div><label>规则</label><select id="s_mode2">' + subModeOptions(g.mode) + '</select></div>' +
     '<div><label>启用</label><input id="s_en2" type="checkbox" ' + (g.enabled ? 'checked' : '') + '></div></div>' +
-    '<label>纳入的入站</label>' +
+    '<label>包含的入站</label>' +
     '<div class="inblist">' + subInboundChecklist(selectedIds) + '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveSub(' + g.id + '))">保存</button>' +
@@ -914,11 +914,12 @@ async function renderSubDetail(id) {
     '<div>订阅二维码</div>' +
     '<img src="' + API + '/qr/' + g.token + '" width="160" height="160" alt="订阅二维码">' +
     '<div class="muted link">' + esc(url) + '</div></div></div>' +
-    '<div class="card"><h2>成员预览（' + (d.members || []).length + '）</h2>' +
-    '<details class="adv"><summary>查看 JSON</summary><pre>' + esc(JSON.stringify(d.members || [], null, 2)) + '</pre></details></div>' +
-    '<div class="card"><h2>订阅内容预览</h2>' +
-    '<details class="adv" ontoggle="loadSubPreview(\'' + g.token + '\')"><summary>查看订阅内容</summary>' +
-    '<pre id="sub_preview" class="muted">点击展开后加载…</pre></details></div>';
+    '<div class="card"><h2>节点列表（' + (d.members || []).length + '）</h2>' +
+    (d.members || []).length ?
+      '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>地址</th><th>协议</th></tr></thead><tbody>' +
+      (d.members || []).map(m => '<tr><td>' + esc(m.alias || m.uuid) + '</td><td class="muted">' + esc(m.host + ':' + m.port) + '</td><td>' + esc(m.protocol || '') + '</td></tr>').join('') +
+      '</tbody></table></div>' : '<div class="empty"><div class="em-ic">🔗</div>暂无节点</div>' +
+    '</div>';
 }
 async function loadSubPreview(token) {
   const pre = document.getElementById('sub_preview'); if (!pre || pre.dataset.loaded) return;
@@ -975,7 +976,7 @@ function subModeOptions(cur) {
   return ms.map(([v, t]) => '<option value="' + v + '" ' + (cur === v ? 'selected' : '') + '>' + t + '</option>').join('');
 }
 async function delSub(id) {
-  if (!await confirmModal('删除订阅组?')) return;
+  if (!await confirmModal('确认删除订阅？')) return;
   const d = await api('DELETE', '/subscriptions/' + id);
   if (d) { subsData = subsData.filter(x => x.id !== id); if (sel.type === 'sub' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
@@ -995,7 +996,7 @@ async function renderCertDetail() {
     '<div class="row">' +
     '<div><label>域名</label><input value="' + esc(cert.domain) + '" disabled></div>' +
     '<div><label>剩余天数</label><input value="' + esc(days) + '" disabled></div>' +
-    '<div><label>自动续签</label><input value="' + (cert.auto_renew ? '是' : '否') + '" disabled></div></div>' +
+    '<div><label>自动续签</label><input value="' + (cert.auto_renew ? '开启' : '关闭') + '" disabled></div></div>' +
     '<div class="row">' +
     '<div><label>到期时间</label><input value="' + esc((cert.expires_at || '').toString().replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
     '<div><label>证书路径</label><input value="' + esc(cert.cert_path || '') + '" disabled></div>' +
@@ -1006,13 +1007,13 @@ async function renderCertDetail() {
     (cert.last_error ? '<div class="card" style="background:var(--danger-soft);border-color:var(--danger)"><b class="off">最近错误</b><br><span class="muted">' + esc(cert.last_error) + '</span></div>' : '') +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => renewCert(' + cert.id + '))">续签</button>' +
-    '<button onclick="withBusy(this, () => distributeCert(' + cert.id + '))">分发到所有节点</button>' +
+    '<button onclick="withBusy(this, () => distributeCert(' + cert.id + '))">分发到节点</button>' +
     '<button class="danger" onclick="delCert(' + cert.id + ')">删除</button></div></div>';
 }
 async function renewCert(id) { const d = await api('POST', '/certs/' + id + '/renew'); if (d && d.ok) { showToast('续签成功', 'ok'); await loadCerts(); renderCertDetail(); } }
 async function distributeCert(id) { const d = await api('POST', '/certs/' + id + '/distribute'); if (d) showToast('已分发到所有节点', 'ok'); }
 async function delCert(id) {
-  if (!await confirmModal('删除证书 #' + id + '？此操作不会回收已下发到节点的证书文件')) return;
+  if (!await confirmModal('确认删除证书 #' + id + '？已下发的证书文件不会被回收')) return;
   const d = await api('DELETE', '/certs/' + id);
   if (d) { certsData = certsData.filter(x => x.id !== id); if (sel.type === 'cert' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
@@ -1064,9 +1065,8 @@ async function renderNotifierDetail(id) {
     '<div><label>类型</label><input value="' + esc(notifTypeLabel(d.type)) + '" disabled></div>' +
     '<div><label>启用</label><input id="n_en2" type="checkbox" ' + (d.enabled ? 'checked' : '') + '></div></div>' +
     notifConfigFields(d.type, cfg) +
-    '<label>通知项目</label>' +
+    '<label>通知事件</label>' +
     '<div class="inblist">' + notifEventChecklist(ev) + '</div>' +
-    '<p class="muted">保存后即时生效。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNotifier(' + d.id + '))">保存</button>' +
     '<button class="secondary" onclick="withBusy(this, () => testNotifier(' + d.id + '))">发送测试</button>' +
@@ -1115,7 +1115,7 @@ async function testNotifier(id) {
   if (d && d.ok) showToast('测试消息已发送', 'ok');
 }
 async function delNotifier(id) {
-  if (!await confirmModal('删除通知渠道 #' + id + '？')) return;
+  if (!await confirmModal('确认删除通知渠道 #' + id + '？')) return;
   const d = await api('DELETE', '/notifiers/' + id);
   if (d) { notifData = notifData.filter(x => x.id !== id); if (sel.type === 'notifier' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
@@ -1127,10 +1127,10 @@ function onNotifTypeChange() { currentNotifType = val('n_type'); document.getEle
 function showCreateNotifier() {
   currentNotifType = 'email';
   setModal('<h2>新建通知渠道</h2>' +
-    '<label>名称</label><input id="n_name" placeholder="我的告警通道">' +
+    '<label>名称</label><input id="n_name" placeholder="如 我的告警">' +
     '<label>类型</label><select id="n_type" onchange="onNotifTypeChange()">' + notifTypeOptions('email') + '</select>' +
     '<div id="n_cfg_fields">' + notifConfigFields('email', {}) + '</div>' +
-    '<label>通知项目</label>' +
+    '<label>通知事件</label>' +
     '<div class="inblist">' + notifEventChecklist(null) + '</div>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNotifier)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
@@ -1141,14 +1141,14 @@ async function doCreateNotifier() {
 
 // ---- 新建节点 / 新建订阅 / 新建证书 ----
 function showCreateNode() {
-  setModal('<h2>注册节点</h2>' +
-    '<label>名称</label><input id="m_n_name" placeholder="hk-01">' +
+  setModal('<h2>添加节点</h2>' +
+    '<label>名称</label><input id="m_n_name" placeholder="如 hk-01">' +
     '<label>地址 ip:port</label><input id="m_n_addr" placeholder="127.0.0.1:54321" onblur="detectRegionNew()">' +
     '<label>区域</label><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)">' +
     '<input type="hidden" id="m_n_country"><input type="hidden" id="m_n_city">' +
-    '<label>标签(逗号)</label><input id="m_n_tags">' +
+    '<label>标签（逗号分隔）</label><input id="m_n_tags">' +
     '<label>端口范围</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
-    '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">注册</button><button class="secondary" onclick="closeModal()">取消</button></div>');
+    '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
 // 端口范围严格校验：空=用全局默认；非空须为 逗号分隔的 "N" 或 "N-M"，每段端口 1-65535 且 lo<=hi
 function validPortRange(s) {
@@ -1176,12 +1176,12 @@ async function doCreateNode() {
 }
 async function showCreateSub() {
   if (!inboundCatalog.length) await loadAllInbounds();
-  setModal('<h2>新建订阅分组</h2>' +
-    '<label>分组名</label><input id="m_s_name" placeholder="my-sub">' +
+  setModal('<h2>新建订阅</h2>' +
+    '<label>名称</label><input id="m_s_name" placeholder="如 我的订阅">' +
     '<div class="row">' +
     '<div><label>格式</label><select id="m_s_fmt">' + subFmtOptions('vmess') + '</select></div>' +
     '<div><label>规则</label><select id="m_s_mode">' + subModeOptions('none') + '</select></div></div>' +
-    '<label>纳入的入站</label>' +
+    '<label>包含的入站</label>' +
     '<div class="inblist">' + subInboundChecklist([]) + '</div>' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateSub)">创建</button><button class="secondary" onclick="closeModal()">取消</button></div>');
 }
