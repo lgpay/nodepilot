@@ -199,10 +199,11 @@ func probeNode(node model.Node) {
 	host := hostOf(node.Address)
 	now := time.Now()
 	for _, in := range inbounds {
-		// 探测间隔跟随自动修复间隔：AutoHealInterval(分钟) 即探测周期；
-		// 0=不自动修复 仍按默认周期检测连通状态，但不换端口。
+		// 探测间隔：正常时跟随自动修复间隔(AutoHealInterval 分钟)；
+		// 一旦失败(fail>0)进入 60s 快速重试，尽早确认故障/恢复；
+		// AutoHealInterval=0 永不换端口，仍按默认周期检测连通。
 		interval := probeInterval
-		if in.AutoHealInterval > 0 {
+		if in.AutoHealInterval > 0 && ps.getFail(in.ID) == 0 {
 			interval = time.Duration(in.AutoHealInterval) * time.Minute
 		}
 		if last, ok := ps.getLastProbe(in.ID); ok && now.Sub(last) < interval {
