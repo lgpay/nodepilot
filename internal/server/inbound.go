@@ -51,6 +51,7 @@ type InboundView struct {
 	Port             int    `json:"port"`
 	Transport        string `json:"transport"`
 	TLSEnabled       bool   `json:"tls_enabled"`
+	TLSCertID        uint   `json:"tls_cert_id"`
 	Enabled          bool   `json:"enabled"`
 	AutoHeal         bool   `json:"auto_heal"`
 	AutoHealInterval int    `json:"auto_heal_interval"`
@@ -89,6 +90,7 @@ func ListAllInbounds(c *gin.Context) {
 			Port:             in.Port,
 			Transport:        in.Transport,
 			TLSEnabled:       in.TLSEnabled,
+			TLSCertID:        in.TLSCertID,
 			Enabled:          in.Enabled,
 			AutoHeal:         in.AutoHeal,
 			AutoHealInterval: in.AutoHealInterval,
