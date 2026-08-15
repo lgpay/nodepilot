@@ -62,6 +62,16 @@ func Restart(path string) error {
 	cmd = c
 	configPath = path
 	log.Printf("[agent] xray started (pid=%d)", c.Process.Pid)
+	// 进程退出时清空 cmd，保证 IsXrayRunning 准确（崩溃后看护才能拉起）
+	go func(pc *exec.Cmd) {
+		_ = pc.Wait()
+		mu.Lock()
+		if cmd == pc { // 仅当仍指向当前 xray 进程时清空，避免误清重启后的新进程
+			cmd = nil
+			log.Printf("[agent] xray process exited (pid=%d)", pc.Process.Pid)
+		}
+		mu.Unlock()
+	}(c)
 	return nil
 }
 

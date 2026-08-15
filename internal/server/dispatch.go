@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,14 @@ func SyncNode(c *gin.Context) {
 }
 
 // syncNode 生成配置并下发到节点 agent，返回新配置版本号（handler 与探测调度器共用）
+// 同一节点的并发下发用互斥锁串行化，避免版本号竞争与 agent 端配置互相覆盖。
+var syncNodeLocks sync.Map // nodeID -> *sync.Mutex
+
 func syncNode(node model.Node) (int, error) {
+	mu, _ := syncNodeLocks.LoadOrStore(node.ID, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
 	var inbounds []model.Inbound
 	store.DB.Where("node_id = ?", node.ID).Find(&inbounds)
 	clientsByInbound := map[uint][]model.Client{}

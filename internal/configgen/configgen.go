@@ -5,10 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
 )
+
+// ClientExpired 判断客户端是否已过期（ExpireTime 非零且在现在之前）
+func ClientExpired(c model.Client) bool {
+	return !c.ExpireTime.IsZero() && c.ExpireTime.Before(time.Now())
+}
 
 // xrayStatsAddr 控制面生成配置时固定的 xray stats API 监听地址；
 // agent 端流量采集器须使用同一地址（internal/agent/traffic.go 的 collectTraffic）。
@@ -58,7 +64,7 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		}
 		clientList := []map[string]interface{}{}
 		for _, c := range clientsByInbound[in.ID] {
-			if !c.Enabled {
+			if !c.Enabled || ClientExpired(c) {
 				continue
 			}
 			clientList = append(clientList, buildClient(in.Protocol, c.UUID))
@@ -116,12 +122,45 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 			stream["security"] = "none"
 		}
 
-		// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
-		settings := map[string]interface{}{"clients": clientList}
+	// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
+	settings := map[string]interface{}{}
+	switch in.Protocol {
+	case "vmess", "vless", "trojan":
+		settings["clients"] = clientList
 		if in.Protocol == "vless" {
 			settings["decryption"] = "none"
 		}
-		ib := map[string]interface{}{
+	case "ss":
+		// SS 不支持 clients 数组，取第一个客户端的 UUID 作为密码（method 用默认 aes-256-gcm）
+		pwd := ""
+		if len(clientList) > 0 {
+			if p, ok := clientList[0]["password"].(string); ok {
+				pwd = p
+			}
+		}
+		settings["method"] = "aes-256-gcm"
+		settings["password"] = pwd
+		if pwd == "" {
+			continue // 无客户端则跳过该入站，避免生成无效配置
+		}
+	case "socks", "http":
+		// SOCKS/HTTP 用 accounts 做用户名密码认证（user 固定 uuid, pass 用 uuid）
+		accounts := []map[string]interface{}{}
+		for _, c := range clientList {
+			uid, _ := c["id"].(string)
+			if uid == "" {
+				continue
+			}
+			accounts = append(accounts, map[string]interface{}{"user": uid, "pass": uid})
+		}
+		if len(accounts) == 0 {
+			continue
+		}
+		settings["accounts"] = accounts
+		settings["ip"] = "0.0.0.0"
+		settings["userLevel"] = 0
+	}
+	ib := map[string]interface{}{
 			"listen":         "0.0.0.0",
 			"port":           in.Port,
 			"protocol":       in.Protocol,
@@ -149,7 +188,7 @@ func buildClient(protocol, uuid string) map[string]interface{} {
 		"level": 0,
 		"email": uuid,
 	}
-	if protocol == "trojan" {
+	if protocol == "trojan" || protocol == "ss" {
 		m["password"] = uuid
 	} else {
 		m["id"] = uuid

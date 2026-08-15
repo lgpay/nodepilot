@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/skip2/go-qrcode"
 	"nodepilot/internal/auth"
+	"nodepilot/internal/configgen"
 	"nodepilot/internal/model"
 	"nodepilot/internal/secret"
 	"nodepilot/internal/store"
@@ -142,7 +143,11 @@ func DeleteSubscription(c *gin.Context) {
 // ---- 对外订阅端点 /sub/{token} ----
 
 // schemeHost 返回请求的 scheme://host（含端口），用于构造对外可访问的绝对 URL。
+// 优先使用管理端配置的 panel_base_url（避免 Host 头注入劫持订阅链接）。
 func schemeHost(c *gin.Context) string {
+	if base, err := store.GetSetting("panel_base_url"); err == nil && base != "" {
+		return strings.TrimRight(base, "/")
+	}
 	scheme := "http"
 	if c.Request.TLS != nil {
 		scheme = "https"
@@ -331,6 +336,9 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 			sni = host
 		}
 		for _, cl := range clients {
+			if configgen.ClientExpired(cl) {
+				continue // 过期客户端不导出
+			}
 			items = append(items, subscription.ExportItem{
 				Host:       host,
 				Port:       in.Port,

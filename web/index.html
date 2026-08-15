@@ -390,6 +390,7 @@ function logout() { localStorage.removeItem('np_token'); token = ''; MUST_CHANGE
 function forceLogin() {
   token = ''; MUST_CHANGE_PWD = false; updatePwBanner();
   localStorage.removeItem('np_token');
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } // 停止后台轮询,避免登录页反复报错
   hideModal(); hideConfirm(); // 关闭可能残留的弹窗/确认层
   const a = document.getElementById('app'); if (a) a.classList.add('hidden');
   const l = document.getElementById('loginWrap'); if (l) l.classList.remove('hidden');
@@ -701,7 +702,8 @@ async function renderNodeDetail(id) {
   if (seq !== renderSeq) return;
   let cmd = '';
   const inst = await api('GET', '/nodes/' + id + '/install');
-  if (inst) { cmd = inst.command || ''; installCmdCache = cmd; }
+  if (inst && inst.command) { cmd = inst.command; installCmdCache = cmd; }
+  else installCmdCache = ''; // 获取失败时清空缓存,避免复制到上一个节点的命令
   const tp = trafficParts(n.monthly_traffic_bytes);
   let hbGlobal = 30;
   try { const s = await api('GET', '/settings'); if (s) hbGlobal = s.agent_heartbeat_interval || 30; } catch (e) {}
@@ -925,10 +927,12 @@ async function showEditInbound(id, nodeId) {
 }
 // 弹窗内保存入站后刷新弹窗
 async function saveInboundModal(id, nodeId) {
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  const port = parseInt(val('ib_port'), 10);
+  if (!port || port < 1 || port > 65535) return showToast('请填写有效端口（1-65535）', 'err');
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
     showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); await showEditInbound(id, nodeId);
   }
 }
@@ -973,12 +977,14 @@ async function renderInboundDetail(id) {
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }
 async function saveInbound(id) {
+  const port = parseInt(val('ib_port'), 10);
+  if (!port || port < 1 || port > 65535) return showToast('请填写有效端口（1-65535）', 'err');
   let nodeId = sel.parentId;
   if (!nodeId) nodeId = inboundNodeId(id);
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null) });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port: +val('ib_port'), transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null) };
     showToast('入站已保存', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderInboundDetail(id);
   }
 }
@@ -989,7 +995,8 @@ async function createClient(inboundId) {
   if (d) {
     clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || [];
     refreshMainAfterClose = true; // 关闭弹窗后刷新节点详情(客户端数量即时更新)
-    showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar();
+    const nidForSync = inboundNodeId(inboundId);
+    showToast('客户端已创建', 'ok'); if (autoSync && nidForSync) await syncNode(nidForSync); renderSidebar();
     // 内联添加(编辑入站弹窗内)：清空编辑器并刷新弹窗；独立页弹窗添加：关闭弹窗刷新页面
     const ed = document.getElementById('client_editor');
     if (ed) {
@@ -1230,13 +1237,15 @@ function toggleSubInbByClients(inbId) {
   if (!inbCb) return;
   inbCb.checked = cliCbs.some(cb => cb.checked);
 }
-// 客户端是否在订阅筛选中被选中（精确到客户端；未配置 client_ids 视为该入站全部选中）
+// 客户端是否在订阅筛选中被选中（精确到客户端；入站未勾选则其客户端不选中）
 function subClientSelected(inbId, cliId) {
   try {
     const f = JSON.parse(subFiltersBase || '{}');
+    // 入站未在 inbound_ids 中（未勾选）时其客户端一律不选中
+    if (!(f.inbound_ids || []).includes(inbId)) return false;
     const cids = f.client_ids || [];
     return cids.length ? cids.includes(cliId) : true; // 未精确指定=全选
-  } catch (e) { return true; }
+  } catch (e) { return false; }
 }
 function buildSubFilters(base) {
   const ids = Array.from(document.querySelectorAll('input[name=sub_inb]:checked')).map(e => +e.value);
@@ -1521,6 +1530,9 @@ async function loadAllInbounds() {
     inboundCatalog = v;
     // 同步填充按节点分组的侧边栏缓存，展开节点时立即可显示入站
     inboundsCache = {};
+    // 清理已删除入站的客户端缓存
+    const liveIds = new Set(v.map(inb => inb.id));
+    Object.keys(clientsCache).forEach(k => { if (!liveIds.has(Number(k))) delete clientsCache[k]; });
     v.forEach(inb => { (inboundsCache[inb.node_id] = inboundsCache[inb.node_id] || []).push(inb); });
     renderSidebar();
     // 后台预加载各入站客户端，展开入站时立即可显示（不阻塞当前渲染）
