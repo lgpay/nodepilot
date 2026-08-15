@@ -426,6 +426,12 @@ document.getElementById('modal').addEventListener('click', e => {
 // ---- 侧边栏 ----
 function dotOf(n) { return n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn'))); }
 function inboundLabel(inb) { return inb.name || ((inb.protocol || '?') + ':' + (inb.port || '?')); }
+// 节点在线状态徽标：仅基于 agent 心跳 status（不含端口连通）
+function onlinePill(n) {
+  if (n.status === 'online') return '<span class="pill ok">在线</span>';
+  if (n.status === 'offline') return '<span class="pill off">离线</span>';
+  return '<span class="pill warn">' + esc(n.status || '未知') + '</span>';
+}
 // 证书状态徽标：valid→ok，failed/expired→off，其余 warn
 // 证书状态中文名：issued=Let's Encrypt 已成功签发（含自动续签），pending=申请中
 function certStatusLabel(s) {
@@ -658,7 +664,7 @@ async function renderNodeDetail(id) {
   if (inst) cmd = inst.command || '';
   const tp = trafficParts(n.monthly_traffic_bytes);
   main.innerHTML =
-    '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span></div>' +
+    '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> <span class="muted">#' + n.id + '</span> ' + onlinePill(n) + '</div>' +
     '<div class="card"><h2>基本信息</h2>' +
     '<div class="field-grid">' +
     '<div><label>名称</label><input id="n_name" value="' + esc(n.name) + '"></div>' +
@@ -680,7 +686,7 @@ async function renderNodeDetail(id) {
     '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
     '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th>连通</th><th></th></tr></thead><tbody>' +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th>状态</th><th></th></tr></thead><tbody>' +
     ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
