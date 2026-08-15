@@ -34,6 +34,7 @@ func StatsOverview(c *gin.Context) {
 		Select("node_id, SUM(up_bytes) AS up, SUM(down_bytes) AS down").
 		Group("node_id").Scan(&nodeRows)
 	nameByNode := map[uint]string{}
+	limitByNode := map[uint]int64{}
 	for _, n := range nodeRows {
 		nameByNode[n.NodeID] = ""
 	}
@@ -42,15 +43,17 @@ func StatsOverview(c *gin.Context) {
 		store.DB.Where("id IN ?", keys(nameByNode)).Find(&nodes)
 		for _, n := range nodes {
 			nameByNode[n.ID] = n.Name
+			limitByNode[n.ID] = n.MonthlyTrafficBytes
 		}
 	}
 	nodeStats := make([]gin.H, 0, len(nodeRows))
 	for _, r := range nodeRows {
 		nodeStats = append(nodeStats, gin.H{
-			"node_id": r.NodeID,
-			"name":    nameByNode[r.NodeID],
-			"up":      r.Up,
-			"down":    r.Down,
+			"node_id":              r.NodeID,
+			"name":                 nameByNode[r.NodeID],
+			"up":                   r.Up,
+			"down":                 r.Down,
+			"monthly_limit_bytes":  limitByNode[r.NodeID],
 		})
 	}
 
