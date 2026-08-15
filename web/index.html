@@ -500,10 +500,20 @@ async function ensureInbounds(id) {
 async function selectInbound(id, nodeId) {
   sel = { type: 'inbound', id, parentId: nodeId };
   expandedNodes.add(nodeId); expandedInbounds.add(id);
-  if (!clientsCache[id]) clientsCache[id] = await api('GET', '/inbounds/' + id + '/clients') || [];
+  await ensureClients(id);
   renderSidebar(); renderMain();
 }
-function toggleInbound(id) { if (expandedInbounds.has(id)) expandedInbounds.delete(id); else expandedInbounds.add(id); renderSidebar(); }
+// 确保某入站客户端已加载；未加载则异步拉取并刷新侧边栏（展开时避免一直显示"暂无客户端"）
+async function ensureClients(id) {
+  if (!clientsCache[id]) {
+    clientsCache[id] = await api('GET', '/inbounds/' + id + '/clients') || [];
+    renderSidebar();
+  }
+}
+function toggleInbound(id) {
+  if (expandedInbounds.has(id)) { expandedInbounds.delete(id); renderSidebar(); }
+  else { expandedInbounds.add(id); ensureClients(id); renderSidebar(); }
+}
 function selectClient(id, inboundId) { sel = { type: 'client', id, parentId: inboundId }; renderSidebar(); renderMain(); }
 function selectSub(id) { sel = { type: 'sub', id, parentId: null }; renderSidebar(); renderMain(); }
 function selectCert(id) { sel = { type: 'cert', id, parentId: null }; renderSidebar(); renderMain(); }
@@ -1240,6 +1250,8 @@ async function loadAllInbounds() {
     inboundsCache = {};
     v.forEach(inb => { (inboundsCache[inb.node_id] = inboundsCache[inb.node_id] || []).push(inb); });
     renderSidebar();
+    // 后台预加载各入站客户端，展开入站时立即可显示（不阻塞当前渲染）
+    v.forEach(inb => { ensureClients(inb.id); });
   }
 }
 
