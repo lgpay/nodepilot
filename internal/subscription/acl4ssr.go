@@ -175,6 +175,23 @@ func parseGroupLine(s string) (aclGroup, error) {
 			} else if g.TestURL != "" {
 				g.Tolerance, _ = strconv.Atoi(m)
 			}
+		case g.TestURL != "" && strings.Contains(m, ","):
+			// ACL4SSR url-test 标准写法把 间隔与容忍度 放在单个字段内，逗号分隔，
+			// 如 "300,,50"（interval,,tolerance）。此处把其中数字段解析为 interval/tolerance，
+			// 而非误当作分组成员。
+			var nums []string
+			for _, s := range strings.Split(m, ",") {
+				s = strings.TrimSpace(s)
+				if isNumeric(s) {
+					nums = append(nums, s)
+				}
+			}
+			if len(nums) > 0 && g.Interval == 0 {
+				g.Interval, _ = strconv.Atoi(nums[0])
+			}
+			if len(nums) > 1 && g.Tolerance == 0 {
+				g.Tolerance, _ = strconv.Atoi(nums[1])
+			}
 		default:
 			g.Members = append(g.Members, m)
 		}
