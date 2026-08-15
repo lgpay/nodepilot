@@ -257,6 +257,7 @@
 </div>
 
 <div id="modal" class="modal hidden"><div class="card modalcard" id="modalBody"></div></div>
+<div id="confirmLayer" class="modal hidden" style="z-index:1200"><div class="card modalcard" id="confirmBody"></div></div>
 <div id="toast" class="toast"></div>
 
 <script>
@@ -342,11 +343,17 @@ async function withBusy(btn, fn) {
 function confirmModal(msg) {
   return new Promise(res => {
     confirmRes = res;
-    setModal('<h2>确认操作</h2><p style="margin:6px 0">' + esc(msg) + '</p>' +
-      '<div class="btnrow"><button onclick="confirmOk()">确认</button><button class="secondary" onclick="closeModal()">取消</button></div>');
+    // 独立确认层(z-index 高于主 modal),不覆盖背景弹窗
+    const card = document.getElementById('confirmBody');
+    card.className = 'card modalcard';
+    card.innerHTML = '<h2>确认操作</h2><p style="margin:6px 0">' + esc(msg) + '</p>' +
+      '<div class="btnrow"><button onclick="confirmOk()">确认</button><button class="secondary" onclick="confirmCancel()">取消</button></div>';
+    document.getElementById('confirmLayer').classList.remove('hidden');
   });
 }
-function confirmOk() { if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } hideModal(); }
+function confirmOk() { if (confirmRes) { const r = confirmRes; confirmRes = null; r(true); } hideConfirm(); }
+function confirmCancel() { if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } hideConfirm(); }
+function hideConfirm() { document.getElementById('confirmLayer').classList.add('hidden'); }
 function setModal(html, cls) {
   const card = document.getElementById('modalBody');
   card.className = 'card modalcard' + (cls ? ' ' + cls : '');
@@ -355,7 +362,7 @@ function setModal(html, cls) {
 }
 function hideModal() { document.getElementById('modal').classList.add('hidden'); }
 function modalOpen() { return !document.getElementById('modal').classList.contains('hidden'); }
-function closeModal() { hideModal(); if (confirmRes) { const r = confirmRes; confirmRes = null; r(false); } }
+function closeModal() { hideModal(); }
 
 // ---- 认证 ----
 let MUST_CHANGE_PWD = false;
@@ -411,6 +418,12 @@ async function doChangePw() {
 }
 // 弹窗内回车触发第一个主按钮；ESC / 点遮罩关闭（强制改密时禁止关闭）
 document.addEventListener('keydown', e => {
+  const cl = document.getElementById('confirmLayer');
+  if (cl && !cl.classList.contains('hidden')) {
+    if (e.key === 'Enter') { const btn = cl.querySelector('.btnrow button:not(.secondary)'); if (btn) btn.click(); }
+    else if (e.key === 'Escape' && !MUST_CHANGE_PWD) confirmCancel();
+    return;
+  }
   const m = document.getElementById('modal');
   if (!m || m.classList.contains('hidden')) return;
   if (e.key === 'Enter') {
@@ -422,6 +435,9 @@ document.addEventListener('keydown', e => {
 });
 document.getElementById('modal').addEventListener('click', e => {
   if (e.target === e.currentTarget && !MUST_CHANGE_PWD) closeModal();
+});
+document.getElementById('confirmLayer').addEventListener('click', e => {
+  if (e.target === e.currentTarget && !MUST_CHANGE_PWD) confirmCancel();
 });
 
 // ---- 侧边栏 ----
@@ -985,10 +1001,10 @@ async function delClient(id, inboundId) {
     clientsCache[inboundId] = (clientsCache[inboundId] || []).filter(x => x.id !== id);
     if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId };
     renderSidebar();
-    // 删除后统一关闭弹窗并刷新节点详情页，避免 confirmModal 覆盖后 modal 状态混乱
-    closeModal();
     const nodeId = inboundNodeId(inboundId);
-    if (nodeId) renderNodeDetail(nodeId); else renderInboundDetail(inboundId);
+    if (modalOpen()) { await showEditInbound(inboundId, nodeId); } // 编辑窗保留并刷新
+    else if (nodeId) renderNodeDetail(nodeId);
+    else renderInboundDetail(inboundId);
   }
 }
 
