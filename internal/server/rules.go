@@ -49,6 +49,8 @@ var (
 // ?fmt=yaml 时包裹为 Clash classical rule-provider 的 payload 格式。
 func GetRuleFile(c *gin.Context) {
 	name := c.Param("name")
+	// *name 通配参数带前导斜杠（如 /Ruleset/GoogleFCM.list），去除之
+	name = strings.TrimPrefix(name, "/")
 	if !isValidRuleName(name) {
 		c.JSON(400, gin.H{"error": "invalid rule name"})
 		return
@@ -82,13 +84,17 @@ func GetRuleFile(c *gin.Context) {
 	c.Data(200, "text/plain; charset=utf-8", []byte(content))
 }
 
-// isValidRuleName 仅允许字母数字、下划线、横线与点，且必须以 .list 结尾，防目录穿越。
+// isValidRuleName 允许字母数字、下划线、横线、点与子目录斜杠，且必须以 .list 结尾。
+// 禁止 ".."（防目录穿越，避免把本地文件系统路径暴露给客户端）。
 func isValidRuleName(name string) bool {
 	if !strings.HasSuffix(name, ".list") {
 		return false
 	}
+	if strings.Contains(name, "..") {
+		return false
+	}
 	for _, r := range name {
-		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '-' && r != '_' && r != '.' {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '-' && r != '_' && r != '.' && r != '/' {
 			return false
 		}
 	}
@@ -172,6 +178,10 @@ func cacheRule(name, content string, expire time.Time) {
 	ruleMemCacheMu.Unlock()
 	if RulesCacheDir != "" {
 		_ = os.MkdirAll(RulesCacheDir, 0o755)
+		// 规则名可能含子目录（如 Ruleset/GoogleFCM.list），确保对应缓存子目录存在
+		if dir := filepath.Dir(name); dir != "." && dir != "" {
+			_ = os.MkdirAll(filepath.Join(RulesCacheDir, dir), 0o755)
+		}
 		_ = os.WriteFile(filepath.Join(RulesCacheDir, name), []byte(content), 0o644)
 	}
 }

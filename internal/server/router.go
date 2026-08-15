@@ -93,7 +93,8 @@ func NewRouter(webDir string) *gin.Engine {
 	v1.GET("/qr/:token", GetSubscriptionQR)
 
 	// 自托管 ACL4SSR 规则镜像（公开，客户端 rule-provider / RULE-SET 引用）
-	v1.GET("/rules/:name", GetRuleFile)
+	// *name 匹配含子目录的规则名（如 Ruleset/GoogleFCM.list）
+	v1.GET("/rules/*name", GetRuleFile)
 
 	// Web 管理界面（单页 index.html）
 	if webDir != "" {
