@@ -619,6 +619,24 @@ function renderStatsView() {
     '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div></div></div>';
 
+  h += '<div class="card"><h2>近 30 天趋势</h2>';
+  if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
+  else {
+    let max = 1;
+    d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
+    h += '<div class="barchart">';
+    d.daily.forEach(x => {
+      const t = (Number(x.up) || 0) + (Number(x.down) || 0);
+      const hh = Math.max(3, (t / max) * 100);
+      h += '<div class="bcol" title="' + x.date + ' ' + fmtBytes(t) + '">' +
+        '<div class="bval">' + fmtBytes(t) + '</div>' +
+        '<div class="bar-v"><span style="height:' + hh + '%"></span></div>' +
+        '<div class="bdate">' + x.date.slice(5) + '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
   h += '<div class="card"><h2>按节点</h2>';
   if (!d.nodes || !d.nodes.length) h += '<div class="empty"><div class="em-ic">📡</div>暂无节点流量数据</div>';
   else {
@@ -645,24 +663,6 @@ function renderStatsView() {
     h += '</tbody></table></div>';
   }
   h += '</details></div>';
-
-  h += '<div class="card"><h2>近 30 天趋势</h2>';
-  if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
-  else {
-    let max = 1;
-    d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
-    h += '<div class="barchart">';
-    d.daily.forEach(x => {
-      const t = (Number(x.up) || 0) + (Number(x.down) || 0);
-      const hh = Math.max(3, (t / max) * 100);
-      h += '<div class="bcol" title="' + x.date + ' ' + fmtBytes(t) + '">' +
-        '<div class="bval">' + fmtBytes(t) + '</div>' +
-        '<div class="bar-v"><span style="height:' + hh + '%"></span></div>' +
-        '<div class="bdate">' + x.date.slice(5) + '</div></div>';
-    });
-    h += '</div>';
-  }
-  h += '</div>';
   document.getElementById('main').innerHTML = h;
 }
 function filterRows(tbId, q) {
