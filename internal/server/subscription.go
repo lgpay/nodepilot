@@ -285,6 +285,7 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		Protocol   []string `json:"protocol"`
 		Tags       []string `json:"tags"`
 		InboundIDs []uint   `json:"inbound_ids"`
+		ClientIDs  []uint   `json:"client_ids"` // 精确到客户端(可跨入站)
 	}
 	_ = json.Unmarshal([]byte(g.Filters), &f)
 
@@ -317,7 +318,12 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 			continue
 		}
 		var clients []model.Client
-		store.DB.Where("inbound_id = ? AND enabled = ?", in.ID, true).Find(&clients)
+		if len(f.ClientIDs) > 0 {
+			// 精确到客户端：仅取选中的客户端（按 id 过滤）
+			store.DB.Where("inbound_id = ? AND enabled = ? AND id IN ?", in.ID, true, f.ClientIDs).Find(&clients)
+		} else {
+			store.DB.Where("inbound_id = ? AND enabled = ?", in.ID, true).Find(&clients)
+		}
 		host := hostOf(node.Address)
 		wsPath := parseWsPath(in.StreamSettings)
 		sni := ""

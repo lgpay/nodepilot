@@ -84,6 +84,8 @@
   .inblist .chk { display: flex; align-items: center; gap: 6px; min-width: 0; }
   .inblist .chk span, .inblist .chk b { white-space: nowrap; }
   .inblist .chk b { color: var(--text); font-weight: 600; }
+  .subcli { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 2px 0 4px 22px; border-bottom: 1px dashed var(--border); margin-bottom: 2px; }
+  .subcli .chk { font-size: 12px; color: var(--muted); }
   .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 6px; }
   .row { display: flex; gap: 14px; }
@@ -653,11 +655,8 @@ function renderStatsView() {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody id="stats_clients_tb">';
     d.clients.forEach(c => {
       const total = (Number(c.up) || 0) + (Number(c.down) || 0);
-      let usage = '—';
-      if (c.traffic_limit_bytes && c.traffic_limit_bytes > 0) {
-        const pct = Math.min(100, (total / c.traffic_limit_bytes) * 100);
-        usage = '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' + pct.toFixed(1) + '%';
-      }
+      const pct = (c.traffic_limit_bytes && c.traffic_limit_bytes > 0) ? Math.min(100, (total / c.traffic_limit_bytes) * 100) : 0;
+      const usage = '<div class="bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' + pct.toFixed(1) + '%';
       h += '<tr><td>' + esc(c.alias || ('#' + c.client_id)) + '</td><td>' + fmtBytes(c.up) + '</td><td>' + fmtBytes(c.down) + '</td><td>' + fmtBytes(total) + '</td><td>' + usage + '</td></tr>';
     });
     h += '</tbody></table></div>';
@@ -1013,15 +1012,31 @@ function subInboundChecklist(selected) {
     byNode[nid].forEach(inb => {
       const chk = selected.includes(inb.id) ? 'checked' : '';
       h += '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + '> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>';
+      // 该入站下的客户端：精确到客户端选择
+      const cls = clientsCache[inb.id] || [];
+      if (cls.length) {
+        h += '<div class="subcli">' + cls.map(c =>
+          '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + '> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
+        ).join('') + '</div>';
+      }
     });
   });
   return h;
 }
+// 客户端是否在订阅筛选中被选中（精确到客户端）
+function subClientSelected(inbId, cliId) {
+  try {
+    const f = JSON.parse(subFiltersBase || '{}');
+    return (f.client_ids || []).includes(cliId);
+  } catch (e) { return false; }
+}
 function buildSubFilters(base) {
   const ids = Array.from(document.querySelectorAll('input[name=sub_inb]:checked')).map(e => +e.value);
+  const cliIds = Array.from(document.querySelectorAll('input[name=sub_cli]:checked')).map(e => +e.value);
   let f = {};
   if (base && base.trim()) { try { f = JSON.parse(base); } catch (e) { showToast('已有筛选解析失败', 'err'); return null; } }
   f.inbound_ids = ids;
+  if (cliIds.length) f.client_ids = cliIds; else delete f.client_ids;
   return JSON.stringify(f);
 }
 function subFmtOptions(cur) {
