@@ -687,11 +687,11 @@ async function renderNodeDetail(id) {
     '<div><label>地址 ip:port</label><input id="n_addr" value="' + esc(n.address) + '" disabled></div>' +
     '<div><label>区域</label><input id="n_region" value="' + esc(regionLabel(n)) + '" disabled></div>' +
     '<div><label>端口范围</label><input id="n_portrange" value="' + esc((n.port_range || '').trim()) + '" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')"></div>' +
+    '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
+    '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '<div><label>客户端版本</label><input value="' + esc(n.agent_version || '-') + '" disabled></div>' +
     '<div><label>最近心跳</label><input value="' + esc((n.last_heartbeat || '').replace('T', ' ').slice(0, 19)) + '" disabled></div>' +
-    '<div><label>月流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="n_mtraffic" type="number" min="0" step="any" value="' + tp.v + '" style="flex:1;min-width:0">' + unitSelect(tp.unit) + '</div></div>' +
     '<div><label>本月已用</label><div class="mbar"><div class="mbar-fill" id="n_mused_fill" style="width:0%"></div></div><div class="muted" id="n_mused" style="margin-top:4px;font-size:12px">加载中…</div></div>' +
-    '<div><label>到期时间</label><input id="n_expire" type="datetime-local" value="' + toDTLocal(n.expires_at) + '"></div>' +
     '</div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveNode(' + n.id + '))">保存节点</button>' +
