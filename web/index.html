@@ -390,6 +390,7 @@ function logout() { localStorage.removeItem('np_token'); token = ''; MUST_CHANGE
 function forceLogin() {
   token = ''; MUST_CHANGE_PWD = false; updatePwBanner();
   localStorage.removeItem('np_token');
+  hideModal(); hideConfirm(); // 关闭可能残留的弹窗/确认层
   const a = document.getElementById('app'); if (a) a.classList.add('hidden');
   const l = document.getElementById('loginWrap'); if (l) l.classList.remove('hidden');
 }
@@ -687,20 +688,24 @@ function filterRows(tbId, q) {
 }
 
 // ---- 节点详情 ----
+let renderSeq = 0; // 异步渲染序号,防止快速切换时旧请求覆盖新视图
 async function renderNodeDetail(id) {
+  const seq = ++renderSeq;
   setLoading('加载节点中…');
   const d = await api('GET', '/nodes/' + id);
-  if (!d) return;
+  if (!d || seq !== renderSeq) return;
   const n = d.node, main = document.getElementById('main');
   const ins = inboundsCache[id] || [];
   // 确保该节点所有入站客户端已加载（入站表'客户端'数量列依赖）
   await Promise.all(ins.map(inb => ensureClients(inb.id)));
+  if (seq !== renderSeq) return;
   let cmd = '';
   const inst = await api('GET', '/nodes/' + id + '/install');
   if (inst) { cmd = inst.command || ''; installCmdCache = cmd; }
   const tp = trafficParts(n.monthly_traffic_bytes);
   let hbGlobal = 30;
   try { const s = await api('GET', '/settings'); if (s) hbGlobal = s.agent_heartbeat_interval || 30; } catch (e) {}
+  if (seq !== renderSeq) return;
   main.innerHTML =
     '<div class="crumb">节点 / <b>' + esc(n.name) + '</b> ' + onlinePill(n) + '</div>' +
     '<div class="card"><h2>基本信息</h2>' +
@@ -729,6 +734,7 @@ async function renderNodeDetail(id) {
     '<div class="tblwrap"><table class="tbl"><thead><tr><th>版本</th><th>状态</th><th>时间</th><th>错误</th></tr></thead><tbody>' +
     (d.config_versions || []).map(v => '<tr><td>' + v.version + '</td><td>' + (v.status === 'applied' ? '<span class="pill ok">已应用</span>' : (v.status === 'failed' ? '<span class="pill off">失败</span>' : '<span class="pill warn">' + esc(v.status) + '</span>')) + '</td><td>' + esc((v.applied_at || '').replace('T', ' ').slice(0, 19)) + '</td><td class="muted">' + esc(v.error || '') + '</td></tr>').join('') +
     '</tbody></table></div></div>';
+  if (seq !== renderSeq) return;
   detectRegion(id);
   loadNodeTraffic(id);
 }
@@ -844,7 +850,7 @@ async function toggleInbound(id, nodeId) {
 async function delInbound(id, nodeId) {
   if (!await confirmModal('确认删除该入站？')) return;
   const d = await api('DELETE', '/inbounds/' + id);
-  if (d) { delete clientsCache[id]; inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
+  if (d) { delete clientsCache[id]; inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; closeModal(); renderSidebar(); renderNodeDetail(nodeId); }
 }
 
 // ---- 到期时间转换 ----
@@ -984,9 +990,10 @@ async function createClient(inboundId) {
     clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || [];
     refreshMainAfterClose = true; // 关闭弹窗后刷新节点详情(客户端数量即时更新)
     showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar();
-    // 内联添加(编辑入站弹窗内)：清空编辑器并刷新弹窗；弹窗添加(独立页)：关闭弹窗刷新页面
-    if (modalOpen()) {
-      const ed = document.getElementById('client_editor'); if (ed) ed.innerHTML = '';
+    // 内联添加(编辑入站弹窗内)：清空编辑器并刷新弹窗；独立页弹窗添加：关闭弹窗刷新页面
+    const ed = document.getElementById('client_editor');
+    if (ed) {
+      ed.innerHTML = '';
       const nodeId = inboundNodeId(inboundId);
       await showEditInbound(inboundId, nodeId);
     } else {
@@ -1013,9 +1020,11 @@ async function delClient(id, inboundId) {
     if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId };
     renderSidebar();
     const nodeId = inboundNodeId(inboundId);
-    if (modalOpen()) { await showEditInbound(inboundId, nodeId); } // 编辑窗保留并刷新
-    else if (nodeId) renderNodeDetail(nodeId);
-    else renderInboundDetail(inboundId);
+    // 编辑入站弹窗内删除：编辑窗保留并刷新；独立页：关闭弹窗刷新页面
+    const ed = document.getElementById('client_editor');
+    if (ed) { await showEditInbound(inboundId, nodeId); }
+    else if (nodeId) { closeModal(); renderNodeDetail(nodeId); }
+    else { closeModal(); renderInboundDetail(inboundId); }
   }
 }
 
@@ -1057,7 +1066,13 @@ async function saveClientModal(id, inboundId) {
   if (d) {
     const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
     if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: cur ? cur.enabled : true };
-    showToast('客户端已保存', 'ok'); const nodeId = inboundNodeId(inboundId); if (autoSync && nodeId) await syncNode(nodeId); renderSidebar(); await showEditInbound(inboundId, nodeId);
+    refreshMainAfterClose = true;
+    showToast('客户端已保存', 'ok'); const nodeId = inboundNodeId(inboundId); if (autoSync && nodeId) await syncNode(nodeId); renderSidebar();
+    // 编辑入站弹窗内内联编辑：刷新编辑窗；独立弹窗编辑：关闭弹窗刷新页面
+    const ed = document.getElementById('client_editor');
+    if (ed) { await showEditInbound(inboundId, nodeId); }
+    else if (nodeId) { closeModal(); renderNodeDetail(nodeId); }
+    else { closeModal(); renderInboundDetail(inboundId); }
   }
 }
 
@@ -1257,7 +1272,7 @@ async function renderCertDetail() {
   setLoading('加载证书中…');
   const id = sel.id;
   const c = certsData.find(x => x.id === id);
-  if (!c) { renderSidebar(); renderMain(); return; }
+  if (!c) { sel = { type: null }; renderSidebar(); renderMain(); return; } // 证书已删除则回列表,避免死循环
   const d = await api('GET', '/certs/' + id);
   const cert = (d && d.domain) ? d : c;
   const days = cert.expires_at ? Math.ceil((new Date(cert.expires_at).getTime() - Date.now()) / 86400000) : '-';
@@ -1447,6 +1462,7 @@ async function doCreateNode() {
     // 创建成功后弹窗展示接入方式（复制命令）
     const inst = await api('GET', '/nodes/' + d.id + '/install');
     const cmd = (inst && inst.command) || '';
+    installCmdCache = cmd; // 同步缓存，避免复制到上一个节点的命令
     setModal('<h2>接入方式</h2>' +
       '<p class="muted">在节点服务器上执行以下命令即可完成接入：</p>' +
       '<textarea id="installCmd" readonly rows="4" style="width:100%;font-family:monospace;font-size:12px;box-sizing:border-box;word-break:break-all">' + esc(cmd) + '</textarea>' +
@@ -1456,6 +1472,7 @@ async function doCreateNode() {
 }
 async function showCreateSub() {
   if (!inboundCatalog.length) await loadAllInbounds();
+  subFiltersBase = ''; // 新建订阅不继承上一个订阅的 filters
   setModal('<h2>新建订阅</h2>' +
     '<label>名称</label><input id="m_s_name" placeholder="如 我的订阅">' +
     '<div class="row">' +
