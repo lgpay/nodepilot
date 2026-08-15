@@ -76,9 +76,9 @@
   .btnrow button { margin-top: 0; }
   .chk { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 400; }
   .chk input { width: auto; margin: 0; accent-color: var(--primary); }
-  .inblist { max-height: 220px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 5px; }
-  .subgrp { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 8px; }
-  .subgrp:first-child { margin-top: 0; }
+  .inblist { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--bg); display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 16px; align-items: start; }
+  .inblist .subgrp { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); margin: 8px 0 0; }
+  .inblist .subgrp:first-child { margin-top: 0; }
   .qr { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   .qr img { border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; padding: 6px; }
   .row { display: flex; gap: 14px; }
