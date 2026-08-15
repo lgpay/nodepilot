@@ -498,6 +498,14 @@ async function ensureClients(id) {
     renderSidebar();
   }
 }
+// 由入站 id 反查所属节点 id（弹窗内操作时 sel 可能是节点类型）
+function inboundNodeId(inboundId) {
+  for (const nid in inboundsCache) {
+    const arr = inboundsCache[nid] || [];
+    if (arr.some(x => x.id === inboundId)) return Number(nid);
+  }
+  return sel.type === 'inbound' ? sel.parentId : null;
+}
 function selectClient(id, inboundId) { sel = { type: 'client', id, parentId: inboundId }; renderSidebar(); renderMain(); }
 function selectSub(id) { sel = { type: 'sub', id, parentId: null }; renderSidebar(); renderMain(); }
 function selectCert(id) { sel = { type: 'cert', id, parentId: null }; renderSidebar(); renderMain(); }
@@ -686,8 +694,8 @@ async function renderNodeDetail(id) {
     '<button onclick="copyInstall()">复制命令</button>' +
     '<button class="danger" onclick="delNode(' + n.id + ')">删除节点</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>启用</th><th>状态</th><th>修复间隔</th><th>修复次数</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td>' + (inb.auto_heal_interval > 0 ? inb.auto_heal_interval + ' 分' : '不修复') + '</td><td>' + (inb.heal_count || 0) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删除</button></td></tr>').join('') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>启用</th><th>状态</th><th>客户端</th><th>修复间隔</th><th>修复次数</th><th></th></tr></thead><tbody>' +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td>' + (clientsCache[inb.id] ? clientsCache[inb.id].length : '—') + '</td><td>' + (inb.auto_heal_interval > 0 ? inb.auto_heal_interval + ' 分' : '不修复') + '</td><td>' + (inb.heal_count || 0) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删除</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
     '<div class="card"><h2>下发记录</h2>' +
@@ -940,14 +948,17 @@ async function saveInbound(id) {
   }
 }
 async function createClient(inboundId) {
-  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('m_c_alias'), traffic_limit_bytes: +(val('m_c_traffic') || 0), expire_time: fromDTLocal(val('m_c_expire')) });
+  const unitEl = document.getElementById('m_c_traffic_unit');
+  const mul = unitEl ? trafficUnitMul(unitEl.value) : 1073741824; // 默认 GB
+  const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('m_c_alias'), traffic_limit_bytes: Math.round(+(val('m_c_traffic') || 0) * mul), expire_time: fromDTLocal(val('m_c_expire')) });
   if (d) {
     clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || [];
     showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar();
     // 内联添加(编辑入站弹窗内)：清空编辑器并刷新弹窗；弹窗添加(独立页)：关闭弹窗刷新页面
     if (modalOpen()) {
       const ed = document.getElementById('client_editor'); if (ed) ed.innerHTML = '';
-      const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId);
+      const nodeId = inboundNodeId(inboundId);
+      await showEditInbound(inboundId, nodeId);
     } else {
       closeModal(); renderInboundDetail(inboundId);
     }
@@ -958,7 +969,7 @@ function showCreateClient(inboundId) {
   setModal('<h2>添加客户端</h2>' +
     '<label>别名</label><input id="m_c_alias" placeholder="如 hk01-iphone">' +
     '<div class="row">' +
-    '<div><label>流量上限（0=不限）</label><input id="m_c_traffic" value="0" type="number" min="0"></div>' +
+    '<div><label>流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="m_c_traffic" value="0" type="number" min="0" style="flex:1;min-width:0"><select id="m_c_traffic_unit" style="width:auto;flex:0 0 auto;padding:9px 8px"><option value="mb">MB</option><option value="gb" selected>GB</option><option value="tb">TB</option></select></div></div>' +
     '<div><label>到期时间</label><input id="m_c_expire" type="datetime-local"></div></div>' +
     '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + inboundId + '))">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
   const el = document.getElementById('m_c_alias'); if (el) el.focus();
@@ -966,7 +977,7 @@ function showCreateClient(inboundId) {
 async function delClient(id, inboundId) {
   if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
   const d = await api('DELETE', '/clients/' + id);
-  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); if (modalOpen()) { const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId); }
+  if (d) { clientsCache[inboundId] = clientsCache[inboundId].filter(x => x.id !== id); if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId }; renderSidebar(); if (modalOpen()) { const nodeId = inboundNodeId(inboundId); await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId); }
 }
 
 // 编辑入站弹窗内：内联添加/编辑客户端（避免弹窗套弹窗）
@@ -976,7 +987,7 @@ function inlineAddClient(inboundId) {
     '<h4>添加客户端</h4>' +
     '<div class="row">' +
     '<div><label>别名</label><input id="m_c_alias" placeholder="如 hk01-iphone"></div>' +
-    '<div><label>流量上限（0=不限）</label><input id="m_c_traffic" value="0" type="number" min="0"></div>' +
+    '<div><label>流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="m_c_traffic" value="0" type="number" min="0" style="flex:1;min-width:0"><select id="m_c_traffic_unit" style="width:auto;flex:0 0 auto;padding:9px 8px"><option value="mb">MB</option><option value="gb" selected>GB</option><option value="tb">TB</option></select></div></div>' +
     '<div><label>到期时间</label><input id="m_c_expire" type="datetime-local"></div></div>' +
     '<div class="btnrow"><button onclick="withBusy(this, () => createClient(' + inboundId + '))">添加</button><button class="secondary" onclick="document.getElementById(\'client_editor\').innerHTML=\'\'">取消</button></div>';
   const el = document.getElementById('m_c_alias'); if (el) el.focus();
@@ -985,12 +996,14 @@ function inlineEditClient(id, inboundId) {
   const ed = document.getElementById('client_editor'); if (!ed) return;
   const c = (clientsCache[inboundId] || []).find(x => x.id === id);
   if (!c) return;
+  const tp = trafficParts(c.traffic_limit_bytes || 0);
+  const unitOpts = [['mb', 'MB'], ['gb', 'GB'], ['tb', 'TB']].map(x => '<option value="' + x[0] + '"' + (x[0] === tp.unit ? ' selected' : '') + '>' + x[1] + '</option>').join('');
   ed.innerHTML =
     '<h4>编辑客户端</h4>' +
     '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
     '<div class="row">' +
     '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
-    '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
+    '<div><label>流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="c_traffic2" value="' + (tp.v || 0) + '" type="number" min="0" style="flex:1;min-width:0"><select id="c_traffic_unit2" style="width:auto;flex:0 0 auto;padding:9px 8px">' + unitOpts + '</select></div></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveClientModal(' + id + ',' + inboundId + '))">保存</button>' +
@@ -999,11 +1012,13 @@ function inlineEditClient(id, inboundId) {
 // 客户端是否在弹窗/页面内：内联保存后刷新编辑入站弹窗
 async function saveClientModal(id, inboundId) {
   const cur = (clientsCache[inboundId] || []).find(x => x.id === id);
-  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: cur ? cur.enabled : true, expire_time: fromDTLocal(val('c_expire2')) });
+  const unitEl = document.getElementById('c_traffic_unit2');
+  const mul = unitEl ? trafficUnitMul(unitEl.value) : 1073741824;
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: Math.round(+(val('c_traffic2') || 0) * mul), enabled: cur ? cur.enabled : true, expire_time: fromDTLocal(val('c_expire2')) });
   if (d) {
     const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
     if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: cur ? cur.enabled : true };
-    showToast('客户端已保存', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId);
+    showToast('客户端已保存', 'ok'); const nodeId = inboundNodeId(inboundId); if (autoSync && nodeId) await syncNode(nodeId); renderSidebar(); await showEditInbound(inboundId, nodeId);
   }
 }
 
@@ -1013,11 +1028,13 @@ async function showEditClient(id, inboundId) {
   await ensureClients(inboundId);
   const c = (clientsCache[inboundId] || []).find(x => x.id === id);
   if (!c) return;
+  const tp = trafficParts(c.traffic_limit_bytes || 0);
+  const unitOpts = [['mb', 'MB'], ['gb', 'GB'], ['tb', 'TB']].map(x => '<option value="' + x[0] + '"' + (x[0] === tp.unit ? ' selected' : '') + '>' + x[1] + '</option>').join('');
   setModal('<h2>编辑客户端</h2>' +
     '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
     '<div class="row">' +
     '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
-    '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
+    '<div><label>流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="c_traffic2" value="' + (tp.v || 0) + '" type="number" min="0" style="flex:1;min-width:0"><select id="c_traffic_unit2" style="width:auto;flex:0 0 auto;padding:9px 8px">' + unitOpts + '</select></div></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveClientModal(' + id + ',' + inboundId + '))">保存</button>' +
@@ -1033,7 +1050,7 @@ async function toggleClient(id, inboundId) {
   if (d) {
     const arr = clientsCache[inboundId] || []; const i = arr.findIndex(x => x.id === id);
     if (i >= 0) arr[i] = { ...arr[i], enabled: next };
-    showToast(next ? '客户端已启用' : '客户端已停用', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar(); if (modalOpen()) { const nodeId = sel.parentId; await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId);
+    showToast(next ? '客户端已启用' : '客户端已停用', 'ok'); const nodeId = inboundNodeId(inboundId); if (autoSync && nodeId) await syncNode(nodeId); renderSidebar(); if (modalOpen()) { await showEditInbound(inboundId, nodeId); } else renderInboundDetail(inboundId);
   }
 }
 async function renderClientDetail(id) {
@@ -1041,13 +1058,15 @@ async function renderClientDetail(id) {
   const inbId = sel.parentId;
   const c = (clientsCache[inbId] || []).find(x => x.id === id);
   if (!c) { renderInboundDetail(inbId); return; }
+  const tp = trafficParts(c.traffic_limit_bytes || 0);
+  const unitOpts = [['mb', 'MB'], ['gb', 'GB'], ['tb', 'TB']].map(x => '<option value="' + x[0] + '"' + (x[0] === tp.unit ? ' selected' : '') + '>' + x[1] + '</option>').join('');
   document.getElementById('main').innerHTML =
     '<div class="crumb">客户端 / <b>' + esc(c.alias || c.uuid) + '</b></div>' +
     '<div class="card">' +
     '<label>UUID</label><input value="' + esc(c.uuid) + '" disabled>' +
     '<div class="row">' +
     '<div><label>别名</label><input id="c_alias2" value="' + esc(c.alias || '') + '"></div>' +
-    '<div><label>流量上限（0=不限）</label><input id="c_traffic2" value="' + (c.traffic_limit_bytes > 0 ? c.traffic_limit_bytes : 0) + '" type="number" min="0"></div>' +
+    '<div><label>流量上限（0=不限）</label><div style="display:flex;gap:8px;align-items:center"><input id="c_traffic2" value="' + (tp.v || 0) + '" type="number" min="0" style="flex:1;min-width:0"><select id="c_traffic_unit2" style="width:auto;flex:0 0 auto;padding:9px 8px">' + unitOpts + '</select></div></div>' +
     '<div><label>到期时间</label><input id="c_expire2" type="datetime-local" value="' + toDTLocal(c.expire_time) + '"></div></div>' +
     '<div class="row">' +
     '<div><label>启用</label><input id="c_enabled2" type="checkbox" ' + (c.enabled ? 'checked' : '') + '></div>' +
@@ -1058,7 +1077,9 @@ async function renderClientDetail(id) {
 }
 async function saveClient(id) {
   const inbId = sel.parentId;
-  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
+  const unitEl = document.getElementById('c_traffic_unit2');
+  const mul = unitEl ? trafficUnitMul(unitEl.value) : 1073741824;
+  const d = await api('PUT', '/clients/' + id, { alias: val('c_alias2'), traffic_limit_bytes: Math.round(+(val('c_traffic2') || 0) * mul), enabled: chk('c_enabled2'), expire_time: fromDTLocal(val('c_expire2')) });
   if (d) {
     const arr = clientsCache[inbId] || []; const i = arr.findIndex(x => x.id === id);
     if (i >= 0) arr[i] = { ...arr[i], alias: val('c_alias2'), traffic_limit_bytes: +(val('c_traffic2') || 0), enabled: chk('c_enabled2') };
@@ -1137,7 +1158,7 @@ function subInboundChecklist(selected) {
       h += '<div class="subinb">' +
         '<label class="chk"><input type="checkbox" name="sub_inb" value="' + inb.id + '" ' + chk + ' onchange="toggleInbClients(this,' + inb.id + ')"> <b>' + esc(nodeName) + '</b> · ' + esc(inboundLabel(inb)) + ' <span class="badge">' + esc(inb.protocol || '?') + '</span>' + (inb.tls_enabled ? ' 🔒' : '') + '</label>' +
         (cls.length ? '<div class="subcli">' + cls.map(c =>
-          '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" data-inb="' + inb.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + '> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
+          '<label class="chk"><input type="checkbox" name="sub_cli" value="' + c.id + '" data-inb="' + inb.id + '" ' + (subClientSelected(inb.id, c.id) ? 'checked' : '') + ' onchange="toggleSubInbByClients(' + inb.id + ')"> ' + esc(c.alias || c.uuid.slice(0, 8)) + '</label>'
         ).join('') + '</div>' : '') +
         '</div>';
     });
@@ -1147,6 +1168,13 @@ function subInboundChecklist(selected) {
 // 勾选/取消入站时联动其全部客户端（勾选入站=全选客户端；取消=全不选）
 function toggleInbClients(inbChk, inbId) {
   document.querySelectorAll('input[name=sub_cli][data-inb="' + inbId + '"]').forEach(cb => { cb.checked = inbChk.checked; });
+}
+// 客户端勾选变化时反向联动入站：该入站客户端全不选 → 入站取消；有任一选中 → 入站勾选
+function toggleSubInbByClients(inbId) {
+  const cliCbs = Array.from(document.querySelectorAll('input[name=sub_cli][data-inb="' + inbId + '"]'));
+  const inbCb = document.querySelector('input[name=sub_inb][value="' + inbId + '"]');
+  if (!inbCb) return;
+  inbCb.checked = cliCbs.some(cb => cb.checked);
 }
 // 客户端是否在订阅筛选中被选中（精确到客户端；未配置 client_ids 视为该入站全部选中）
 function subClientSelected(inbId, cliId) {
