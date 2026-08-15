@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"nodepilot/internal/model"
 )

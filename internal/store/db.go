@@ -10,7 +10,7 @@ import (
 	"nodepilot/internal/model"
 	"nodepilot/internal/secret"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -22,7 +22,8 @@ var DB *gorm.DB
 func Init(dbPath string) error {
 	// WAL 模式提升并发读写能力；busy_timeout 避免写锁等待立即报错；
 	// foreign_keys=on 使外键约束（如级联删除）生效。
-	dsn := dbPath + "?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on"
+	// 使用纯 Go 驱动(glebarez/modernc),DSN 参数用 _pragma 格式;CGO_ENABLED=0 静态编译,无 GLIBC 依赖。
+	dsn := dbPath + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return err

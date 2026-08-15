@@ -81,17 +81,17 @@ get_server_binary() {
     green "管理端二进制已下载并解压到 $INSTALL_DIR"
     return
   fi
-  # 3) 回退：本地 go build（server 依赖 CGO/sqlite，需要 gcc）
+  # 3) 回退：本地 go build（纯 Go 实现，无 CGO/GLIBC 依赖，仅需 Go 工具链）
   red "下载失败，尝试本地 go build 回退..."
-  if command_exists go && command_exists gcc; then
+  if command_exists go; then
     green "使用 go build 生成 server"
-    (cd "$(dirname "$0")/.." && go build -o "$INSTALL_DIR/bin/$BINARY_NAME" ./cmd/server) || {
+    (cd "$(dirname "$0")/.." && CGO_ENABLED=0 go build -o "$INSTALL_DIR/bin/$BINARY_NAME" ./cmd/server) || {
       red "go build 失败"; exit 1
     }
     cp -r ./web/* "$WEB_DIR/" 2>/dev/null || true
     green "管理端已通过 go build 生成"
   else
-    red "下载失败且未安装 Go/gcc，无法继续。请设置 NP_BINARY_URL 指向可用的 server 二进制包。"; exit 1
+    red "下载失败且未安装 Go，无法继续。请设置 NP_BINARY_URL 指向可用的 server 二进制包。"; exit 1
   fi
   chmod +x "$INSTALL_DIR/bin/$BINARY_NAME"
 }
