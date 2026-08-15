@@ -278,6 +278,7 @@ let autoSync = localStorage.getItem('np_autosync') === '1';
 let dark = localStorage.getItem('np_dark') === '1';
 let refreshTimer = null;
 let confirmRes = null;
+let refreshMainAfterClose = false; // 关闭弹窗后需刷新当前视图(客户端增删后)
 let statsData = null;
 
 // ---- 主题 ----
@@ -362,7 +363,15 @@ function setModal(html, cls) {
 }
 function hideModal() { document.getElementById('modal').classList.add('hidden'); }
 function modalOpen() { return !document.getElementById('modal').classList.contains('hidden'); }
-function closeModal() { hideModal(); }
+function closeModal() {
+  hideModal();
+  if (refreshMainAfterClose) {
+    refreshMainAfterClose = false;
+    // 关闭弹窗后刷新当前视图，入站表'客户端'数量即时更新
+    if (sel.type === 'node') renderNodeDetail(sel.id);
+    else renderMain();
+  }
+}
 
 // ---- 认证 ----
 let MUST_CHANGE_PWD = false;
@@ -833,7 +842,7 @@ async function toggleInbound(id, nodeId) {
   }
 }
 async function delInbound(id, nodeId) {
-  if (!await confirmModal('确认删除入站 #' + id + '？')) return;
+  if (!await confirmModal('确认删除该入站？')) return;
   const d = await api('DELETE', '/inbounds/' + id);
   if (d) { delete clientsCache[id]; inboundsCache[nodeId] = inboundsCache[nodeId].filter(x => x.id !== id); if (sel.type === 'inbound' && sel.id === id) sel = { type: 'node', id: nodeId }; renderSidebar(); renderNodeDetail(nodeId); }
 }
@@ -973,6 +982,7 @@ async function createClient(inboundId) {
   const d = await api('POST', '/inbounds/' + inboundId + '/clients', { alias: val('m_c_alias'), traffic_limit_bytes: Math.round(+(val('m_c_traffic') || 0) * mul), expire_time: fromDTLocal(val('m_c_expire')) });
   if (d) {
     clientsCache[inboundId] = await api('GET', '/inbounds/' + inboundId + '/clients') || [];
+    refreshMainAfterClose = true; // 关闭弹窗后刷新节点详情(客户端数量即时更新)
     showToast('客户端已创建', 'ok'); if (autoSync && sel.parentId) await syncNode(sel.parentId); renderSidebar();
     // 内联添加(编辑入站弹窗内)：清空编辑器并刷新弹窗；弹窗添加(独立页)：关闭弹窗刷新页面
     if (modalOpen()) {
@@ -995,10 +1005,11 @@ function showCreateClient(inboundId) {
   const el = document.getElementById('m_c_alias'); if (el) el.focus();
 }
 async function delClient(id, inboundId) {
-  if (!await confirmModal('确认删除客户端 #' + id + '？')) return;
+  if (!await confirmModal('确认删除该客户端？')) return;
   const d = await api('DELETE', '/clients/' + id);
   if (d) {
     clientsCache[inboundId] = (clientsCache[inboundId] || []).filter(x => x.id !== id);
+    refreshMainAfterClose = true; // 关闭弹窗后刷新节点详情(客户端数量即时更新)
     if (sel.type === 'client' && sel.id === id) sel = { type: 'inbound', id: inboundId };
     renderSidebar();
     const nodeId = inboundNodeId(inboundId);
@@ -1273,7 +1284,7 @@ async function renderCertDetail() {
 async function renewCert(id) { const d = await api('POST', '/certs/' + id + '/renew'); if (d && d.ok) { showToast('续签成功', 'ok'); await loadCerts(); renderCertDetail(); } }
 async function distributeCert(id) { const d = await api('POST', '/certs/' + id + '/distribute'); if (d) showToast('已分发到所有节点', 'ok'); }
 async function delCert(id) {
-  if (!await confirmModal('确认删除证书 #' + id + '？已下发的证书文件不会被回收')) return;
+  if (!await confirmModal('确认删除该证书？已下发的证书文件不会被回收')) return;
   const d = await api('DELETE', '/certs/' + id);
   if (d) { certsData = certsData.filter(x => x.id !== id); if (sel.type === 'cert' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
@@ -1375,7 +1386,7 @@ async function testNotifier(id) {
   if (d && d.ok) showToast('测试消息已发送', 'ok');
 }
 async function delNotifier(id) {
-  if (!await confirmModal('确认删除通知渠道 #' + id + '？')) return;
+  if (!await confirmModal('确认删除该通知渠道？')) return;
   const d = await api('DELETE', '/notifiers/' + id);
   if (d) { notifData = notifData.filter(x => x.id !== id); if (sel.type === 'notifier' && sel.id === id) sel = { type: null }; renderSidebar(); renderMain(); }
 }
