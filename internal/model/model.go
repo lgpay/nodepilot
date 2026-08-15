@@ -56,6 +56,9 @@ type Inbound struct {
 	PortAutoFixed    bool   `gorm:"default:false" json:"port_auto_fixed"` // 当前端口是否由自愈换过（诊断标记）
 	AutoHeal         bool   `gorm:"default:true" json:"auto_heal"`        // 端口不通时是否允许自动换端口（已由间隔控制，此字段保留兼容）
 	AutoHealInterval int    `gorm:"default:10" json:"auto_heal_interval"` // 自动修复最小间隔(分钟)，0=不自动修复
+
+	// Connectivity 入站端口连通状态(ok/fail/空=未知)，由控制面探测维护，不入库
+	Connectivity string `gorm:"-" json:"connectivity"`
 }
 
 // Client 代理用户（vmess 等客户端账号）

@@ -31,6 +31,7 @@ type probeState struct {
 	healAttempts map[uint]int
 	lastHeal     map[uint]time.Time
 	wasOffline   map[uint]bool
+	connState    map[uint]string // 入站ID → ok|fail（最近一次端口连通探测结果）
 }
 
 var ps = &probeState{
@@ -38,6 +39,7 @@ var ps = &probeState{
 	healAttempts: map[uint]int{},
 	lastHeal:     map[uint]time.Time{},
 	wasOffline:   map[uint]bool{},
+	connState:    map[uint]string{},
 }
 
 func (s *probeState) incFail(id uint) {
@@ -56,6 +58,21 @@ func (s *probeState) getFail(id uint) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.failCounts[id]
+}
+
+func (s *probeState) setConn(id uint, state string) {
+	s.mu.Lock()
+	s.connState[id] = state
+	s.mu.Unlock()
+}
+
+func (s *probeState) getConn(id uint) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if v, ok := s.connState[id]; ok {
+		return v
+	}
+	return ""
 }
 
 func (s *probeState) getHeal(id uint) int {
@@ -169,6 +186,7 @@ func probeNode(node model.Node) {
 		addr := net.JoinHostPort(host, strconv.Itoa(in.Port))
 		conn, err := net.DialTimeout("tcp", addr, dialTimeout)
 		if err != nil {
+			ps.setConn(in.ID, "fail")
 			ps.incFail(in.ID)
 			allOK = false
 			log.Printf("[probe] node=%d inbound=%d port=%d unreachable (fails=%d)", node.ID, in.ID, in.Port, ps.getFail(in.ID))
@@ -180,6 +198,7 @@ func probeNode(node model.Node) {
 			}
 		} else {
 			conn.Close()
+			ps.setConn(in.ID, "ok")
 			ps.resetFail(in.ID)
 		}
 	}
@@ -240,6 +259,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 		"port":            newPort,
 		"port_auto_fixed": true,
 	})
+	ps.setConn(in.ID, "fail") // 新端口待下一轮探测确认
 	log.Printf("[probe] node=%d inbound=%d self-heal: port %d -> %d", node.ID, in.ID, oldPort, newPort)
 
 	notifyHealed(node, in, oldPort, newPort)

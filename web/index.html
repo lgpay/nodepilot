@@ -688,8 +688,8 @@ async function renderNodeDetail(id) {
     '<textarea id="installCmd" readonly rows="3" style="width:100%;font-family:monospace;font-size:12px">' + esc(cmd) + '</textarea>' +
     '<div class="btnrow"><button onclick="copyInstall()">复制命令</button></div></div>' +
     '<div class="card"><h2>入站（' + ins.length + '）</h2>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>状态</th><th></th></tr></thead><tbody>' +
-    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td>' + (inb.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>协议</th><th>端口</th><th>传输</th><th>TLS</th><th>自动修复</th><th>启用</th><th>连通</th><th></th></tr></thead><tbody>' +
+    ins.map(inb => '<tr><td>' + inb.id + '</td><td>' + esc(inb.protocol) + '</td><td>' + inb.port + '</td><td>' + esc(inb.transport || 'tcp') + '</td><td>' + (inb.tls_enabled ? '🔒' : '') + '</td><td>' + (inb.port_auto_fixed ? '已换端口' : '—') + '</td><td><input type="checkbox" ' + (inb.enabled ? 'checked' : '') + ' onchange="toggleInbound(' + inb.id + ',' + n.id + ')"></td><td>' + (inb.connectivity === 'ok' ? '<span class="pill ok">连通</span>' : (inb.connectivity === 'fail' ? '<span class="pill off">不通</span>' : '<span class="pill warn">未知</span>')) + '</td><td><button class="secondary small" onclick="showEditInbound(' + inb.id + ',' + n.id + ')">编辑</button> <button class="danger small" onclick="delInbound(' + inb.id + ',' + n.id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateInbound(' + n.id + ')">添加入站</button></div></div>' +
     '<div class="card"><h2>下发记录</h2>' +
@@ -791,6 +791,18 @@ function showCreateInbound(nodeId) {
     '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + nodeId + '))">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
   const el = document.getElementById('m_i_name'); if (el) el.focus();
 }
+// 切换入站启用状态（入站列表启用勾选框）
+async function toggleInbound(id, nodeId) {
+  const cur = (inboundsCache[nodeId] || []).find(x => x.id === id);
+  if (!cur) return;
+  const next = !cur.enabled;
+  const d = await api('PUT', '/inbounds/' + id, { enabled: next });
+  if (d) {
+    const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], enabled: next };
+    showToast(next ? '入站已启用' : '入站已停用', 'ok'); if (autoSync) await syncNode(nodeId); renderSidebar(); renderNodeDetail(nodeId);
+  }
+}
 async function delInbound(id, nodeId) {
   if (!await confirmModal('确认删除入站 #' + id + '？')) return;
   const d = await api('DELETE', '/inbounds/' + id);
@@ -859,8 +871,8 @@ async function showEditInbound(id, nodeId) {
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发配置</button>' +
     '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div>' +
     '<h3>客户端（' + cls.length + '）</h3>' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody>' +
-    (cls.length ? cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><button class="secondary small" onclick="toggleClient(' + c.id + ',' + id + ')">' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</button></td><td><button class="secondary small" onclick="inlineEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">（暂无客户端）</td></tr>') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody>' +
+    (cls.length ? cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleClient(' + c.id + ',' + id + ')"></td><td><button class="secondary small" onclick="inlineEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">（暂无客户端）</td></tr>') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="inlineAddClient(' + id + ')">添加客户端</button></div>' +
     '<div id="client_editor"></div>',
@@ -910,8 +922,8 @@ async function renderInboundDetail(id) {
     '<button class="danger" onclick="delInbound(' + id + ',' + nodeId + ')">删除入站</button></div></div>' +
     '<div class="card"><h2>客户端（' + cls.length + '）</h2>' +
     '<input class="search" placeholder="搜索客户端…" oninput="filterRows(\'inb_clients_tb\', this.value)">' +
-    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>状态</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
-    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><button class="secondary small" onclick="toggleClient(' + c.id + ',' + id + ')">' + (c.enabled ? '<span class="pill ok">启用</span>' : '<span class="pill off">停用</span>') + '</button></td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
+    '<div class="tblwrap"><table class="tbl"><thead><tr><th>ID</th><th>UUID</th><th>别名</th><th>启用</th><th></th></tr></thead><tbody id="inb_clients_tb">' +
+    cls.map(c => '<tr><td>' + c.id + '</td><td class="link">' + esc(c.uuid) + '</td><td>' + esc(c.alias || '') + '</td><td><input type="checkbox" ' + (c.enabled ? 'checked' : '') + ' onchange="toggleClient(' + c.id + ',' + id + ')"></td><td><button class="secondary small" onclick="showEditClient(' + c.id + ',' + id + ')">编辑</button> <button class="danger small" onclick="delClient(' + c.id + ',' + id + ')">删</button></td></tr>').join('') +
     '</tbody></table></div>' +
     '<div class="btnrow"><button onclick="showCreateClient(' + id + ')">添加客户端</button></div></div>';
 }

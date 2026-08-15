@@ -38,6 +38,10 @@ func ListInbounds(c *gin.Context) {
 	id := c.Param("id")
 	var inbounds []model.Inbound
 	store.DB.Where("node_id = ?", id).Find(&inbounds)
+	// 填充每个入站端口的连通状态（探测结果，控制面内存态）
+	for i := range inbounds {
+		inbounds[i].Connectivity = ps.getConn(inbounds[i].ID)
+	}
 	c.JSON(200, inbounds)
 }
 
