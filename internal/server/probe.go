@@ -21,6 +21,7 @@ const (
 	failThreshold       = 3 // 连续失败几次触发自愈
 	maxSelfHealAttempts = 5 // 最多换端口次数
 	offlineThreshold    = 3 * time.Minute
+	hbFailThreshold     = 3 // 连续几次心跳未到达即判节点离线（不再用时间阈值）
 )
 
 // probeState 探测调度器的内存态（连续失败次数 / 自愈次数 / 上次自愈时间 / 是否曾离线）。
@@ -33,6 +34,8 @@ type probeState struct {
 	wasOffline   map[uint]bool
 	connState    map[uint]string // 入站ID → ok|fail（最近一次端口连通探测结果）
 	lastProbe    map[uint]time.Time // 入站ID → 最近一次探测时间（探测按自动修复间隔调度）
+	hbFailCounts map[uint]int      // 节点ID → 连续未收到心跳次数
+	hbLastSeen   map[uint]time.Time // 节点ID → 已计账(已确认收到)的最近心跳时间
 }
 
 var ps = &probeState{
@@ -42,6 +45,8 @@ var ps = &probeState{
 	wasOffline:   map[uint]bool{},
 	connState:    map[uint]string{},
 	lastProbe:    map[uint]time.Time{},
+	hbFailCounts: map[uint]int{},
+	hbLastSeen:   map[uint]time.Time{},
 }
 
 func (s *probeState) incFail(id uint) {
@@ -127,6 +132,36 @@ func (s *probeState) wasOfflineNow(id uint) bool {
 	return s.wasOffline[id]
 }
 
+func (s *probeState) incHbFail(id uint) {
+	s.mu.Lock()
+	s.hbFailCounts[id]++
+	s.mu.Unlock()
+}
+
+func (s *probeState) resetHbFail(id uint) {
+	s.mu.Lock()
+	s.hbFailCounts[id] = 0
+	s.mu.Unlock()
+}
+
+func (s *probeState) getHbFail(id uint) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.hbFailCounts[id]
+}
+
+func (s *probeState) getHbLastSeen(id uint) time.Time {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.hbLastSeen[id]
+}
+
+func (s *probeState) setHbLastSeen(id uint, t time.Time) {
+	s.mu.Lock()
+	s.hbLastSeen[id] = t
+	s.mu.Unlock()
+}
+
 // StartProbeScheduler 启动节点连通性探测与自愈调度器
 func StartProbeScheduler() {
 	go func() {
@@ -175,20 +210,39 @@ func probeNode(node model.Node) {
 		}
 		return
 	}
-	// 整体失联（心跳超时）：直接下线，不改端口
-	// 离线阈值跟随节点心跳间隔：至少 2 次心跳未到才判离线（避免心跳间隔 > 固定阈值导致误判）
-	offlineFor := offlineThreshold
-	if node.HeartbeatInterval > 0 {
-		if t := time.Duration(node.HeartbeatInterval) * time.Second * 2; t > offlineFor {
-			offlineFor = t
+	// 整体失联（心跳连续未到达）：直接下线，不改端口。
+	// 不再用时间阈值：期望每 heartbeat_interval 收到一次心跳，连续 hbFailThreshold(3) 次
+	// 心跳未到达即判离线。hbLastSeen 记录「已确认收到/已计账」的最近心跳时间，用于逐拍
+	// 计数，避免每个探测周期重复 +1。
+	seen := ps.getHbLastSeen(node.ID)
+	if seen.IsZero() {
+		seen = node.LastHeartbeat
+		ps.setHbLastSeen(node.ID, seen)
+	}
+	if node.LastHeartbeat.After(seen) {
+		// 收到了新心跳：重置失败计数，并把基准推进到最新心跳时间
+		ps.setHbLastSeen(node.ID, node.LastHeartbeat)
+		ps.resetHbFail(node.ID)
+	} else if node.HeartbeatInterval > 0 {
+		// 没有新心跳：若距上次已计账心跳已超过一个周期，记一次「心跳未到达」，并推进基准
+		if time.Since(seen) > time.Duration(node.HeartbeatInterval)*time.Second {
+			ps.setHbLastSeen(node.ID, seen.Add(time.Duration(node.HeartbeatInterval)*time.Second))
+			ps.incHbFail(node.ID)
+		}
+	} else {
+		// 未知心跳间隔（极少数情况）：回退固定 3 分钟时间阈值，避免误判
+		if time.Since(node.LastHeartbeat) > offlineThreshold {
+			ps.incHbFail(node.ID)
+		} else {
+			ps.resetHbFail(node.ID)
 		}
 	}
-	if time.Since(node.LastHeartbeat) > offlineFor {
+	if ps.getHbFail(node.ID) >= hbFailThreshold {
 		store.DB.Model(&model.Node{}).Where("id = ?", node.ID).Updates(map[string]interface{}{
 			"status":       "offline",
 			"connectivity": "offline",
 		})
-		log.Printf("[probe] node=%d heartbeat timeout, marked offline", node.ID)
+		log.Printf("[probe] node=%d heartbeat missed %d times, marked offline", node.ID, ps.getHbFail(node.ID))
 		// 仅当节点状态由在线切换为离线时发一次离线通知；持续离线期间不再重复推送。
 		// 判据结合内存态与 DB 状态：控制面重启后内存态丢失，但 DB 中 status 仍为 offline，
 		// 此时不重复通知；恢复在线后再离线会重新触发（与 node_recovered 的通知机制对称）。
@@ -263,6 +317,13 @@ func probeNode(node model.Node) {
 		if ps.wasOfflineNow(node.ID) && prev != "ok" {
 			ps.setOffline(node.ID, false)
 			notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点「%s」代理端口已恢复可达", node.Name))
+			// 离线期间可能改过配置：恢复时自动把当前配置重推一次（与心跳恢复路径互补，
+			// 此处覆盖「端口/自愈恢复」而心跳路径覆盖「心跳恢复」，二者互斥不重复推送）。
+			go func(n model.Node) {
+				if _, err := syncNode(n); err != nil {
+					log.Printf("[probe] auto-sync on recovery node=%d failed: %v", n.ID, err)
+				}
+			}(node)
 		}
 	}
 }
@@ -280,7 +341,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 		alreadyOffline := ps.wasOfflineNow(node.ID) || node.Status == "offline"
 		ps.setOffline(node.ID, true)
 		if !alreadyOffline {
-			notifyOffline(node)
+			notifyHealFailed(node, att)
 		}
 		return
 	}
@@ -323,19 +384,24 @@ func selfHeal(node model.Node, in model.Inbound) {
 	ps.resetFail(in.ID) // 等待下次探测验证新端口
 }
 
-// notifyOffline 节点下线预警（心跳超时或自愈耗尽）
+// notifyOffline 节点因心跳超时离线预警（与修复失败分支区分）
 func notifyOffline(node model.Node) {
-	notify.Dispatch("node_offline", "🔴 节点离线", fmt.Sprintf("节点 #%d (%s) 已离线（心跳超时或自愈尝试耗尽）", node.ID, node.Name))
+	notify.Dispatch("node_offline", "🔴 节点离线", fmt.Sprintf("节点「%s」心跳超时，已离线", node.Name))
 }
 
-// notifyHealed 节点自愈成功（换端口后恢复）
-// 天级去重：同一节点当天只通知一次，避免端口反复故障时自愈连发刷屏。
+// notifyHealFailed 节点因端口修复尝试耗尽离线预警（与心跳超时分支区分）
+func notifyHealFailed(node model.Node, attempts int) {
+	notify.Dispatch("node_heal_failed", "🔴 节点离线（修复失败）", fmt.Sprintf("节点「%s」代理端口修复失败，已离线", node.Name))
+}
+
+// notifyHealed 节点修复成功（换端口后恢复）
+// 天级去重：同一节点当天只通知一次，避免端口反复故障时修复连发刷屏。
 func notifyHealed(node model.Node, in model.Inbound, oldPort, newPort int) {
 	key := fmt.Sprintf("%d:healed:%s", node.ID, time.Now().UTC().Format("2006-01-02"))
 	if !markAlerted(key) {
 		return
 	}
-	notify.Dispatch("node_healed", "🟡 节点已自愈", fmt.Sprintf("节点 #%d (%s) 入站 #%d 端口 %d → %d 已切换并恢复", node.ID, node.Name, in.ID, oldPort, newPort))
+	notify.Dispatch("node_healed", "🟡 节点已修复", fmt.Sprintf("节点「%s」入站端口 %d → %d 已修复并恢复", node.Name, oldPort, newPort))
 }
 
 // ---- 端口范围工具 ----

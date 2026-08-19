@@ -441,7 +441,19 @@ func Heartbeat(c *gin.Context) {
 	if hb > 0 {
 		updates["heartbeat_interval"] = hb
 	}
+	// 记录恢复前是否离线：用于「离线期间改了配置 → 恢复后自动重推」
+	wasOffline := node.Status == "offline"
 	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(updates)
+	// 节点从离线恢复：自动把当前(可能离线期间改动过的)配置重推一次，
+	// 避免「面板改了但不生效」的困惑。后台 goroutine 执行，不阻塞心跳响应；
+	// syncNode 自身有按节点互斥锁，不会与手动同步并发冲突。
+	if wasOffline {
+		go func(n model.Node) {
+			if _, err := syncNode(n); err != nil {
+				log.Printf("[heartbeat] auto-sync on recovery node=%d failed: %v", n.ID, err)
+			}
+		}(node)
+	}
 	// 响应中携带控制面配置的心跳间隔(秒)，agent 据此动态调整，无需重启
 	want := 30
 	if v, err := store.GetSetting("agent_heartbeat_interval"); err == nil && v != "" {

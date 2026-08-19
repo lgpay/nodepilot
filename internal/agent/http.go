@@ -124,8 +124,11 @@ func PutConfig(c *gin.Context) {
 		return
 	}
 	path := filepath.Join(cfg.ConfigDir, "config.json")
-	// 先写临时文件并校验，通过后才落正式路径，避免坏配置留在磁盘并在重启后拉起
-	tmpPath := path + ".tmp"
+	// 先写临时文件并校验，通过后才落正式路径，避免坏配置留在磁盘并在重启后拉起。
+	// 注意：临时文件必须以 .json 结尾——xray 按文件扩展名识别配置格式，
+	// 若用 .tmp 后缀，xray run -test 会报 "Failed to get format" 导致校验永远失败、
+	// 配置永远无法下发（见节点自愈/端口变更全部失效的问题）。
+	tmpPath := filepath.Join(cfg.ConfigDir, "config.tmp.json")
 	if err := os.WriteFile(tmpPath, body.XrayConfig, 0644); err != nil {
 		log.Printf("[agent] write temp config failed: %v", err)
 		c.JSON(500, gin.H{"error": "failed to write config"})

@@ -67,6 +67,7 @@ var NotifyEvents = []string{
 	"node_offline",           // 节点离线
 	"node_recovered",         // 节点恢复在线
 	"node_healed",            // 节点自愈
+	"node_heal_failed",       // 节点修复失败(端口修复耗尽)
 	"node_expired",           // 节点到期（自动停用）
 	"node_traffic_exhausted", // 节点月流量耗尽(自动停用)
 	"node_traffic_warning",   // 节点月流量预警
