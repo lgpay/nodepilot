@@ -205,7 +205,7 @@ func probeNode(node model.Node) {
 		log.Printf("[probe] node=%d expired at %s, disabled", node.ID, node.ExpiresAt.Format(time.RFC3339))
 		key := fmt.Sprintf("%d:expired:%s", node.ID, node.ExpiresAt.Format("2006-01-02"))
 		if markAlerted(key) {
-			notify.Dispatch("node_expired", "🔴 节点已到期", fmt.Sprintf("节点「%s」已于 %s 到期，已自动停用",
+			notify.Dispatch("node_expired", "🔴 节点到期提醒", fmt.Sprintf("节点「%s」已于 %s 到期，已停用",
 				node.Name, node.ExpiresAt.Format("2006-01-02 15:04")))
 		}
 		return
@@ -316,7 +316,7 @@ func probeNode(node model.Node) {
 		// 状态由 offline/degraded 切回 ok：触发「恢复在线」通知（只发一次）
 		if ps.wasOfflineNow(node.ID) && prev != "ok" {
 			ps.setOffline(node.ID, false)
-			notify.Dispatch("node_recovered", "✅ 节点恢复在线", fmt.Sprintf("节点「%s」代理端口已恢复可达", node.Name))
+			notify.Dispatch("node_recovered", "✅ 节点恢复提醒", fmt.Sprintf("节点「%s」心跳恢复，已上线", node.Name))
 			// 离线期间可能改过配置：恢复时自动把当前配置重推一次（与心跳恢复路径互补，
 			// 此处覆盖「端口/自愈恢复」而心跳路径覆盖「心跳恢复」，二者互斥不重复推送）。
 			go func(n model.Node) {
@@ -386,12 +386,12 @@ func selfHeal(node model.Node, in model.Inbound) {
 
 // notifyOffline 节点因心跳超时离线预警（与修复失败分支区分）
 func notifyOffline(node model.Node) {
-	notify.Dispatch("node_offline", "🔴 节点离线", fmt.Sprintf("节点「%s」心跳超时，已离线", node.Name))
+	notify.Dispatch("node_offline", "🔴 节点离线提醒", fmt.Sprintf("节点「%s」心跳超时，已离线", node.Name))
 }
 
 // notifyHealFailed 节点因端口修复尝试耗尽离线预警（与心跳超时分支区分）
 func notifyHealFailed(node model.Node, attempts int) {
-	notify.Dispatch("node_heal_failed", "🔴 节点离线（修复失败）", fmt.Sprintf("节点「%s」代理端口修复失败，已离线", node.Name))
+	notify.Dispatch("node_heal_failed", "🔴 代理端口修复失败", fmt.Sprintf("节点「%s」代理端口修复失败，已离线", node.Name))
 }
 
 // notifyHealed 节点修复成功（换端口后恢复）
@@ -401,7 +401,7 @@ func notifyHealed(node model.Node, in model.Inbound, oldPort, newPort int) {
 	if !markAlerted(key) {
 		return
 	}
-	notify.Dispatch("node_healed", "🟡 节点已修复", fmt.Sprintf("节点「%s」入站端口 %d → %d 已修复并恢复", node.Name, oldPort, newPort))
+	notify.Dispatch("node_healed", "🟡 代理端口修复成功", fmt.Sprintf("节点「%s」代理端口 %d → %d 修复成功", node.Name, oldPort, newPort))
 }
 
 // ---- 端口范围工具 ----

@@ -86,7 +86,7 @@ func checkTrafficLimit() {
 		if !markAlerted(key) {
 			continue
 		}
-		notify.Dispatch("client_traffic_over", "🟡 流量超额", fmt.Sprintf("客户端「%s」已用 %s / 限额 %s",
+		notify.Dispatch("client_traffic_over", "🟡 客户端流量耗尽", fmt.Sprintf("客户端「%s」已用 %s，达到限额 %s，已停用",
 			clientLabel(c), fmtBytes(r.Total), fmtBytes(c.TrafficLimitBytes)))
 	}
 }
@@ -115,7 +115,7 @@ func checkNodeMonthlyTraffic() {
 			store.DB.Model(&model.Node{}).Where("id = ?", n.ID).Update("enabled", false)
 			key := fmt.Sprintf("%d:node-monthly-off:%s", n.ID, month)
 			if markAlerted(key) {
-				notify.Dispatch("node_traffic_exhausted", "🔴 节点月流量耗尽", fmt.Sprintf("节点「%s」本月已用 %s / 上限 %s，已达 100%%，已自动停用",
+				notify.Dispatch("node_traffic_exhausted", "🔴 节点月流量耗尽", fmt.Sprintf("节点「%s」本月已用 %s 达到限额 %s，已停用",
 					n.Name, fmtBytes(used), fmtBytes(limit)))
 			}
 			continue
@@ -124,7 +124,7 @@ func checkNodeMonthlyTraffic() {
 			// 90%：提醒一次（每月去重）
 			key := fmt.Sprintf("%d:node-monthly-90:%s", n.ID, month)
 			if markAlerted(key) {
-				notify.Dispatch("node_traffic_warning", "🟡 节点月流量预警", fmt.Sprintf("节点「%s」本月已用 %s / 上限 %s（约 %.0f%%）",
+				notify.Dispatch("node_traffic_warning", "🟡 节点月流量预警", fmt.Sprintf("节点「%s」本月已用 %s 达到限额 %s（约 %.0f%%）",
 					n.Name, fmtBytes(used), fmtBytes(limit), float64(used)*100/float64(limit)))
 			}
 		}
@@ -147,7 +147,7 @@ func checkExpiry() {
 			if !markAlerted(key) {
 				continue
 			}
-			notify.Dispatch("client_expired", "❌ 客户端已过期", fmt.Sprintf("客户端「%s」已于 %s 过期",
+			notify.Dispatch("client_expired", "❌ 客户端过期提醒", fmt.Sprintf("客户端「%s」已于 %s 过期，已停用",
 				clientLabel(c), c.ExpireTime.Format("2006-01-02 15:04")))
 		} else if c.ExpireTime.Before(soon) {
 			key := fmt.Sprintf("%d:expiring:%s", c.ID, today)
@@ -155,7 +155,7 @@ func checkExpiry() {
 				continue
 			}
 			days := int(c.ExpireTime.Sub(now).Hours() / 24)
-			notify.Dispatch("client_expiring", "⏰ 客户端即将到期", fmt.Sprintf("客户端「%s」将于 %s 到期（剩约 %d 天）",
+			notify.Dispatch("client_expiring", "⏰ 客户端到期提醒", fmt.Sprintf("客户端「%s」将于 %s 到期（剩约 %d 天）",
 				clientLabel(c), c.ExpireTime.Format("2006-01-02 15:04"), days))
 		}
 	}
