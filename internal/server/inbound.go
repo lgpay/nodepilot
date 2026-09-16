@@ -20,7 +20,15 @@ import (
 // validateInbound 在服务端校验入站配置，避免生成非法 xray 配置导致节点 xray 崩溃。
 // trojan 协议必须启用 TLS 且指定证书（cert_id>0）：xray 不接受无 TLS 的 trojan，
 // 且证书缺省路径 /root/cert 在节点上不存在，二者任一缺失都会拖垮整个节点（一个坏入站使整份配置校验失败）。
-func validateInbound(protocol string, tlsEnabled bool, certID uint) error {
+func validateInbound(protocol, transport string, tlsEnabled bool, certID uint) error {
+	validProtocols := map[string]bool{"vmess": true, "vless": true, "trojan": true, "ss": true, "socks": true, "http": true}
+	if !validProtocols[protocol] {
+		return fmt.Errorf("不支持的入站协议: %s", protocol)
+	}
+	validTransports := map[string]bool{"": true, "tcp": true, "ws": true, "grpc": true}
+	if !validTransports[transport] {
+		return fmt.Errorf("不支持的传输类型: %s", transport)
+	}
 	if protocol == "trojan" {
 		if !tlsEnabled {
 			return fmt.Errorf("trojan 入站必须启用 TLS（tls_enabled=true）")
@@ -30,6 +38,13 @@ func validateInbound(protocol string, tlsEnabled bool, certID uint) error {
 		}
 	}
 	return nil
+}
+
+type inboundDeployment struct {
+	Attempted bool   `json:"attempted"`
+	Status    string `json:"status,omitempty"`
+	Version   int    `json:"version,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // ---- 入站 CRUD ----
@@ -56,12 +71,14 @@ type InboundView struct {
 	Transport        string `json:"transport"`
 	TLSEnabled       bool   `json:"tls_enabled"`
 	TLSCertID        uint   `json:"tls_cert_id"`
+	StreamSettings   string `json:"stream_settings"`
+	Fallback         string `json:"fallback"`
 	Enabled          bool   `json:"enabled"`
 	AutoHeal         bool   `json:"auto_heal"`
 	AutoHealInterval int    `json:"auto_heal_interval"`
 	PortAutoFixed    bool   `json:"port_auto_fixed"`
-	HealCount        int    `json:"heal_count"`      // 自动修复次数
-	Connectivity     string `json:"connectivity"`    // 入站端口连通状态(ok/fail/空=未知)
+	HealCount        int    `json:"heal_count"`   // 自动修复次数
+	Connectivity     string `json:"connectivity"` // 入站端口连通状态(ok/fail/空=未知)
 }
 
 // ListAllInbounds 列出全部入站并附带所属节点名（供订阅分组精确选择）
@@ -97,6 +114,8 @@ func ListAllInbounds(c *gin.Context) {
 			Transport:        in.Transport,
 			TLSEnabled:       in.TLSEnabled,
 			TLSCertID:        in.TLSCertID,
+			StreamSettings:   in.StreamSettings,
+			Fallback:         in.Fallback,
 			Enabled:          in.Enabled,
 			AutoHeal:         in.AutoHeal,
 			AutoHealInterval: in.AutoHealInterval,
@@ -140,7 +159,7 @@ func CreateInbound(c *gin.Context) {
 		AutoHeal:         derefBool(body.AutoHeal, true),
 		AutoHealInterval: body.AutoHealInterval,
 	}
-	if err := validateInbound(in.Protocol, in.TLSEnabled, in.TLSCertID); err != nil {
+	if err := validateInbound(in.Protocol, in.Transport, in.TLSEnabled, in.TLSCertID); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -148,9 +167,9 @@ func CreateInbound(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	afterInboundSave(in)
+	deployment := afterInboundSave(in)
 	slog.Info("audit", "action", "inbound_create", "id", in.ID, "node_id", in.NodeID, "protocol", in.Protocol, "port", in.Port)
-	c.JSON(201, gin.H{"id": in.ID})
+	c.JSON(201, gin.H{"id": in.ID, "deployment": deployment})
 }
 
 func UpdateInbound(c *gin.Context) {
@@ -224,7 +243,11 @@ func UpdateInbound(c *gin.Context) {
 	if body.TLSCertID != nil {
 		effCert = *body.TLSCertID
 	}
-	if err := validateInbound(effProto, effTLS, effCert); err != nil {
+	effTransport := in.Transport
+	if body.Transport != nil {
+		effTransport = *body.Transport
+	}
+	if err := validateInbound(effProto, effTransport, effTLS, effCert); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -232,26 +255,33 @@ func UpdateInbound(c *gin.Context) {
 	// 用更新后的生效值触发后续动作
 	in.TLSEnabled = effTLS
 	in.TLSCertID = effCert
-	afterInboundSave(in)
+	deployment := afterInboundSave(in)
 	slog.Info("audit", "action", "inbound_update", "id", in.ID)
-	c.JSON(200, gin.H{"ok": true})
+	c.JSON(200, gin.H{"ok": true, "deployment": deployment})
 }
 
 // afterInboundSave 入站保存后：若使用 TLS 证书，把证书产物分发到该节点并触发配置下发（保存即生效）。
 // 免去「保存入站 → 证书页手动分发 → 再下发配置」的步骤。
-func afterInboundSave(in model.Inbound) {
+func afterInboundSave(in model.Inbound) inboundDeployment {
 	if !in.TLSEnabled || in.TLSCertID == 0 {
-		return
+		return inboundDeployment{}
 	}
+	result := inboundDeployment{Attempted: true}
 	var node model.Node
 	if err := store.DB.First(&node, in.NodeID).Error; err != nil {
 		log.Printf("[inbound] 节点 #%d 不存在，跳过证书分发", in.NodeID)
-		return
+		result.Status, result.Error = "failed", "节点不存在"
+		return result
 	}
 	pushCertToNode(node, in.TLSCertID)
-	if _, err := syncNode(node); err != nil {
+	version, err := syncNode(node)
+	if err != nil {
 		log.Printf("[inbound] 节点 #%d 配置下发失败: %v", node.ID, err)
+		result.Status, result.Error = "failed", err.Error()
+		return result
 	}
+	result.Status, result.Version = "applied", version
+	return result
 }
 
 // pushCertToNode 把证书签发产物推送到单个节点 agent（幂等；失败仅记录，不阻断保存）。
@@ -428,9 +458,14 @@ func UpdateClient(c *gin.Context) {
 	if body.Enabled != nil {
 		updates["enabled"] = *body.Enabled
 	}
-	if body.ExpireTime != nil && *body.ExpireTime != "" {
-		if t, err := time.Parse(time.RFC3339, *body.ExpireTime); err == nil {
+	if body.ExpireTime != nil {
+		if *body.ExpireTime == "" {
+			updates["expire_time"] = time.Time{}
+		} else if t, err := time.Parse(time.RFC3339, *body.ExpireTime); err == nil {
 			updates["expire_time"] = t
+		} else {
+			c.JSON(400, gin.H{"error": "客户端到期时间格式不正确"})
+			return
 		}
 	}
 	store.DB.Model(&client).Updates(updates)

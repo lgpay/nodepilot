@@ -15,7 +15,7 @@ NodePilot 让你用**一台管理服务器**集中配置 / 下发 `vmess` 等多
 - 多协议入站：`vmess` / `vless` / `trojan` / `shadowsocks` / `socks` / `http`
 - 用户 / 客户端管理：UUID 自动生成、流量上限、到期时间
 - 配置下发（推模式）：管理端生成 xray 配置 → agent 校验 → 落盘 → 重启热重载，版本记录与失败标记
-- 节点心跳上报、CPU/内存采集、连通性自检与端口自愈
+- 节点心跳上报、连通性自检与端口自愈（CPU/内存指标暂不上报）
 - 订阅分组与订阅链接：vmess / clash / surfboard / loon / sip008，ACL4SSR 分流规则（自托管镜像）
 - 证书管理：Let's Encrypt + Cloudflare DNS-01 泛域名证书，自动续签与分发
 - 预警通知：邮件 / 企业微信 / Telegram
@@ -113,7 +113,7 @@ go build -ldflags "-X main.Version=$VERSION" -o bin/agent  ./cmd/agent
   --xray /usr/local/bin/xray
 ```
 
-agent 会周期上报心跳（含 CPU / 内存），并做 xray 进程看护（崩溃自动拉起）；
+agent 会周期上报心跳，并做 xray 进程看护（崩溃自动拉起）；
 收到下发的配置会先用 `xray run -test` 校验，通过后才落盘并重启热重载（坏配置不会中断当前进程）。
 在管理端对节点点击「下发配置」即可把入站 / 用户推送并热重载。
 
@@ -191,7 +191,7 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 环境变量可覆盖：`NP_ADDR`（默认 `:8081`，须与注册节点时 `address` 端口一致）、`NP_XRAY`、`NP_CONFIG_DIR`、`NP_INSTALL_DIR`、`NP_BINARY_URL`。
 管理菜单：`bash install-agent.sh` 可选 安装 / 启动 / 停止 / 重启 / 状态 / 配置 / 卸载；`bash install-agent.sh uninstall` 卸载。
 
-> agent 二进制从 GitHub Release `v0.1.1` 下载（当前仓库为 public）。私有化部署可设置 `NP_BINARY_URL` 指向自托管地址。
+> agent 二进制从 GitHub Release `v1.0.0` 下载（当前仓库为 public）。私有化部署可设置 `NP_BINARY_URL` 指向自托管地址。
 
 ### ACL4SSR 规则同步
 
@@ -234,7 +234,7 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 - 管理端与 agent 间 MVP 使用 HTTP + 默认跳过 TLS 校验，生产应启用 HTTPS 并设置 `NP_AGENT_TLS_VERIFY=true`
 - 节点 agent 热重载采用重启 xray 进程（秒级中断），后续可升级为 xray api reload
 - 节点 agent 一键脚本会自动安装 xray-core（官方 XTLS 脚本）
-- 尚未实现：2FA、agent 自更新、配置一键回滚接口、Web 资源看板（CPU/内存已采集入库但未在界面展示）
+- 尚未实现：2FA、agent 自更新、配置一键回滚接口、手动连通测试与持久化自愈日志；CPU/内存指标当前固定为 0，不作为运行看板数据
 
 ## 路线图
 

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/smtp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -131,7 +132,7 @@ type emailConfig struct {
 type EmailSender struct{ cfg emailConfig }
 
 func (s *EmailSender) Send(title, body string) error {
-	addr := fmt.Sprintf("%s:%d", s.cfg.SMTPHost, s.cfg.SMTPPort)
+	addr := net.JoinHostPort(s.cfg.SMTPHost, strconv.Itoa(s.cfg.SMTPPort))
 	from := s.cfg.From
 	to := s.cfg.To
 

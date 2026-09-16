@@ -32,7 +32,7 @@ func SyncNode(c *gin.Context) {
 	}
 	version, err := syncNode(node)
 	if err != nil {
-		c.JSON(502, gin.H{"error": "dispatch failed"})
+		c.JSON(502, gin.H{"error": "dispatch failed", "detail": err.Error()})
 		return
 	}
 	slog.Info("audit", "action", "node_config_sync", "id", node.ID, "version", version)

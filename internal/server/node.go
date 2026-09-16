@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -125,6 +126,14 @@ func CreateNode(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	if strings.TrimSpace(body.Name) == "" {
+		c.JSON(400, gin.H{"error": "节点名称不能为空"})
+		return
+	}
+	if _, _, err := net.SplitHostPort(strings.TrimSpace(body.Address)); err != nil {
+		c.JSON(400, gin.H{"error": "节点地址格式不正确，请使用 host:port"})
 		return
 	}
 	if !validPortRange(body.PortRange) {
@@ -275,6 +284,10 @@ func UpdateNode(c *gin.Context) {
 	}
 	if body.Enabled != nil {
 		updates["enabled"] = *body.Enabled
+		if !*body.Enabled {
+			updates["status"] = "offline"
+			updates["connectivity"] = "offline"
+		}
 	}
 	if body.PortRange != nil {
 		if !validPortRange(*body.PortRange) {
@@ -311,13 +324,22 @@ func DeleteNode(c *gin.Context) {
 	id := c.Param("id")
 	// 事务内级联删除关联数据，避免孤儿记录
 	err := store.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("node_id = ?", id).Delete(&model.Inbound{}).Error; err != nil {
+		var inboundIDs []uint
+		if err := tx.Model(&model.Inbound{}).Where("node_id = ?", id).Pluck("id", &inboundIDs).Error; err != nil {
 			return err
 		}
 		// clients 通过 inbound 间接归属，按节点下所有 inbound 删除
-		if err := tx.
-			Where("inbound_id IN (SELECT id FROM inbounds WHERE node_id = ?)", id).
-			Delete(&model.Client{}).Error; err != nil {
+		if len(inboundIDs) > 0 {
+			if err := tx.Where("inbound_id IN ?", inboundIDs).Delete(&model.Client{}).Error; err != nil {
+				return err
+			}
+			for _, inboundID := range inboundIDs {
+				if err := removeInboundFromSubscriptionFilters(tx, strconv.FormatUint(uint64(inboundID), 10)); err != nil {
+					return err
+				}
+			}
+		}
+		if err := tx.Where("node_id = ?", id).Delete(&model.Inbound{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("node_id = ?", id).Delete(&model.ConfigVersion{}).Error; err != nil {
@@ -409,6 +431,11 @@ func Heartbeat(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "node not found"})
 		return
 	}
+	if !node.Enabled {
+		store.DB.Model(&node).Updates(map[string]interface{}{"status": "offline", "connectivity": "offline"})
+		c.JSON(403, gin.H{"error": "node disabled"})
+		return
+	}
 	// 到期节点：拒绝心跳并停用，agent 端应停止服务
 	if node.ExpiresAt != nil && !node.ExpiresAt.IsZero() && time.Now().After(*node.ExpiresAt) {
 		store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
@@ -420,11 +447,11 @@ func Heartbeat(c *gin.Context) {
 		return
 	}
 	var body struct {
-		AgentVersion       string  `json:"agent_version"`
-		Cpu                float64 `json:"cpu"`
-		Mem                float64 `json:"mem"`
-		XrayRunning        bool    `json:"xray_running"`
-		HeartbeatInterval  int     `json:"heartbeat_interval"`
+		AgentVersion      string  `json:"agent_version"`
+		Cpu               float64 `json:"cpu"`
+		Mem               float64 `json:"mem"`
+		XrayRunning       bool    `json:"xray_running"`
+		HeartbeatInterval int     `json:"heartbeat_interval"`
 	}
 	c.ShouldBindJSON(&body)
 	hb := body.HeartbeatInterval
