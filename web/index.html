@@ -44,6 +44,8 @@
 
   header { background: var(--header-bg); color: var(--header-fg); padding: 0 18px; height: 52px; display: flex; align-items: center; justify-content: space-between; flex: 0 0 auto; border-bottom: 1px solid var(--border); z-index: 5; }
   .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-home { display:flex; align-items:center; gap:10px; color:inherit; text-decoration:none; border-radius:6px; }
+  .brand-home:hover { color:var(--primary); }
   .brand .logo { width: 26px; height: 26px; border-radius: 6px; display: block; object-fit: contain; }
   header h1 { font-size: 16px; margin: 0; font-weight: 700; letter-spacing: .2px; }
   header .right { display: flex; align-items: center; gap: 9px; }
@@ -139,8 +141,6 @@
   @media (min-width: 1300px) { .main { max-width: var(--maxw); margin: 0 auto; width: 100%; } }
   .login-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .login-card { width: 100%; max-width: 400px; margin: 0; border-radius: var(--radius); }
-  .login-card .brand { justify-content: center; margin-bottom: 12px; }
-  .login-logo { width: 220px; max-width: 80%; height: auto; display: block; }
 
   .sb-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 16px 8px 6px; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
   .sb-head:first-child { margin-top: 4px; }
@@ -362,6 +362,123 @@
   @media(max-width:1100px){.telemetry-grid,.telemetry-grid.compact{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr}.resource-grid{grid-template-columns:repeat(2,1fr)}.ops-strip{display:none}}
   @media(max-width:700px){.account-toggle{display:block}header .right{display:none!important;position:absolute;right:10px;top:52px;z-index:80;width:210px;padding:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);flex-direction:column;align-items:stretch}header .right.mobile-open{display:flex!important}header .right .chk{padding:8px 2px}header .right button{width:100%;margin:0}.telemetry-grid,.telemetry-grid.compact,.resource-grid,.settings-grid{grid-template-columns:1fr}.page-head{align-items:flex-start;flex-direction:column}.detail-head{align-items:flex-start;flex-direction:column}.fleet-row{grid-template-columns:1fr 70px 60px}.fleet-row>:nth-child(3),.fleet-row>:nth-child(4){display:none}.sidebar{top:58px}.main{padding:15px}.list-toolbar{align-items:stretch;flex-direction:column}.list-toolbar .search{max-width:none}.deploy-row{grid-template-columns:1fr 80px}.deploy-row>:last-child{grid-column:1/-1}.deploy-summary{grid-template-columns:1fr}.world-map{min-height:170px}.map-unlocated{width:100%;margin-left:0}}
   @media(prefers-reduced-motion:reduce){.map-marker .map-halo{animation:none}}
+  /* 统一页面结构：标题、操作区和内容卡片保持同一阅读节奏。 */
+  .main { max-width:1440px; padding:28px 32px 56px; }
+  .page-head { padding:0 0 20px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+  .page-head .btnrow { gap:8px; }
+  .page-head .btnrow button { min-height:34px; }
+  .page-head h1 { font-size:28px; letter-spacing:-.03em; }
+  .page-head p { max-width:680px; margin-top:8px; line-height:1.7; }
+  .telemetry-grid.compact { gap:12px; }
+  .telemetry { min-height:112px; padding:16px; }
+  .card { padding:18px 20px; margin-bottom:16px; }
+  .card h2 { margin-bottom:16px; }
+  .list-toolbar { padding-bottom:4px; }
+  .list-toolbar .search { min-height:38px; }
+  .tbl th { white-space:nowrap; }
+  .resource-card { min-height:150px; display:flex; flex-direction:column; }
+  .resource-card .btnrow { margin-top:auto; }
+  .btnrow button { min-height:34px; }
+  .settings-grid { align-items:start; }
+  @media(max-width:700px){.main{padding:20px 14px 40px}.page-head h1{font-size:24px}.page-head{padding-bottom:16px;margin-bottom:16px}.page-head .btnrow{width:100%}.page-head .btnrow button{flex:1}.card{padding:15px}.telemetry{min-height:100px}}
+  /* Workspace design: semantic colors are supplied by applyTheme(). */
+  body { font-size:14px; letter-spacing:0; line-height:1.65; }
+  header { height:64px; padding:0 24px; }
+  header::after,.card h2::before,.telemetry::after { display:none; }
+  header h1 { font-size:16px; letter-spacing:0; }
+  .brand .logo { filter:none; }
+  .ops-strip { font:13px/1.5 inherit; letter-spacing:0; }
+  .ops-strip > span:not(:nth-child(2)) { display:none; }
+  .sidebar { width:224px; padding:20px 14px; }
+  .sb-logo { padding:4px 12px 20px; }
+  .sb-kicker { font:600 14px/1.6 inherit; letter-spacing:0; color:var(--text); }
+  .sb-title,.sb-head { font-size:12px; letter-spacing:0; }
+  .sidebar-foot { display:none; }
+  .ti { min-height:46px; margin:4px 0; padding:10px 12px; border:0; border-radius:8px; font-size:14px; }
+  .ti.active { color:var(--primary); }
+  .nav-count { color:var(--muted); border:0; border-radius:6px; background:var(--bg); font-size:12px; }
+  .main { max-width:1560px; padding:32px 36px 64px; }
+  .page-head { border:0; margin-bottom:26px; padding:0; align-items:center; }
+  .page-head h1 { font-size:28px; line-height:1.3; font-weight:700; }
+  .page-head p { font-size:14px; margin-top:8px; }
+  .card,.telemetry,.resource-card,.kpi { border-radius:12px; box-shadow:var(--shadow); }
+  .card { padding:24px; margin-bottom:20px; }
+  .card:hover { border-color:var(--border); }
+  .card h2 { font-size:16px; margin-bottom:20px; }
+  .card h3,.resource-card h3 { font-size:15px; color:var(--text); }
+  .muted,label,.subtle-note,.list-count,.telemetry .t-label,.telemetry .t-note { font-size:13px; line-height:1.6; }
+  .telemetry-grid,.telemetry-grid.compact { gap:16px; margin-bottom:24px; }
+  .telemetry { padding:20px 24px; min-height:120px; }
+  .telemetry .t-label { font-family:inherit; letter-spacing:0; }
+  .telemetry .t-value { font-family:inherit; font-size:30px; margin:8px 0; font-variant-numeric:tabular-nums; }
+  .dash-grid { grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr); gap:20px; }
+  .dash-stack { min-width:0; gap:0; }
+  .dash-grid .fleet-row { grid-template-columns:minmax(0,1fr) 64px 64px; }
+  .dash-grid .fleet-row > :nth-child(3),.dash-grid .fleet-row > :nth-child(4) { display:none; }
+  .fleet-row { padding:14px 0; font-size:14px; grid-template-columns:minmax(120px,1fr) 76px minmax(155px,1fr) 90px 76px; }
+  .attention-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:14px 0; border-bottom:1px solid var(--border); }
+  .attention-row:last-child { border:0; }
+  .resource-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:16px; }
+  .resource-card { border:1px solid var(--border); padding:20px; gap:12px; }
+  .resource-card code,.fleet-row code,.topology-node { font-size:13px; }
+  .resource-card .btnrow { padding-top:12px; }
+  button { border-radius:8px; color:var(--on-primary); font-size:14px; min-height:40px; padding:9px 16px; }
+  button:hover { box-shadow:none; }
+  button.small,button.sm { font-size:13px; min-height:34px; border-radius:7px; }
+  button.danger { color:var(--danger); border-color:var(--danger); background:var(--danger-soft); }
+  button.danger:hover { background:var(--danger); color:var(--card); }
+  button.secondary:hover { background:var(--sidebar-hover); border-color:var(--muted); }
+  :focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+  input,select,textarea { min-height:42px; border-radius:8px; font-size:14px; }
+  input[type=checkbox],input[type=radio] { min-height:auto; }
+  .tblwrap { border-radius:8px; }
+  .tbl { font-size:14px; }
+  .tbl th,.tbl td { padding:13px 16px; }
+  .tbl th,[data-theme=light] .tbl th { background:var(--bg); font:600 13px/1.5 inherit; letter-spacing:0; }
+  .tbl tbody tr:hover,[data-theme=dark] .tbl tbody tr:hover { background:var(--primary-soft); box-shadow:none; }
+  .pill,.badge { border-radius:6px; padding:3px 8px; font:500 12px/1.5 inherit; letter-spacing:0; text-transform:none; }
+  .badge,[data-theme=dark] .badge { background:var(--bg); color:var(--muted); }
+  .badge.blue,[data-theme=dark] .badge.blue { background:var(--primary-soft); color:var(--primary); }
+  .pill::before,.map-legend .swatch { box-shadow:none; }
+  .world-map { border-radius:8px; background:var(--bg); }
+  .world-map { background:radial-gradient(ellipse at 50% 45%,var(--primary-soft),transparent 68%),var(--bg); box-shadow:inset 0 0 0 1px var(--border); }
+  .world-map .map-land { fill:color-mix(in srgb,var(--muted) 22%,transparent); stroke:color-mix(in srgb,var(--muted) 48%,transparent); stroke-width:.55; }
+  .world-map .map-grid { stroke:color-mix(in srgb,var(--muted) 20%,transparent); stroke-dasharray:2 3; }
+  .map-marker .map-dot { r:5; stroke-width:2.5; }
+  .spark { height:160px; background:none; gap:5px; }
+  .spark span { background:var(--primary); border-radius:3px 3px 0 0; opacity:.75; }
+  .login-wrap { background:var(--bg); }
+  .login-card { border-color:var(--border); max-width:420px; padding:32px; }
+  .qr img { max-width:100%; height:auto; }
+  .settings-grid { gap:20px; }
+  .appearance-card { margin-bottom:24px; }
+  .theme-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; }
+  .theme-choice { text-align:left; background:var(--card); color:var(--text); border:1px solid var(--border); padding:12px; margin:0; }
+  .theme-choice:hover { background:var(--bg); }
+  .theme-choice[aria-pressed=true] { border-color:var(--primary); box-shadow:0 0 0 2px var(--primary-soft); }
+  .theme-choice b,.theme-choice small { display:block; }
+  .theme-choice small { color:var(--muted); font-size:12px; font-weight:400; }
+  .theme-preview { height:64px; display:flex; padding:8px; gap:6px; border-radius:6px; margin-bottom:12px; background:var(--preview-bg); }
+  .theme-preview i { width:20%; border-radius:3px; background:var(--preview-accent); }
+  .theme-preview span { flex:1; border-radius:3px; border-top:8px solid var(--preview-accent); background:var(--preview-card); }
+  .appearance-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .appearance-toolbar p { margin:0; }
+  .appearance-toolbar select { width:auto; }
+  @media(max-width:1200px) { .dash-grid { grid-template-columns:1fr; } .theme-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media(max-width:900px) { .sidebar { top:64px; } .main { padding:24px; } .settings-grid { grid-template-columns:1fr; } }
+  @media(max-width:700px) {
+    header { padding:0 14px; } header .right { top:64px; }
+    .main { padding:20px 14px 40px; } .card { padding:18px; }
+    .page-head { align-items:stretch; } .page-head h1 { font-size:24px; }
+    .telemetry-grid.compact { grid-template-columns:1fr; gap:10px; }
+    .telemetry { min-height:0; padding:16px 20px; }
+    .fleet-row { grid-template-columns:minmax(0,1fr) 64px 64px; }
+    .theme-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .appearance-toolbar { align-items:stretch; flex-direction:column; }
+    .appearance-toolbar select { width:100%; }
+    .field-grid { grid-template-columns:1fr; }
+  }
+  @media(prefers-reduced-motion:reduce) { *,*::before,*::after { animation:none!important; transition:none!important; } }
 </style>
 </head>
 <body>
@@ -369,14 +486,17 @@
 <header>
   <div class="brand">
     <button class="burger" id="burgerBtn" onclick="toggleSidebar()">☰</button>
-    <img class="logo" src="logo.png" alt="NodePilot">
-    <h1>NodePilot 控制台</h1>
+    <a class="brand-home" href="#/overview" onclick="if(token) navigate('/overview'); return false;" aria-label="NodePilot 控制台，返回首页">
+      <img class="logo" src="logo.png" alt="">
+      <h1>NodePilot 控制台</h1>
+    </a>
     <div class="ops-strip"><span><i></i>管理端已连接</span><span>最近更新：<b id="refreshStatus">等待数据</b></span><span>在线节点：<b id="hbStatus">--/--</b></span><span>待下发：<b id="deployStatus">0</b></span></div>
   </div>
   <button class="secondary small account-toggle hidden" id="accountToggle" onclick="toggleAccountMenu()" aria-label="账号与设置">账户</button>
   <div id="headerRight" class="right hidden">
     <label class="chk"><input type="checkbox" id="autoSyncChk" onchange="setAutoSync(this.checked)"> 自动下发</label>
-    <button class="secondary small" id="darkBtn" onclick="toggleDark()">🌙 暗色</button>
+    <button class="secondary small" onclick="showAppearance()">外观主题</button>
+    <button class="secondary small" id="darkBtn" onclick="toggleDark()">切换明暗</button>
     <span id="who" class="muted"></span>
     <button class="secondary small" onclick="showChangePw()">修改密码</button>
     <button class="secondary small" onclick="logout()">退出</button>
@@ -390,7 +510,6 @@
 
 <div id="loginWrap" class="login-wrap hidden">
   <div id="login" class="card login-card">
-    <div class="brand"><img class="login-logo" src="lockup.png" alt="NodePilot"></div>
     <h2 style="text-align:center">登录控制台</h2>
     <label>用户名</label><input id="user" value="admin" onkeydown="if(event.key==='Enter')login()">
     <label>密码</label><input id="pass" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')login()">
@@ -425,6 +544,14 @@ let subFiltersBase = ''; // 当前订阅已有的 filters JSON(合并基础,避�
 let installCmdCache = ''; // 当前节点接入命令缓存(复制按钮用)
 let currentNotifType = 'email';
 let autoSync = localStorage.getItem('np_autosync') === '1';
+const editedFields = new Map();
+let navigationApproved = false;
+function fieldValue(el) { return el.type==='checkbox'||el.type==='radio' ? el.checked : el.value; }
+function dirtyFields(scope) { return [...editedFields].filter(([el,initial])=>el.isConnected && (!scope || scope.contains(el)) && fieldValue(el)!==initial); }
+function rememberField(el) {
+  if (!el.matches('input,select,textarea') || !el.closest('#main,#modalBody') || el.matches('.search,[data-color-mode],[type=hidden]') || /setAutoSync|setPalette|toggleDark/.test(el.getAttribute('onchange')||'')) return;
+  if (!editedFields.has(el)) editedFields.set(el,fieldValue(el));
+}
 const savedTheme = localStorage.getItem('np_dark');
 let dark = savedTheme === null ? true : savedTheme === '1';
 let refreshTimer = null;
@@ -530,10 +657,42 @@ async function afterInboundSaved(nodeId, label, deployment) {
 }
 
 // ---- 主题 ----
+const palettes = {
+  ocean: {name:'雾海青蓝',note:'清爽 · 专注',hue:205,light:'#1664ad',dark:'#80bcff'},
+  iris: {name:'暮山靛紫',note:'沉静 · 柔和',hue:255,light:'#6952b5',dark:'#baa7ff'},
+  forest: {name:'青竹翡翠',note:'自然 · 舒适',hue:160,light:'#16775d',dark:'#6ed5b2'},
+  amber: {name:'暖砂琥珀',note:'温暖 · 克制',hue:35,light:'#95600c',dark:'#eac17c'},
+  rose: {name:'烟霞玫红',note:'细腻 · 明快',hue:335,light:'#ad3970',dark:'#f29bc2'}
+};
+let palette = localStorage.getItem('np_palette') || 'ocean';
+if (!Object.hasOwn(palettes,palette)) palette='ocean';
 function applyTheme() {
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-  const b = document.getElementById('darkBtn'); if (b) b.textContent = dark ? '☀️ 浅色' : '🌙 暗色';
+  const root=document.documentElement, p=palettes[palette], h=p.hue;
+  root.dataset.theme = dark ? 'dark' : 'light';
+  root.dataset.palette = palette;
+  const bg=dark?`hsl(${h} 16% 10%)`:`hsl(${h} 24% 96%)`;
+  const card=dark?`hsl(${h} 14% 14%)`:'#ffffff';
+  const fg=dark?'#edf0f5':'#202936', muted=dark?'#abb4c2':'#5d6878';
+  const accent=dark?p.dark:p.light, soft=dark?`hsl(${h} 25% 21%)`:`hsl(${h} 42% 93%)`;
+  const border=dark?`hsl(${h} 12% 25%)`:`hsl(${h} 18% 86%)`;
+  const tokens={bg,card,border,text:fg,muted,primary:accent,'primary-strong':accent,'primary-soft':soft,
+    'on-primary':dark?'#17212d':'#ffffff','header-bg':card,'header-fg':fg,'header-accent':accent,
+    'sidebar-bg':card,'sidebar-fg':muted,'sidebar-hover':bg,'sidebar-act':soft,
+    'input-bg':card,'input-border':border,'input-dis':bg,'code-bg':bg,'code-fg':fg,
+    danger:dark?'#ff9b9b':'#b42335','danger-strong':dark?'#ffbaba':'#96192a','danger-soft':dark?'#382226':'#fff0f1',
+    ok:dark?'#7bd9ac':'#14764c','ok-soft':dark?'#1c332b':'#eaf7f0',warn:dark?'#f2ce83':'#885b08','warn-soft':dark?'#352e20':'#fff5df',
+    shadow:dark?'none':'0 2px 8px rgba(24,39,60,.03)','shadow-lg':'0 20px 60px rgba(0,0,0,.25)',radius:'12px','radius-sm':'8px'};
+  Object.entries(tokens).forEach(([key,value])=>root.style.setProperty('--'+key,value));
+  const b=document.getElementById('darkBtn'); if(b)b.textContent=dark?'切换浅色':'切换深色';
+  document.querySelectorAll('[data-palette-choice]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.paletteChoice===palette)));
+  document.querySelectorAll('[data-color-mode]').forEach(el=>el.value=dark?'dark':'light');
+  document.querySelectorAll('[data-preview]').forEach(el=>{const c=palettes[el.dataset.preview];el.style.setProperty('--preview-bg',dark?`hsl(${c.hue} 16% 10%)`:`hsl(${c.hue} 24% 94%)`);el.style.setProperty('--preview-card',dark?`hsl(${c.hue} 14% 22%)`:'#fff');el.style.setProperty('--preview-accent',dark?c.dark:c.light);});
 }
+function setPalette(id) { if(!Object.hasOwn(palettes,id))return; palette=id;localStorage.setItem('np_palette',id);applyTheme(); }
+function appearanceControls() {
+  return '<div class="appearance-toolbar"><p class="muted">选择配色与明暗模式，即时生效，仅保存在当前浏览器。</p><select aria-label="明暗模式" data-color-mode onchange="if((this.value===\'dark\')!==dark)toggleDark()"><option value="light" '+(!dark?'selected':'')+'>浅色模式</option><option value="dark" '+(dark?'selected':'')+'>深色模式</option></select></div><div class="theme-grid">'+Object.entries(palettes).map(([id,p])=>'<button class="theme-choice" data-palette-choice="'+id+'" aria-pressed="'+(palette===id)+'" onclick="setPalette(\''+id+'\')"><span class="theme-preview" data-preview="'+id+'" aria-hidden="true"><i></i><span></span></span><b>'+p.name+'</b><small>'+p.note+'</small></button>').join('')+'</div>';
+}
+function showAppearance() { setModal('<h2>外观主题</h2>'+appearanceControls()+'<div class="btnrow"><button onclick="closeModal()">完成</button></div>','wide');applyTheme(); }
 function toggleDark() { dark = !dark; localStorage.setItem('np_dark', dark ? '1' : '0'); applyTheme(); }
 applyTheme();
 
@@ -544,6 +703,9 @@ function authH() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 
 
 // api：非 2xx 统一 toast 服务端 error 并返回 null，避免"失败却提示成功"
 async function api(method, path, body) {
+  const scope = document.getElementById(modalOpen()?'modalBody':'main');
+  const saving = ['POST','PUT','PATCH'].includes(method) && body && !('latitude' in body) && !path.startsWith('/auth/') && !/\/(sync|test|renew|distribute)$/.test(path);
+  const submitted = saving ? dirtyFields(scope).filter(([el])=>el.id!=='n_hbinterval'||path==='/settings').map(([el])=>[el,fieldValue(el)]) : [];
   let r;
   try { r = await fetch(API + path, { method, headers: authH(), body: body ? JSON.stringify(body) : undefined }); }
   catch (e) { showToast('网络错误，请检查连接', 'err'); return null; }
@@ -557,6 +719,7 @@ async function api(method, path, body) {
     forceChangePw(); return null;
   }
   if (!r.ok) { showToast(data.error || ('请求失败 HTTP ' + r.status), 'err'); return null; }
+  submitted.forEach(([el,value])=>editedFields.set(el,value));
   const stamp = document.getElementById('refreshStatus');
   if (stamp && path !== '/auth/login') stamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return data;
@@ -586,9 +749,11 @@ async function copySubContent(stoken) {
 // 防重复提交：禁用按钮 + "处理中…"，finally 恢复
 async function withBusy(btn, fn) {
   if (!btn) return fn();
+  if (btn.disabled) return;
   const old = btn.textContent;
   btn.disabled = true; btn.textContent = '处理中…';
-  try { return await fn(); } finally { btn.disabled = false; btn.textContent = old; }
+  btn.setAttribute('aria-busy','true');
+  try { return await fn(); } catch(e) { showToast('操作未完成，请检查连接后重试','err'); } finally { btn.disabled = false; btn.textContent = old; btn.removeAttribute('aria-busy'); }
 }
 // 自定义确认弹窗（Promise<boolean>）
 function confirmModal(msg) {
@@ -615,6 +780,9 @@ function hideModal() { document.getElementById('modal').classList.add('hidden');
 function modalOpen() { return !document.getElementById('modal').classList.contains('hidden'); }
 function closeModal() {
   if (batchDeployRunning) return showToast('批量下发尚未完成', 'warn');
+  const scope=document.getElementById('modalBody');
+  if (dirtyFields(scope).length && !window.confirm('有未保存的修改，确定放弃并关闭吗？')) return;
+  for(const [el] of editedFields) if(scope.contains(el)) editedFields.delete(el);
   hideModal();
   if (refreshMainAfterClose) {
     refreshMainAfterClose = false;
@@ -753,12 +921,18 @@ function navItem(active, icon, label, count, fn) {
 
 // ---- 路由与选中 ----
 function navigate(path, replace) {
+  if (dirtyFields().length && !window.confirm('有未保存的修改，确定放弃并离开当前页面吗？')) return;
+  editedFields.clear(); navigationApproved=false;
   const hash = '#' + (path.startsWith('/') ? path : '/' + path);
   if (location.hash === hash) return applyRoute();
+  navigationApproved=!replace;
   capturePageState();
   if (replace) history.replaceState(null, '', hash); else location.hash = hash;
   if (replace) applyRoute();
 }
+document.addEventListener('focusin', e=>rememberField(e.target));
+document.addEventListener('pointerdown', e=>rememberField(e.target));
+window.addEventListener('beforeunload', e => { if (dirtyFields().length) { e.preventDefault(); e.returnValue = ''; } });
 function parseRoute() {
   const raw = (location.hash || '#/overview').slice(1);
   const parts = raw.split('?');
@@ -829,6 +1003,12 @@ function selectInboundHub() { navigate('/inbounds'); }
 function selectSubscriptionHub() { navigate('/resources/subscriptions'); }
 function selectCertificateHub() { navigate('/resources/certificates'); }
 function selectSub(id) { navigate('/subscriptions/' + id); }
+function showSubscriptionQr(id) {
+  const sub = subsData.find(x => x.id === id);
+  if (!sub || !sub.token) return showToast('订阅信息尚未加载', 'warn');
+  const url = location.origin + API + '/sub/' + sub.token;
+  setModal('<h2>订阅二维码</h2><p class="muted">' + esc(sub.name || '订阅') + '</p><div class="qr" style="align-items:center;width:100%"><img src="' + API + '/qr/' + encodeURIComponent(sub.token) + '" width="220" height="220" alt="' + esc(sub.name || '订阅') + '二维码"><button class="secondary small" onclick="copyText(\'' + esc(url).replace(/'/g, "\\'") + '\')">复制订阅链接</button></div><div class="btnrow"><button class="secondary" onclick="closeModal()">关闭</button></div>');
+}
 function selectCert(id) { navigate('/certificates/' + id); }
 function selectStats() { navigate('/traffic'); }
 function selectNotifierHub() { navigate('/notifiers'); }
@@ -868,13 +1048,13 @@ function renderWelcome() {
   const certIssues = certsData.filter(c => ['failed','expired','error'].includes((c.status||'').toLowerCase()) || (c.expires_at && new Date(c.expires_at).getTime() < Date.now()+30*86400000)).length;
   const offline = nodesData.filter(n=>n.status !== 'online').length;
   const attention = offline + certIssues;
-  let h = pageHead('全局态势', '运行概览', '节点运行状态、网络流量与待处理事项。', '<button class="secondary small" onclick="refreshDashboard()">刷新数据</button><button class="small" onclick="syncAllNodes()">全部下发</button>') +
+  let h = pageHead('总览', '运行概览', '查看节点、入站和流量的整体运行情况。', '<button class="secondary small" onclick="refreshDashboard()">刷新数据</button><button class="small" onclick="syncAllNodes()">全部下发</button>') +
     '<div class="telemetry-grid compact">' + telemetry('在线节点', online + '<small> / ' + nodesData.length + '</small>', offline ? offline + ' 个节点未在线' : '节点心跳正常', offline ? 'amber' : 'green') +
     telemetry('本月流量', statsData ? fmtBytes(monthTraffic) : '—', '按 UTC 月统计', '') +
     telemetry('待关注资源', attention, attention ? offline + ' 节点 · ' + certIssues + ' 证书' : '暂无已知异常', attention ? 'amber' : 'green') + '</div>' +
-    '<div class="dash-grid"><div class="dash-stack"><div class="card"><h2>30 天网络流量趋势</h2>' + sparkBars(statsData && statsData.daily) + '</div>' +
+    '<div class="dash-grid"><div class="dash-stack">' +
     '<div class="card"><h2>节点运行状态</h2>' + worldMapMarkup() + '<div class="section-gap">' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0)).slice(0,5)) + '</div></div></div>' +
-    '<div class="dash-stack"><div class="card"><h2>控制面与节点</h2><div class="topology"><div class="topology-node">管理端<br><span class="ok">已连接</span></div><i class="topology-line"></i><div class="topology-node">' + nodesData.length + ' 个节点<br><span class="' + (offline?'warn':'ok') + '">' + online + ' 个在线</span></div></div></div>' +
+    '<div class="dash-stack"><div class="card"><h2>近 30 天流量</h2>' + sparkBars(statsData && statsData.daily) + '<div class="btnrow"><button class="secondary small" onclick="selectStats()">查看流量统计</button></div></div>' +
     '<div class="card"><h2>待处理事项</h2>' + attentionRows(offline, certIssues) + '</div></div></div>';
   document.getElementById('main').innerHTML = h;
   drawWorldMap();
@@ -926,17 +1106,17 @@ async function hydrateMissingMapCoords() {
   }));
   if (document.getElementById('worldMap')) drawWorldMap();
 }
-function pageHead(kicker, title, desc, actions) { return '<div class="page-head"><div><div class="eyebrow">' + kicker + '</div><h1>' + title + '</h1><p>' + desc + '</p></div><div class="btnrow">' + (actions || '') + '</div></div>'; }
+function pageHead(kicker, title, desc, actions) { return '<div class="page-head"><div><h1>' + title + '</h1><p>' + desc + '</p></div><div class="btnrow">' + (actions || '') + '</div></div>'; }
 function telemetry(label, value, note, cls) { return '<div class="telemetry ' + cls + '"><div class="t-label">' + label + '</div><div class="t-value">' + value + '</div><div class="t-note">' + note + '</div></div>'; }
 function sparkBars(daily) { const ds = daily || []; if (!ds.length) return '<div class="empty compact">暂无流量上报数据</div>'; let max=Math.max(...ds.map(x=>(+x.up||0)+(+x.down||0)),1); return '<div class="spark">'+ds.map(x=>'<span title="'+esc(x.date||'')+' '+fmtBytes((+x.up||0)+(+x.down||0))+'" style="height:'+Math.max(4,(((+x.up||0)+(+x.down||0))/max*100))+'%"></span>').join('')+'</div>'; }
-function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';const region=regionLabel(n);return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><span class="node-region">'+esc((n.flag ? n.flag+' ' : '') + region)+'</span><code>'+esc(n.address)+'</code></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
-function attentionRows(offline, certIssues) { if (!offline && !certIssues) return '<div class="empty compact">暂无已知异常</div>'; let h=''; if(offline) h+='<div class="fleet-row"><span>离线或未上报节点</span><span class="pill off">'+offline+'</span><button class="secondary small" onclick="selectNodeHub()">查看</button></div>'; if(certIssues) h+='<div class="fleet-row"><span>失败或 30 天内到期证书</span><span class="pill warn">'+certIssues+'</span><button class="secondary small" onclick="selectCertificateHub()">查看</button></div>'; return h; }
+function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';const region=regionLabel(n);return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><span class="node-region">'+esc(region)+'</span></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
+function attentionRows(offline, certIssues) { if (!offline && !certIssues) return '<div class="empty compact">暂无已知异常</div>'; let h=''; if(offline) h+='<div class="attention-row"><span>离线或未上报节点</span><span class="pill off">'+offline+'</span><button class="secondary small" onclick="selectNodeHub()">查看</button></div>'; if(certIssues) h+='<div class="attention-row"><span>失败或 30 天内到期证书</span><span class="pill warn">'+certIssues+'</span><button class="secondary small" onclick="selectCertificateHub()">查看</button></div>'; return h; }
 async function loadOverviewStats() { const d=await api('GET','/stats/overview'); if(d){statsData=d;if(!sel.type)renderWelcome();} }
 async function refreshDashboard() { await Promise.all([loadNodes(),loadSubs(),loadCerts(),loadNotifiers(),loadAllInbounds(),loadOverviewStats()]); if(!sel.type) renderWelcome(); }
 
 function renderNodeHub() {
   const online=nodesData.filter(n=>n.status==='online').length, pending=nodesData.filter(n=>deployState[n.id]&&deployState[n.id].pending).length;
-  let h=pageHead('节点 / 管理', '节点管理', '集中查看代理节点、运行状态与下发情况。','<button class="secondary small" onclick="loadNodes()">刷新状态</button><button class="secondary small" onclick="syncAllNodes()">全部下发</button><button class="small" onclick="showCreateNode()">添加节点</button>')+
+  let h=pageHead('资源 / 节点', '节点管理', '管理节点连接、运行状态和配置下发。','<button class="secondary small" onclick="loadNodes()">刷新状态</button><button class="secondary small" onclick="syncAllNodes()">全部下发</button><button class="small" onclick="showCreateNode()">添加节点</button>')+
     '<div class="telemetry-grid compact">'+telemetry('节点总数',nodesData.length,'已注册节点代理','')+telemetry('在线节点',online,'最近心跳正常','green')+telemetry('待下发配置',pending,pending?'存在未应用修改':'配置已同步',pending?'amber':'green')+'</div><div class="card"><h2>受管节点</h2>'+listToolbar('nodes-list','搜索节点、地址或状态…',nodesData.length)+'<div data-list="nodes-list">'+fleetRows(nodesData)+'</div><div class="filtered-empty" data-filter-empty="nodes-list">没有匹配的节点</div></div>';
   document.getElementById('main').innerHTML=h;
   restoreListFilter('nodes-list');
@@ -944,22 +1124,22 @@ function renderNodeHub() {
 function renderInboundHub() {
   const enabled=inboundCatalog.filter(x=>x.enabled).length, users=Object.values(clientsCache).reduce((n,a)=>n+(a||[]).length,0);
   let rows=inboundCatalog.map(i=>{const node=nodesData.find(n=>n.id===i.node_id);const loaded=Object.prototype.hasOwnProperty.call(clientsCache,i.id);const count=loaded?(clientsCache[i.id]||[]).length:'—';return '<tr data-search-row><td><b>'+esc(i.name||('入站 #'+i.id))+'</b><br><span class="muted">'+esc(node&&node.name||('节点 #'+i.node_id))+'</span></td><td><span class="badge blue">'+esc(i.protocol)+'</span></td><td>'+i.port+' / '+esc(i.transport||'tcp')+'</td><td>'+(i.tls_enabled?'<span class="pill ok">TLS</span>':'<span class="pill neutral">明文</span>')+'</td><td>'+count+'</td><td>'+(i.connectivity==='ok'?'<span class="pill ok">连通</span>':i.connectivity==='fail'?'<span class="pill off">失败</span>':'<span class="pill neutral">未探测</span>')+'</td><td><button class="secondary small" onclick="selectInbound('+i.id+','+i.node_id+')">查看</button></td></tr>'}).join('');
-  document.getElementById('main').innerHTML=pageHead('入站 / 身份','入站管理','管理 Xray-Core 入站、传输协议、TLS 与客户端身份。','<button class="secondary small" onclick="loadAllInbounds()">重新载入</button>'+(nodesData.length?'<button class="small" onclick="showCreateInbound()">创建入站</button>':'<button class="small" onclick="showCreateNode()">先添加节点</button>'))+
+  document.getElementById('main').innerHTML=pageHead('资源 / 入站','入站管理','管理代理入口、传输方式、TLS 和客户端。','<button class="secondary small" onclick="loadAllInbounds()">重新载入</button>'+(nodesData.length?'<button class="small" onclick="showCreateInbound()">创建入站</button>':'<button class="small" onclick="showCreateNode()">先添加节点</button>'))+
     '<div class="telemetry-grid compact">'+telemetry('全部入站',inboundCatalog.length,'已配置端口','')+telemetry('已启用',enabled,'配置启用状态','green')+telemetry('已加载客户端',users,'正在按入站汇总','')+'</div><div class="card"><h2>入站目录</h2>'+listToolbar('inbounds-list','搜索入站、节点、协议或端口…',inboundCatalog.length)+'<div class="tblwrap"><table class="tbl"><thead><tr><th>入站 / 节点</th><th>协议</th><th>端口 / 传输</th><th>安全</th><th>用户</th><th>连通性</th><th></th></tr></thead><tbody data-list="inbounds-list">'+(rows||'<tr><td colspan="7" class="empty">暂无入站</td></tr>')+'</tbody></table><div class="filtered-empty" data-filter-empty="inbounds-list">没有匹配的入站</div></div></div>';
   restoreListFilter('inbounds-list');
 }
 function renderResourceHub() {
   const section = sel.section === 'certificates' ? 'certificates' : 'subscriptions';
-  const subCards=subsData.map(s=>'<div class="resource-card" data-search-row><span class="badge blue">'+formatName(s.format)+'</span><h3>'+esc(s.name)+'</h3><code>'+((s.mode==='acl4ssr'||s.mode==='acl4ssr_online')?'已启用 ACL4SSR 规则':'直连配置')+'</code><div class="btnrow"><button class="secondary small" onclick="copyText(location.origin+\'/api/v1/sub/'+s.token+'\')">复制链接</button><button class="secondary small" onclick="selectSub('+s.id+')">管理</button></div></div>').join('');
+  const subCards=subsData.map(s=>'<div class="resource-card" data-search-row><span class="badge blue">'+formatName(s.format)+'</span><h3>'+esc(s.name)+'</h3><code>'+((s.mode==='acl4ssr'||s.mode==='acl4ssr_online')?'已启用 ACL4SSR 规则':'直连配置')+'</code><div class="btnrow"><button class="secondary small" onclick="copyText(location.origin+\'/api/v1/sub/'+s.token+'\')">复制链接</button><button class="secondary small" onclick="showSubscriptionQr('+s.id+')">二维码</button><button class="secondary small" onclick="selectSub('+s.id+')">管理</button></div></div>').join('');
   const certRows=certsData.map(c=>'<tr data-search-row><td><b>'+esc(c.domain)+'</b></td><td>'+certPill(c)+'</td><td>'+esc((c.expires_at||'').replace('T',' ').slice(0,10)||'—')+'</td><td>'+(c.auto_renew?'<span class="pill ok">自动</span>':'<span class="pill warn">手动</span>')+'</td><td><button class="secondary small" onclick="selectCert('+c.id+')">管理</button></td></tr>').join('');
   let body='';
   if(section==='subscriptions') body='<div class="card"><h2>订阅分组</h2>'+listToolbar('subscriptions-list','搜索订阅名称、格式或规则…',subsData.length)+'<div class="resource-grid" data-list="subscriptions-list">'+(subCards||'<div class="resource-card"><h3>暂无订阅分组</h3><code>创建第一个订阅分组</code></div>')+'</div><div class="filtered-empty" data-filter-empty="subscriptions-list">没有匹配的订阅</div></div>';
-  else body='<div class="card"><h2>Let\'s Encrypt 证书</h2>'+listToolbar('certificates-list','搜索域名、状态或续签方式…',certsData.length)+'<div class="tblwrap"><table class="tbl"><thead><tr><th>域名</th><th>状态</th><th>到期</th><th>自动续签</th><th></th></tr></thead><tbody data-list="certificates-list">'+(certRows||'<tr><td colspan="5" class="empty">暂无证书</td></tr>')+'</tbody></table><div class="filtered-empty" data-filter-empty="certificates-list">没有匹配的证书</div></div></div>';
+  else body='<div class="card"><h2>证书列表</h2>'+listToolbar('certificates-list','搜索域名、状态或续签方式…',certsData.length)+'<div class="tblwrap"><table class="tbl"><thead><tr><th>域名</th><th>状态</th><th>到期</th><th>自动续签</th><th></th></tr></thead><tbody data-list="certificates-list">'+(certRows||'<tr><td colspan="5" class="empty">暂无证书</td></tr>')+'</tbody></table><div class="filtered-empty" data-filter-empty="certificates-list">没有匹配的证书</div></div></div>';
   const certIssues=certsData.filter(c=>['failed','expired','error'].includes((c.status||'').toLowerCase())||(c.expires_at&&new Date(c.expires_at).getTime()<Date.now()+30*86400000)).length;
   const metrics=section==='subscriptions'
     ? telemetry('订阅分组',subsData.length,'已配置分组','')+telemetry('已启用',subsData.filter(s=>s.enabled).length,'可公开获取','green')+telemetry('规则模式',subsData.filter(s=>s.mode&&s.mode!=='none').length,'启用路由规则','')
     : telemetry('托管证书',certsData.length,'证书记录','')+telemetry('已签发',certsData.filter(c=>['issued','valid','ok'].includes((c.status||'').toLowerCase())).length,'当前有效','green')+telemetry('需要关注',certIssues,'失败或即将到期',certIssues?'amber':'green');
-  document.getElementById('main').innerHTML=pageHead('安全 / 分发',section==='subscriptions'?'订阅管理':'证书管理',section==='subscriptions'?'管理订阅分组、客户端范围与配置分发链接。':'管理证书申请、续签状态与节点分发。',section==='subscriptions'?'<button class="small" onclick="showCreateSub()">新建订阅</button>':'<button class="small" onclick="showCreateCert()">申请证书</button>')+
+  document.getElementById('main').innerHTML=pageHead('资源 / 分发',section==='subscriptions'?'订阅管理':'证书管理',section==='subscriptions'?'创建订阅链接并选择可用的入站和客户端。':'申请、续签证书并管理节点分发。',section==='subscriptions'?'<button class="small" onclick="showCreateSub()">新建订阅</button>':'<button class="small" onclick="showCreateCert()">申请证书</button>')+
     '<div class="telemetry-grid compact">'+metrics+'</div>'+body;
   restoreListFilter(section==='subscriptions'?'subscriptions-list':'certificates-list');
 }
@@ -1027,14 +1207,14 @@ function renderStatsView() {
   const d = statsData; if (!d) return;
   const today = d.today || { up: 0, down: 0 };
   const total = d.total || { up: 0, down: 0 };
-  let h = '<div class="card"><h2>流量统计</h2><div class="kpis">' +
+  let h = pageHead('','流量统计','查看每日流量趋势及节点、客户端用量。','')+'<div class="card"><h2>流量汇总</h2><div class="kpis">' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up) + '</div><div class="kl">今日上行</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.down) + '</div><div class="kl">今日下行</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(today.up + today.down) + '</div><div class="kl">今日合计</div></div>' +
     '<div class="kpi"><div class="kv">' + fmtBytes(total.up + total.down) + '</div><div class="kl">累计合计</div></div></div></div>';
 
-  h += '<div class="card"><h2>📈 近 30 天趋势</h2>';
-  if (!d.daily || !d.daily.length) h += '<div class="empty"><div class="em-ic">📈</div>暂无趋势数据</div>';
+  h += '<div class="card"><h2>近 30 天流量趋势</h2>';
+  if (!d.daily || !d.daily.length) h += '<div class="empty">暂无趋势数据</div>';
   else {
     let max = 1;
     d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
@@ -1051,8 +1231,8 @@ function renderStatsView() {
   }
   h += '</div>';
 
-  h += '<div class="card"><h2>🖥 按节点（当月）</h2>';
-  if (!d.nodes || !d.nodes.length) h += '<div class="empty"><div class="em-ic">📡</div>暂无节点流量数据</div>';
+  h += '<div class="card"><h2>节点流量（当月）</h2>';
+  if (!d.nodes || !d.nodes.length) h += '<div class="empty">暂无节点流量数据</div>';
   else {
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody>';
     d.nodes.forEach(n => {
@@ -1065,7 +1245,7 @@ function renderStatsView() {
   h += '</div>';
 
   h += '<div class="card"><h2>按客户端</h2>';
-  if (!d.clients || !d.clients.length) h += '<div class="empty"><div class="em-ic">👥</div>暂无客户端流量数据</div>';
+  if (!d.clients || !d.clients.length) h += '<div class="empty">暂无客户端流量数据</div>';
   else {
     h += listToolbar('traffic-clients','搜索客户端或流量…',d.clients.length);
     h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>客户端</th><th>上行</th><th>下行</th><th>合计</th><th>用量</th></tr></thead><tbody id="stats_clients_tb" data-list="traffic-clients">';
@@ -1438,7 +1618,7 @@ async function renderInboundDetail(id) {
   const node = nodesData.find(x => x.id === nodeId);
   document.getElementById('main').innerHTML =
     detailHead('入站 · ' + (node ? node.name : '#' + nodeId), inboundLabel(inb), '/inbounds') +
-    '<div class="card"><h2>入站信息</h2>' +
+    '<div class="card"><h2>入站配置</h2>' +
     '<div class="field-grid">' +
     '<div><label>名称（可选）</label><input id="ib_name" value="' + esc(inb.name || '') + '" placeholder="如 hk-tg-ws"></div>' +
     '<div><label>启用</label><input id="ib_enabled" type="checkbox" ' + (inb.enabled ? 'checked' : '') + '></div>' +
@@ -1655,7 +1835,7 @@ async function renderSubDetail(id) {
   const selectedIds = cur.inbound_ids || [];
   document.getElementById('main').innerHTML =
     detailHead('订阅', g.name, '/resources/subscriptions') +
-    '<div class="card"><h2>🔗 订阅配置</h2>' +
+    '<div class="card"><h2>订阅配置</h2>' +
     '<div class="row">' +
     '<div><label>名称</label><input id="s_name2" value="' + esc(g.name) + '"></div>' +
     '<div><label>格式</label><select id="s_fmt2">' + subFmtOptions(g.format) + '</select></div>' +
@@ -1676,7 +1856,7 @@ async function renderSubDetail(id) {
     ((d.members || []).length ?
       '<div class="tblwrap"><table class="tbl"><thead><tr><th>节点</th><th>地址</th><th>协议</th></tr></thead><tbody>' +
       (d.members || []).map(m => '<tr><td>' + esc(m.Alias || m.UUID) + '</td><td class="muted">' + esc(m.Host + ':' + m.Port) + '</td><td>' + esc(m.Protocol || '') + '</td></tr>').join('') +
-      '</tbody></table></div>' : '<div class="empty"><div class="em-ic">🔗</div>暂无节点</div>') +
+      '</tbody></table></div>' : '<div class="empty">暂无节点</div>') +
     '</div>';
 }
 async function loadSubPreview(token) {
@@ -1836,7 +2016,7 @@ function notifierEventsLabel(raw) {
 }
 function renderNotifierHub() {
   const rows = notifData.map(n=>'<tr data-search-row><td><b>'+esc(n.name)+'</b></td><td><span class="badge blue">'+esc(notifTypeLabel(n.type))+'</span></td><td>'+(n.enabled?'<span class="pill ok">已启用</span>':'<span class="pill neutral">已停用</span>')+'</td><td>'+esc(notifierEventsLabel(n.events))+'</td><td><button class="secondary small" onclick="selectNotifier('+n.id+')">编辑</button> <button class="secondary small" onclick="withBusy(this,()=>testNotifier('+n.id+'))">发送测试</button></td></tr>').join('');
-  document.getElementById('main').innerHTML=pageHead('事件 / 通知','预警通知','配置邮件、企业微信或 Telegram 告警渠道。','<button class="small" onclick="showCreateNotifier()">新建渠道</button>')+
+  document.getElementById('main').innerHTML=pageHead('系统 / 通知','预警通知','配置告警渠道并选择需要接收的系统事件。','<button class="small" onclick="showCreateNotifier()">新建渠道</button>')+
     '<div class="telemetry-grid compact">'+telemetry('全部渠道',notifData.length,'已配置渠道','')+telemetry('已启用',notifData.filter(n=>n.enabled).length,'可接收事件','green')+telemetry('即时通讯',notifData.filter(n=>n.type!=='email').length,'企业微信 / Telegram','')+'</div>'+
     '<div class="card"><h2>通知渠道</h2>'+listToolbar('notifiers-list','搜索名称、类型、状态或事件…',notifData.length)+'<div class="tblwrap"><table class="tbl"><thead><tr><th>名称</th><th>类型</th><th>状态</th><th>订阅事件</th><th>操作</th></tr></thead><tbody data-list="notifiers-list">'+(rows||'<tr><td colspan="5"><div class="empty compact">暂无通知渠道</div></td></tr>')+'</tbody></table><div class="filtered-empty" data-filter-empty="notifiers-list">没有匹配的通知渠道</div></div></div>';
   restoreListFilter('notifiers-list');
@@ -1933,11 +2113,12 @@ async function renderSettings() {
     settingsData = await api('GET','/settings');
     if (!settingsData || sel.type !== 'settings' || epoch !== routeEpoch) return;
   }
-  document.getElementById('main').innerHTML=pageHead('控制台 / 偏好','系统设置','管理 Agent 心跳、浏览器偏好与管理员账号。','')+
-    '<div class="settings-grid"><div class="card"><h2>Agent 心跳</h2><label for="set_hb">全局心跳间隔（秒）</label><input id="set_hb" type="number" min="5" max="86400" value="'+esc(settingsData.agent_heartbeat_interval||30)+'"><p class="muted">范围 5–86400 秒，Agent 在后续心跳响应中获取新值。</p><div class="btnrow"><button onclick="withBusy(this,saveSettings)">保存设置</button></div></div>'+
-    '<div class="card"><h2>本机偏好</h2><label class="chk"><input type="checkbox" '+(dark?'checked':'')+' onchange="toggleDark()"> 使用深色主题</label><label class="chk" style="margin-top:14px"><input type="checkbox" '+(autoSync?'checked':'')+' onchange="setAutoSync(this.checked)"> 保存配置后自动下发</label><p class="muted">这些设置只保存在当前浏览器。</p></div>'+
+  document.getElementById('main').innerHTML=pageHead('系统 / 设置','系统设置','管理节点代理心跳、浏览器偏好和管理员账号。','')+
+    '<div class="settings-grid"><div class="card"><h2>节点代理心跳</h2><label for="set_hb">全局心跳间隔（秒）</label><input id="set_hb" type="number" min="5" max="86400" value="'+esc(settingsData.agent_heartbeat_interval||30)+'"><p class="muted">范围 5–86400 秒，节点代理会在后续心跳响应中获取新值。</p><div class="btnrow"><button onclick="withBusy(this,saveSettings)">保存设置</button></div></div>'+
+    '<div class="card"><h2>配置下发</h2><label class="chk"><input type="checkbox" '+(autoSync?'checked':'')+' onchange="setAutoSync(this.checked)"> 保存配置后自动下发</label><p class="muted">关闭后，保存的配置需手动下发到节点。此偏好仅保存在当前浏览器。</p></div>'+
     '<div class="card"><h2>管理员账号</h2><p class="muted">当前登录账号：admin</p><div class="btnrow"><button class="secondary" onclick="showChangePw()">修改密码</button><button class="secondary" onclick="logout()">退出登录</button></div></div>'+
-    '<div class="card"><h2>当前能力边界</h2><div class="subtle-note">当前后端仅提供全局心跳间隔设置。TLS 校验、主密钥状态与任务队列尚无读取接口，因此控制台不展示推测状态。</div></div></div>';
+    '<div class="card appearance-card" style="grid-column:1/-1"><h2>外观主题</h2>'+appearanceControls()+'</div></div>';
+  applyTheme();
 }
 async function saveSettings() {
   const hb=parseInt(val('set_hb'),10);
@@ -2093,7 +2274,10 @@ async function enterApp() {
   if (!MUST_CHANGE_PWD) refreshTimer = setInterval(loadNodes, 30000);
 }
 
-window.addEventListener('hashchange', () => { capturePageState(); applyRoute(); });
+window.addEventListener('hashchange', e => {
+  if (!navigationApproved && dirtyFields().length && !window.confirm('有未保存的修改，确定放弃并离开当前页面吗？')) { history.replaceState(null,'',e.oldURL); return; }
+  navigationApproved=false; editedFields.clear(); capturePageState(); applyRoute();
+});
 if (token) enterApp();
 else { document.getElementById('loginWrap').classList.remove('hidden'); document.getElementById('app').classList.add('hidden'); }
 </script>
