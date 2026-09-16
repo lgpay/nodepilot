@@ -20,6 +20,7 @@ var geoClient = &http.Client{Timeout: 6 * time.Second}
 // 若地址变更会走新 IP 重新识别。
 type geoCacheEntry struct {
 	code, name, city, region string
+	latitude, longitude      float64
 }
 
 var (
@@ -28,20 +29,20 @@ var (
 )
 
 // cachedGeoLookup 先查缓存，未命中则调外部服务并把成功结果写入缓存。
-func cachedGeoLookup(ip string) (code, name, city, region string) {
+func cachedGeoLookup(ip string) (code, name, city, region string, latitude, longitude float64) {
 	geoCacheMu.Lock()
 	e, ok := geoCache[ip]
 	geoCacheMu.Unlock()
 	if ok {
-		return e.code, e.name, e.city, e.region
+		return e.code, e.name, e.city, e.region, e.latitude, e.longitude
 	}
-	code, name, city, region = geoLookup(ip)
+	code, name, city, region, latitude, longitude = geoLookup(ip)
 	if code != "" {
 		geoCacheMu.Lock()
-		geoCache[ip] = geoCacheEntry{code, name, city, region}
+		geoCache[ip] = geoCacheEntry{code, name, city, region, latitude, longitude}
 		geoCacheMu.Unlock()
 	}
-	return code, name, city, region
+	return code, name, city, region, latitude, longitude
 }
 
 // GeoLookup 根据节点地址（ip:port 或域名）查询所属国家（ISO 两位码 + 国家名 + 城市）。
@@ -70,24 +71,24 @@ func GeoLookup(c *gin.Context) {
 			ip = ips[0]
 		}
 	}
-	code, name, city, region := cachedGeoLookup(ip.String())
+	code, name, city, region, latitude, longitude := cachedGeoLookup(ip.String())
 	if code == "" {
 		c.JSON(502, gin.H{"error": "IP 归属查询失败，请稍后重试"})
 		return
 	}
-	c.JSON(200, gin.H{"country_code": code, "country": name, "city": city, "region": region})
+	c.JSON(200, gin.H{"country_code": code, "country": name, "city": city, "region": region, "latitude": latitude, "longitude": longitude})
 }
 
 // geoLookup 依次尝试多个免费 IP 归属服务，返回第一个成功结果（国家码/国家名/城市/省州）。
-func geoLookup(ip string) (code, name, city, region string) {
+func geoLookup(ip string) (code, name, city, region string, latitude, longitude float64) {
 	// url/字段名/成功判定字段（statusKey+statusOK 为空则只取 codeKey）
 	type probe struct {
-		url, codeKey, nameKey, cityKey, regionKey, statusKey, statusOK string
+		url, codeKey, nameKey, cityKey, regionKey, latKey, lonKey, statusKey, statusOK string
 	}
 	probes := []probe{
-		{"http://ip-api.com/json/%s?lang=zh-CN", "countryCode", "country", "city", "regionName", "status", "success"},
-		{"https://ipwho.is/%s", "country_code", "country", "city", "region", "success", "true"},
-		{"https://ipapi.co/%s/json/", "country_code", "country_name", "city", "region", "", ""},
+		{"http://ip-api.com/json/%s?lang=zh-CN", "countryCode", "country", "city", "regionName", "lat", "lon", "status", "success"},
+		{"https://ipwho.is/%s", "country_code", "country", "city", "region", "latitude", "longitude", "success", "true"},
+		{"https://ipapi.co/%s/json/", "country_code", "country_name", "city", "region", "latitude", "longitude", "", ""},
 	}
 	for _, p := range probes {
 		u := fmt.Sprintf(p.url, ip)
@@ -122,7 +123,9 @@ func geoLookup(ip string) (code, name, city, region string) {
 		nameV, _ := d[p.nameKey].(string)
 		cityV, _ := d[p.cityKey].(string)
 		regionV, _ := d[p.regionKey].(string)
-		return strings.ToUpper(codeV), nameV, cityV, regionV
+		latV, _ := d[p.latKey].(float64)
+		lonV, _ := d[p.lonKey].(float64)
+		return strings.ToUpper(codeV), nameV, cityV, regionV, latV, lonV
 	}
-	return "", "", "", ""
+	return "", "", "", "", 0, 0
 }

@@ -14,13 +14,15 @@ type Admin struct {
 
 // Node 代理节点（数据面）：运行 node-agent + xray
 type Node struct {
-	ID      uint   `gorm:"primaryKey" json:"id"`
-	Name    string `gorm:"size:128" json:"name"`
-	Address string `gorm:"size:128" json:"address"` // agent 监听地址，如 127.0.0.1:54321
-	Region  string `gorm:"size:64" json:"region"`   // 国家（中文名或 ISO 码），用于生成旗帜
-	City    string `gorm:"size:64" json:"city"`     // 城市（如 法兰克福），让区域显示更精确
-	Flag    string `json:"flag" gorm:"-"`           // 由 region 派生，不入库
-	Tags    string `gorm:"size:512" json:"tags"`    // 逗号分隔
+	ID        uint    `gorm:"primaryKey" json:"id"`
+	Name      string  `gorm:"size:128" json:"name"`
+	Address   string  `gorm:"size:128" json:"address"` // agent 监听地址，如 127.0.0.1:54321
+	Region    string  `gorm:"size:64" json:"region"`   // 国家（中文名或 ISO 码），用于生成旗帜
+	City      string  `gorm:"size:64" json:"city"`     // 城市（如 法兰克福），让区域显示更精确
+	Latitude  float64 `json:"latitude"`                // IP 归属地纬度，用于概览地图标点
+	Longitude float64 `json:"longitude"`               // IP 归属地经度，用于概览地图标点
+	Flag      string  `json:"flag" gorm:"-"`           // 由 region 派生，不入库
+	Tags      string  `gorm:"size:512" json:"tags"`    // 逗号分隔
 	// 节点 token 不再以明文持久化：
 	//   TokenHash：sha256(token) hex，用于校验 agent 上报/下发的 Bearer（常量时间比较）。
 	//   TokenEnc ：AES-GCM 加密的明文 token，仅用于管理端主动推送配置/证书到 agent 时解密使用。
@@ -34,7 +36,7 @@ type Node struct {
 	CPU                 float64    `json:"cpu"` // 最近心跳上报的 CPU 使用率(%)
 	Mem                 float64    `json:"mem"` // 最近心跳上报的内存使用率(%)
 	LastHeartbeat       time.Time  `json:"last_heartbeat"`
-	HeartbeatInterval   int        `gorm:"default:30" json:"heartbeat_interval"` // agent 心跳间隔(秒)，由 agent 上报
+	HeartbeatInterval   int        `gorm:"default:30" json:"heartbeat_interval"`   // agent 心跳间隔(秒)，由 agent 上报
 	PortRange           string     `gorm:"size:64" json:"port_range"`              // 如 10000-65535 或 10000-20000,30000-40000；空=全局默认
 	MonthlyTrafficBytes int64      `gorm:"default:0" json:"monthly_traffic_bytes"` // 月流量上限(字节)，0=不限
 	ExpiresAt           *time.Time `json:"expires_at"`                             // 服务器有效期（到期时间），空=长期有效

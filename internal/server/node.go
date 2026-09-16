@@ -116,13 +116,15 @@ func ChangePassword(c *gin.Context) {
 
 func CreateNode(c *gin.Context) {
 	var body struct {
-		Name                string `json:"name"`
-		Address             string `json:"address"`
-		Region              string `json:"region"`
-		City                string `json:"city"`
-		Tags                string `json:"tags"`
-		PortRange           string `json:"port_range"`
-		MonthlyTrafficBytes int64  `json:"monthly_traffic_bytes"`
+		Name                string  `json:"name"`
+		Address             string  `json:"address"`
+		Region              string  `json:"region"`
+		City                string  `json:"city"`
+		Latitude            float64 `json:"latitude"`
+		Longitude           float64 `json:"longitude"`
+		Tags                string  `json:"tags"`
+		PortRange           string  `json:"port_range"`
+		MonthlyTrafficBytes int64   `json:"monthly_traffic_bytes"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -151,6 +153,8 @@ func CreateNode(c *gin.Context) {
 		Address:             strings.TrimSpace(body.Address),
 		Region:              strings.TrimSpace(body.Region),
 		City:                strings.TrimSpace(body.City),
+		Latitude:            body.Latitude,
+		Longitude:           body.Longitude,
 		Tags:                strings.TrimSpace(body.Tags),
 		PortRange:           strings.TrimSpace(body.PortRange),
 		MonthlyTrafficBytes: body.MonthlyTrafficBytes,
@@ -172,7 +176,7 @@ func CreateNode(c *gin.Context) {
 func ListNodes(c *gin.Context) {
 	var nodes []model.Node
 	// 不返回 Token 字段
-	store.DB.Select("id,name,address,region,city,tags,enabled,status,connectivity,agent_version,cpu,mem,last_heartbeat,port_range,monthly_traffic_bytes,expires_at,created_at").
+	store.DB.Select("id,name,address,region,city,latitude,longitude,tags,enabled,status,connectivity,agent_version,cpu,mem,last_heartbeat,port_range,monthly_traffic_bytes,expires_at,created_at").
 		Find(&nodes)
 	for i := range nodes {
 		nodes[i].Flag = subscription.FlagEmoji(nodes[i].Region)
@@ -256,14 +260,16 @@ func UpdateNode(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name                *string `json:"name"`
-		Region              *string `json:"region"`
-		City                *string `json:"city"`
-		Tags                *string `json:"tags"`
-		Enabled             *bool   `json:"enabled"`
-		PortRange           *string `json:"port_range"`
-		MonthlyTrafficBytes *int64  `json:"monthly_traffic_bytes"`
-		ExpiresAt           *string `json:"expires_at"` // RFC3339；空串=清除（长期有效）
+		Name                *string  `json:"name"`
+		Region              *string  `json:"region"`
+		City                *string  `json:"city"`
+		Latitude            *float64 `json:"latitude"`
+		Longitude           *float64 `json:"longitude"`
+		Tags                *string  `json:"tags"`
+		Enabled             *bool    `json:"enabled"`
+		PortRange           *string  `json:"port_range"`
+		MonthlyTrafficBytes *int64   `json:"monthly_traffic_bytes"`
+		ExpiresAt           *string  `json:"expires_at"` // RFC3339；空串=清除（长期有效）
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -278,6 +284,12 @@ func UpdateNode(c *gin.Context) {
 	}
 	if body.City != nil {
 		updates["city"] = *body.City
+	}
+	if body.Latitude != nil {
+		updates["latitude"] = *body.Latitude
+	}
+	if body.Longitude != nil {
+		updates["longitude"] = *body.Longitude
 	}
 	if body.Tags != nil {
 		updates["tags"] = *body.Tags

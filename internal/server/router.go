@@ -118,6 +118,16 @@ func NewRouter(webDir string) *gin.Engine {
 		if fp := filepath.Join(webDir, "lockup.png"); fileExists(fp) {
 			r.StaticFile("/lockup.png", fp)
 		}
+		// 概览页世界地图使用的 Natural Earth 110m 陆地拓扑数据。
+		if fp := filepath.Join(webDir, "land-110m.json"); fileExists(fp) {
+			r.StaticFile("/land-110m.json", fp)
+		}
+		if fp := filepath.Join(webDir, "d3.min.js"); fileExists(fp) {
+			r.StaticFile("/d3.min.js", fp)
+		}
+		if fp := filepath.Join(webDir, "topojson-client.min.js"); fileExists(fp) {
+			r.StaticFile("/topojson-client.min.js", fp)
+		}
 	}
 
 	return r

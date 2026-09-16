@@ -191,12 +191,13 @@
   .kl { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .bar { display: inline-block; width: 90px; height: 8px; background: var(--border); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
   .bar span { display: block; height: 100%; background: var(--primary); }
-  .barchart { display: flex; align-items: flex-end; gap: 4px; height: 220px; margin-top: 8px; overflow-x: auto; padding-bottom: 4px; }
-  .bcol { flex: 1 0 28px; min-width: 28px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
-  .bval { font-size: 10px; color: var(--muted); white-space: nowrap; transform: scale(.9); margin-bottom: 2px; }
-  .bar-v { width: 70%; max-width: 30px; height: 180px; background: var(--border); border-radius: 4px 4px 0 0; overflow: hidden; display: flex; align-items: flex-end; }
+  .barchart { display: grid; grid-template-columns: repeat(var(--bar-count, 30), minmax(0, 1fr)); align-items: end; gap: clamp(1px, .3vw, 4px); width: 100%; height: 220px; margin-top: 8px; overflow: hidden; padding-bottom: 4px; }
+  .bcol { min-width: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; overflow: visible; }
+  .bval { display: none; }
+  .bar-v { width: min(70%, 30px); min-width: 2px; height: 180px; background: var(--border); border-radius: 4px 4px 0 0; overflow: hidden; display: flex; align-items: flex-end; }
   .bar-v span { display: block; width: 100%; background: var(--primary); border-radius: 4px 4px 0 0; }
-  .bdate { font-size: 10px; color: var(--muted); margin-top: 4px; white-space: nowrap; }
+  .bdate { width: 100%; height: 14px; overflow: visible; font-size: 9px; color: transparent; margin-top: 4px; white-space: nowrap; text-align: center; }
+  .bcol:nth-child(5n + 1) .bdate, .bcol:last-child .bdate { color: var(--muted); }
 
   .qgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
   .qcard { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; cursor: pointer; box-shadow: var(--shadow); transition: border-color .14s; }
@@ -311,6 +312,43 @@
   .spark span { flex:1; min-width:3px; background:linear-gradient(180deg,var(--primary),rgba(6,182,212,.12)); border-radius:1px 1px 0 0; opacity:.82; }
   .fleet-row { display:grid; grid-template-columns:minmax(140px,1.4fr) 72px minmax(155px,1fr) 88px 76px; align-items:center; gap:10px; min-height:42px; padding:6px 2px; border-bottom:1px solid var(--border); font-size:11px; }
   .fleet-row:last-child{border-bottom:0}.fleet-row code{font-size:10px;color:var(--muted)}
+  .fleet-row .node-region { display:block; margin-top:2px; font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .world-map { position:relative; width:100%; aspect-ratio:2/1; min-height:220px; overflow:hidden; background:radial-gradient(circle at 50% 42%,rgba(6,182,212,.07),transparent 62%),var(--bg); border:1px solid var(--border); }
+  .world-map svg { display:block; width:100%; height:100%; }
+  .world-map .map-land { fill:rgba(127,141,163,.18); stroke:rgba(127,141,163,.42); stroke-width:.7; vector-effect:non-scaling-stroke; }
+  .world-map .map-grid { fill:none; stroke:rgba(127,141,163,.13); stroke-width:.55; vector-effect:non-scaling-stroke; }
+  .map-marker { cursor:pointer; }
+  .map-marker .map-halo { opacity:.2; transform-box:fill-box; transform-origin:center; animation:mapPulse 2.4s ease-out infinite; }
+  .map-marker .map-dot { stroke:var(--card); stroke-width:2; vector-effect:non-scaling-stroke; }
+  .map-marker.online .map-dot,.map-marker.online .map-halo{fill:var(--ok)}
+  .map-marker.offline .map-dot,.map-marker.offline .map-halo{fill:var(--danger)}
+  .map-marker.mixed .map-dot,.map-marker.mixed .map-halo{fill:var(--warn)}
+  .map-marker text { fill:var(--text); font:600 10px/1 "JetBrains Mono",Consolas,monospace; text-anchor:middle; pointer-events:none; }
+  .map-legend { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:9px; color:var(--muted); font-size:11px; }
+  .map-legend .key { display:inline-flex; align-items:center; gap:5px; }
+  .map-legend .swatch { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 7px currentColor; }
+  .map-legend .swatch.offline{background:var(--danger)} .map-legend .swatch.mixed{background:var(--warn)}
+  .map-unlocated { margin-left:auto; }
+  /* 提升辅助信息可读性，避免深色控制台中字号过小。 */
+  .sb-title { font-size:12px; }
+  .sb-head,.sb-kicker,.eyebrow { font-size:12px; line-height:1.5; }
+  .sidebar-foot { font-size:12px; }
+  .ti { font-size:14px; }
+  .nav-count,.ops-strip { font-size:12px; }
+  .card h2 { font-size:15px; }
+  .page-head p { font-size:13px; }
+  .telemetry .t-label { font-size:12px; }
+  .telemetry .t-note { font-size:12px; line-height:1.5; }
+  .list-count { font-size:11px; }
+  .fleet-row { font-size:12px; }
+  .fleet-row code,.fleet-row .node-region { font-size:12px; }
+  .fleet-row > span:first-child { min-width:0; overflow-wrap:anywhere; }
+  .resource-card code,.topology-node { font-size:12px; }
+  .map-legend { font-size:12px; }
+  .subtle-note { font-size:13px; }
+  .tbl th { font-size:12px; line-height:1.4; }
+  .pill,.badge { font-size:12px; height:auto; min-height:23px; line-height:1.4; }
+  @keyframes mapPulse { 0%{transform:scale(.9);opacity:.3} 70%,100%{transform:scale(2.2);opacity:0} }
   .resource-grid { display:grid; grid-template-columns:repeat(3,minmax(220px,1fr)); gap:10px; }
   .resource-card { background:var(--card); border:1px solid var(--border); border-top:2px solid var(--primary); padding:14px; border-radius:3px; }
   .resource-card h3 { margin:0 0 4px; color:var(--text); font-size:13px; }.resource-card code{font-size:10px;color:var(--muted)}
@@ -322,7 +360,8 @@
   .login-card { max-width:390px; padding:28px; border-color:rgba(6,182,212,.2); }
   .modal { backdrop-filter:blur(8px); background:rgba(3,7,14,.72); }
   @media(max-width:1100px){.telemetry-grid,.telemetry-grid.compact{grid-template-columns:repeat(2,1fr)}.dash-grid{grid-template-columns:1fr}.resource-grid{grid-template-columns:repeat(2,1fr)}.ops-strip{display:none}}
-  @media(max-width:700px){.account-toggle{display:block}header .right{display:none!important;position:absolute;right:10px;top:52px;z-index:80;width:210px;padding:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);flex-direction:column;align-items:stretch}header .right.mobile-open{display:flex!important}header .right .chk{padding:8px 2px}header .right button{width:100%;margin:0}.telemetry-grid,.telemetry-grid.compact,.resource-grid,.settings-grid{grid-template-columns:1fr}.page-head{align-items:flex-start;flex-direction:column}.detail-head{align-items:flex-start;flex-direction:column}.fleet-row{grid-template-columns:1fr 70px 60px}.fleet-row>:nth-child(3),.fleet-row>:nth-child(4){display:none}.sidebar{top:58px}.main{padding:15px}.list-toolbar{align-items:stretch;flex-direction:column}.list-toolbar .search{max-width:none}.deploy-row{grid-template-columns:1fr 80px}.deploy-row>:last-child{grid-column:1/-1}.deploy-summary{grid-template-columns:1fr}}
+  @media(max-width:700px){.account-toggle{display:block}header .right{display:none!important;position:absolute;right:10px;top:52px;z-index:80;width:210px;padding:12px;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow-lg);flex-direction:column;align-items:stretch}header .right.mobile-open{display:flex!important}header .right .chk{padding:8px 2px}header .right button{width:100%;margin:0}.telemetry-grid,.telemetry-grid.compact,.resource-grid,.settings-grid{grid-template-columns:1fr}.page-head{align-items:flex-start;flex-direction:column}.detail-head{align-items:flex-start;flex-direction:column}.fleet-row{grid-template-columns:1fr 70px 60px}.fleet-row>:nth-child(3),.fleet-row>:nth-child(4){display:none}.sidebar{top:58px}.main{padding:15px}.list-toolbar{align-items:stretch;flex-direction:column}.list-toolbar .search{max-width:none}.deploy-row{grid-template-columns:1fr 80px}.deploy-row>:last-child{grid-column:1/-1}.deploy-summary{grid-template-columns:1fr}.world-map{min-height:170px}.map-unlocated{width:100%;margin-left:0}}
+  @media(prefers-reduced-motion:reduce){.map-marker .map-halo{animation:none}}
 </style>
 </head>
 <body>
@@ -369,6 +408,8 @@
 <div id="confirmLayer" class="modal hidden" style="z-index:1200"><div class="card modalcard" id="confirmBody"></div></div>
 <div id="toast" class="toast"></div>
 
+<script src="d3.min.js"></script>
+<script src="topojson-client.min.js"></script>
 <script>
 const API = '/api/v1';
 let token = localStorage.getItem('np_token') || '';
@@ -832,15 +873,63 @@ function renderWelcome() {
     telemetry('本月流量', statsData ? fmtBytes(monthTraffic) : '—', '按 UTC 月统计', '') +
     telemetry('待关注资源', attention, attention ? offline + ' 节点 · ' + certIssues + ' 证书' : '暂无已知异常', attention ? 'amber' : 'green') + '</div>' +
     '<div class="dash-grid"><div class="dash-stack"><div class="card"><h2>30 天网络流量趋势</h2>' + sparkBars(statsData && statsData.daily) + '</div>' +
-    '<div class="card"><h2>节点运行状态</h2>' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0)).slice(0,5)) + '</div></div>' +
+    '<div class="card"><h2>节点运行状态</h2>' + worldMapMarkup() + '<div class="section-gap">' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0)).slice(0,5)) + '</div></div></div>' +
     '<div class="dash-stack"><div class="card"><h2>控制面与节点</h2><div class="topology"><div class="topology-node">管理端<br><span class="ok">已连接</span></div><i class="topology-line"></i><div class="topology-node">' + nodesData.length + ' 个节点<br><span class="' + (offline?'warn':'ok') + '">' + online + ' 个在线</span></div></div></div>' +
     '<div class="card"><h2>待处理事项</h2>' + attentionRows(offline, certIssues) + '</div></div></div>';
   document.getElementById('main').innerHTML = h;
+  drawWorldMap();
+}
+const fallbackCoords = { '中国':[104,35], '美国':[-100,38], '加拿大':[-106,56], '德国':[10,51], '法国':[2,46], '英国':[-3,55], '日本':[138,36], '新加坡':[104,1], '香港':[114,22], '台湾':[121,24], '韩国':[128,36], '俄罗斯':[90,60], '荷兰':[5,52], '芬兰':[26,64], '瑞典':[15,62], '挪威':[8,61], '丹麦':[10,56], '波兰':[19,52], '西班牙':[-4,40], '意大利':[12,42], '瑞士':[8,47], '奥地利':[14,48], '比利时':[4,51], '澳大利亚':[134,-25], '新西兰':[172,-41], '印度':[79,22], '印度尼西亚':[118,-2], '马来西亚':[102,4], '泰国':[101,15], '越南':[108,16], '菲律宾':[122,13], '巴西':[-52,-10], '墨西哥':[-102,23], '阿根廷':[-64,-34], '智利':[-71,-30], '土耳其':[35,39], '阿联酋':[54,24], '以色列':[35,31], '南非':[24,-29] };
+const mapGeoTried = new Set();
+function nodeCoords(n) {
+  const lat = Number(n.latitude), lon = Number(n.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon)) return [lon, lat];
+  for (const k of Object.keys(fallbackCoords)) if ((n.region || '').includes(k) || (n.city || '').includes(k)) return fallbackCoords[k];
+  return null;
+}
+function worldMapMarkup() {
+  const located = nodesData.filter(n => nodeCoords(n)).length;
+  const unlocated = nodesData.length - located;
+  return '<div id="worldMap" class="world-map" role="img" aria-label="节点全球分布地图"><div class="empty compact">正在加载地图…</div></div><div class="map-legend"><span class="key"><i class="swatch"></i>在线</span><span class="key"><i class="swatch offline"></i>离线</span><span class="key"><i class="swatch mixed"></i>同区域多节点</span>' + (unlocated ? '<span class="map-unlocated">' + unlocated + ' 个节点暂无区域坐标</span>' : '') + '</div>';
+}
+async function drawWorldMap() {
+  const root = document.getElementById('worldMap');
+  if (!root || !window.d3 || !window.topojson) return;
+  const width = Math.max(320, root.clientWidth || 640), height = Math.round(width / 2);
+  try {
+    const world = await fetch('/land-110m.json').then(r => r.json());
+    const land = topojson.feature(world, world.objects.land);
+    const projection = d3.geoEquirectangular().fitSize([width, height], land);
+    const path = d3.geoPath(projection);
+    const groups = {};
+    nodesData.forEach(n => { const c = nodeCoords(n); if (!c) return; const p = projection(c); if (!p) return; const key = p.map(v => Math.round(v / 8)).join(':'); (groups[key] ||= { x:p[0], y:p[1], nodes:[] }).nodes.push(n); });
+    let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="节点全球分布"><path class="map-land" d="' + path(land) + '"/>';
+    for (let lon=-150; lon<=150; lon+=30) { const a=projection([lon,-60]), b=projection([lon,75]); svg += '<path class="map-grid" d="M'+a[0].toFixed(1)+','+a[1].toFixed(1)+' L'+b[0].toFixed(1)+','+b[1].toFixed(1)+'"/>'; }
+    for (const g of Object.values(groups)) { const online=g.nodes.filter(n=>n.status==='online').length, cls=online===g.nodes.length?'online':online?'mixed':'offline'; const label=g.nodes.length>1?String(g.nodes.length):''; const tip=g.nodes.map(n=>n.name+'（'+(n.status==='online'?'在线':'离线')+'）').join('、'); const first=g.nodes[0]; svg += '<g class="map-marker '+cls+'" tabindex="0" role="button" onclick="selectNode('+first.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();selectNode('+first.id+')}" aria-label="'+esc(tip)+'"><title>'+esc(tip)+'</title><circle class="map-halo" cx="'+g.x.toFixed(1)+'" cy="'+g.y.toFixed(1)+'" r="7"/><circle class="map-dot" cx="'+g.x.toFixed(1)+'" cy="'+g.y.toFixed(1)+'" r="4"/>'+(label?'<text x="'+g.x.toFixed(1)+'" y="'+(g.y-9).toFixed(1)+'">'+label+'</text>':'')+'</g>'; }
+    svg += '</svg>'; root.innerHTML = svg;
+    hydrateMissingMapCoords();
+  } catch (e) { root.innerHTML = '<div class="empty compact">地图数据加载失败</div>'; }
+}
+async function hydrateMissingMapCoords() {
+  const targets = nodesData.filter(n => !((Number(n.latitude)||0) || (Number(n.longitude)||0)) && !mapGeoTried.has(n.id));
+  if (!targets.length) return;
+  await Promise.all(targets.map(async n => {
+    mapGeoTried.add(n.id);
+    try {
+      const r = await fetch(API + '/geo?host=' + encodeURIComponent(n.address), { headers:authH() });
+      const d = await r.json();
+      if (!r.ok || !Number.isFinite(Number(d.latitude)) || !Number.isFinite(Number(d.longitude))) return;
+      const body = { region:d.country||d.country_code||n.region||'', city:d.city||d.region||n.city||'', latitude:Number(d.latitude), longitude:Number(d.longitude) };
+      const saved = await fetch(API + '/nodes/' + n.id, { method:'PATCH', headers:authH(), body:JSON.stringify(body) });
+      if (saved.ok) Object.assign(n, body);
+    } catch (e) {}
+  }));
+  if (document.getElementById('worldMap')) drawWorldMap();
 }
 function pageHead(kicker, title, desc, actions) { return '<div class="page-head"><div><div class="eyebrow">' + kicker + '</div><h1>' + title + '</h1><p>' + desc + '</p></div><div class="btnrow">' + (actions || '') + '</div></div>'; }
 function telemetry(label, value, note, cls) { return '<div class="telemetry ' + cls + '"><div class="t-label">' + label + '</div><div class="t-value">' + value + '</div><div class="t-note">' + note + '</div></div>'; }
 function sparkBars(daily) { const ds = daily || []; if (!ds.length) return '<div class="empty compact">暂无流量上报数据</div>'; let max=Math.max(...ds.map(x=>(+x.up||0)+(+x.down||0)),1); return '<div class="spark">'+ds.map(x=>'<span title="'+esc(x.date||'')+' '+fmtBytes((+x.up||0)+(+x.down||0))+'" style="height:'+Math.max(4,(((+x.up||0)+(+x.down||0))/max*100))+'%"></span>').join('')+'</div>'; }
-function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><br><code>'+esc(n.address)+'</code></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
+function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';const region=regionLabel(n);return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><span class="node-region">'+esc((n.flag ? n.flag+' ' : '') + region)+'</span><code>'+esc(n.address)+'</code></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
 function attentionRows(offline, certIssues) { if (!offline && !certIssues) return '<div class="empty compact">暂无已知异常</div>'; let h=''; if(offline) h+='<div class="fleet-row"><span>离线或未上报节点</span><span class="pill off">'+offline+'</span><button class="secondary small" onclick="selectNodeHub()">查看</button></div>'; if(certIssues) h+='<div class="fleet-row"><span>失败或 30 天内到期证书</span><span class="pill warn">'+certIssues+'</span><button class="secondary small" onclick="selectCertificateHub()">查看</button></div>'; return h; }
 async function loadOverviewStats() { const d=await api('GET','/stats/overview'); if(d){statsData=d;if(!sel.type)renderWelcome();} }
 async function refreshDashboard() { await Promise.all([loadNodes(),loadSubs(),loadCerts(),loadNotifiers(),loadAllInbounds(),loadOverviewStats()]); if(!sel.type) renderWelcome(); }
@@ -905,7 +994,7 @@ async function detectRegion(id) {
   const city = d.city || d.region || '';
   if (el) el.value = (name ? (city ? name + '·' + city : name) : '（识别失败）');
   if (name && (name !== (n.region || '') || city !== (n.city || ''))) {
-    const r = await api('PATCH', '/nodes/' + id, { region: name, city: city });
+    const r = await api('PATCH', '/nodes/' + id, { region: name, city: city, latitude: Number(d.latitude) || 0, longitude: Number(d.longitude) || 0 });
     if (r) { await loadNodes(); }
   }
 }
@@ -920,6 +1009,8 @@ async function detectRegionNew() {
     if (el) el.value = city ? name + '·' + city : name;
     document.getElementById('m_n_country').value = name;
     document.getElementById('m_n_city').value = city;
+    document.getElementById('m_n_lat').value = Number(d.latitude) || 0;
+    document.getElementById('m_n_lon').value = Number(d.longitude) || 0;
   } else if (el) el.value = '（识别失败）';
 }
 
@@ -947,11 +1038,11 @@ function renderStatsView() {
   else {
     let max = 1;
     d.daily.forEach(x => { const t = (Number(x.up) || 0) + (Number(x.down) || 0); if (t > max) max = t; });
-    h += '<div class="barchart">';
+    h += '<div class="barchart" style="--bar-count:' + d.daily.length + '">';
     d.daily.forEach(x => {
       const t = (Number(x.up) || 0) + (Number(x.down) || 0);
       const hh = Math.max(3, (t / max) * 100);
-      h += '<div class="bcol" title="' + x.date + ' ' + fmtBytes(t) + '">' +
+      h += '<div class="bcol" title="' + x.date + ' ' + fmtBytes(t) + '" aria-label="' + x.date + '，流量 ' + fmtBytes(t) + '">' +
         '<div class="bval">' + fmtBytes(t) + '</div>' +
         '<div class="bar-v"><span style="height:' + hh + '%"></span></div>' +
         '<div class="bdate">' + x.date.slice(5) + '</div></div>';
@@ -1880,7 +1971,7 @@ function showCreateNode() {
     '<label>节点名称</label><input id="m_n_name" placeholder="如 hk-01">' +
     '<label>节点地址（ip:port）</label><input id="m_n_addr" placeholder="127.0.0.1:54321" onblur="detectRegionNew()">' +
     '<label>区域（自动识别）</label><input id="m_n_region" disabled placeholder="填写地址后自动识别" style="background:var(--input-dis)">' +
-    '<input type="hidden" id="m_n_country"><input type="hidden" id="m_n_city">' +
+    '<input type="hidden" id="m_n_country"><input type="hidden" id="m_n_city"><input type="hidden" id="m_n_lat"><input type="hidden" id="m_n_lon">' +
     '<label>标签（逗号分隔）</label><input id="m_n_tags" placeholder="如 hk,edge,production">' +
     '<label>端口范围（留空用全局默认）</label><input id="m_n_pr" placeholder="如 10000-20000,30000-40000" oninput="this.value=this.value.replace(/[\\t\\r\\n ]+/g,\'\')">' +
     '<div class="btnrow"><button onclick="withBusy(this, doCreateNode)">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
@@ -1906,7 +1997,7 @@ async function doCreateNode() {
   if (!validPortRange(pr)) return showToast('端口范围格式不正确（如 10000-20000,30000-40000）', 'err');
   const rawRegion = val('m_n_region');
   const region = (rawRegion && !rawRegion.includes('识别') && !rawRegion.includes('失败')) ? val('m_n_country') : '';
-  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: region, city: val('m_n_city'), tags: val('m_n_tags').split(',').map(x=>x.trim()).filter(Boolean).join(','), port_range: pr });
+  const d = await api('POST', '/nodes', { name: val('m_n_name'), address: val('m_n_addr'), region: region, city: val('m_n_city'), latitude: Number(val('m_n_lat')) || 0, longitude: Number(val('m_n_lon')) || 0, tags: val('m_n_tags').split(',').map(x=>x.trim()).filter(Boolean).join(','), port_range: pr });
   if (d && d.id) {
     await loadNodes();
     // 创建成功后弹窗展示接入方式（复制命令）
