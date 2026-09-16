@@ -690,14 +690,14 @@ function renderSidebar() {
   const online = nodesData.filter(n => n.status === 'online').length;
   const clients = Object.values(clientsCache).reduce((n, a) => n + (a || []).length, 0);
   const pendingDeploys = nodesData.filter(n => deployState[n.id] && deployState[n.id].pending).length;
-  let h = '<div class="sb-logo"><div class="sb-kicker">NodePilot / Control Plane</div><div class="sb-title">Infrastructure Operations</div></div>' +
-    '<div class="sb-head">Core navigation</div>' +
+  let h = '<div class="sb-logo"><div class="sb-kicker">NodePilot 控制中心</div><div class="sb-title">基础设施运维平台</div></div>' +
+    '<div class="sb-head">核心导航</div>' +
     navItem(!sel.type, '01', '运行概览', '', 'selectOverview()') +
     navItem(sel.type === 'nodes' || sel.type === 'node', '02', '节点管理', online + '/' + nodesData.length, 'selectNodeHub()') +
     navItem(sel.type === 'inbounds' || sel.type === 'inbound' || sel.type === 'client', '03', '入站管理', clients || inboundCatalog.length, 'selectInboundHub()') +
     navItem((sel.type === 'resources' && sel.section !== 'certificates') || sel.type === 'sub', '04', '订阅管理', subsData.length, 'selectSubscriptionHub()') +
     navItem((sel.type === 'resources' && sel.section === 'certificates') || sel.type === 'cert', '05', '证书管理', certsData.length, 'selectCertificateHub()') +
-    '<div class="sb-head">Operations</div>' +
+    '<div class="sb-head">运维管理</div>' +
     navItem(sel.type === 'stats', '↗', '流量统计', '', 'selectStats()') +
     navItem(sel.type === 'notifiers' || sel.type === 'notifier', '!', '预警通知', notifData.length, 'selectNotifierHub()') +
     navItem(sel.type === 'settings', '⚙', '系统设置', '', 'selectSettings()') +
@@ -848,20 +848,20 @@ async function refreshDashboard() { await Promise.all([loadNodes(),loadSubs(),lo
 function renderNodeHub() {
   const online=nodesData.filter(n=>n.status==='online').length, pending=nodesData.filter(n=>deployState[n.id]&&deployState[n.id].pending).length;
   let h=pageHead('节点 / 管理', '节点管理', '集中查看代理节点、运行状态与下发情况。','<button class="secondary small" onclick="loadNodes()">刷新状态</button><button class="secondary small" onclick="syncAllNodes()">全部下发</button><button class="small" onclick="showCreateNode()">添加节点</button>')+
-    '<div class="telemetry-grid compact">'+telemetry('节点总数',nodesData.length,'已注册 Agent','')+telemetry('在线节点',online,'最近心跳正常','green')+telemetry('待下发配置',pending,pending?'存在未应用修改':'配置已同步',pending?'amber':'green')+'</div><div class="card"><h2>受管节点</h2>'+listToolbar('nodes-list','搜索节点、地址或状态…',nodesData.length)+'<div data-list="nodes-list">'+fleetRows(nodesData)+'</div><div class="filtered-empty" data-filter-empty="nodes-list">没有匹配的节点</div></div>';
+    '<div class="telemetry-grid compact">'+telemetry('节点总数',nodesData.length,'已注册节点代理','')+telemetry('在线节点',online,'最近心跳正常','green')+telemetry('待下发配置',pending,pending?'存在未应用修改':'配置已同步',pending?'amber':'green')+'</div><div class="card"><h2>受管节点</h2>'+listToolbar('nodes-list','搜索节点、地址或状态…',nodesData.length)+'<div data-list="nodes-list">'+fleetRows(nodesData)+'</div><div class="filtered-empty" data-filter-empty="nodes-list">没有匹配的节点</div></div>';
   document.getElementById('main').innerHTML=h;
   restoreListFilter('nodes-list');
 }
 function renderInboundHub() {
   const enabled=inboundCatalog.filter(x=>x.enabled).length, users=Object.values(clientsCache).reduce((n,a)=>n+(a||[]).length,0);
-  let rows=inboundCatalog.map(i=>{const node=nodesData.find(n=>n.id===i.node_id);const loaded=Object.prototype.hasOwnProperty.call(clientsCache,i.id);const count=loaded?(clientsCache[i.id]||[]).length:'—';return '<tr data-search-row><td><b>'+esc(i.name||('Inbound #'+i.id))+'</b><br><span class="muted">'+esc(node&&node.name||('Node #'+i.node_id))+'</span></td><td><span class="badge blue">'+esc(i.protocol)+'</span></td><td>'+i.port+' / '+esc(i.transport||'tcp')+'</td><td>'+(i.tls_enabled?'<span class="pill ok">TLS</span>':'<span class="pill neutral">明文</span>')+'</td><td>'+count+'</td><td>'+(i.connectivity==='ok'?'<span class="pill ok">连通</span>':i.connectivity==='fail'?'<span class="pill off">失败</span>':'<span class="pill neutral">未探测</span>')+'</td><td><button class="secondary small" onclick="selectInbound('+i.id+','+i.node_id+')">查看</button></td></tr>'}).join('');
+  let rows=inboundCatalog.map(i=>{const node=nodesData.find(n=>n.id===i.node_id);const loaded=Object.prototype.hasOwnProperty.call(clientsCache,i.id);const count=loaded?(clientsCache[i.id]||[]).length:'—';return '<tr data-search-row><td><b>'+esc(i.name||('入站 #'+i.id))+'</b><br><span class="muted">'+esc(node&&node.name||('节点 #'+i.node_id))+'</span></td><td><span class="badge blue">'+esc(i.protocol)+'</span></td><td>'+i.port+' / '+esc(i.transport||'tcp')+'</td><td>'+(i.tls_enabled?'<span class="pill ok">TLS</span>':'<span class="pill neutral">明文</span>')+'</td><td>'+count+'</td><td>'+(i.connectivity==='ok'?'<span class="pill ok">连通</span>':i.connectivity==='fail'?'<span class="pill off">失败</span>':'<span class="pill neutral">未探测</span>')+'</td><td><button class="secondary small" onclick="selectInbound('+i.id+','+i.node_id+')">查看</button></td></tr>'}).join('');
   document.getElementById('main').innerHTML=pageHead('入站 / 身份','入站管理','管理 Xray-Core 入站、传输协议、TLS 与客户端身份。','<button class="secondary small" onclick="loadAllInbounds()">重新载入</button>'+(nodesData.length?'<button class="small" onclick="showCreateInbound()">创建入站</button>':'<button class="small" onclick="showCreateNode()">先添加节点</button>'))+
     '<div class="telemetry-grid compact">'+telemetry('全部入站',inboundCatalog.length,'已配置端口','')+telemetry('已启用',enabled,'配置启用状态','green')+telemetry('已加载客户端',users,'正在按入站汇总','')+'</div><div class="card"><h2>入站目录</h2>'+listToolbar('inbounds-list','搜索入站、节点、协议或端口…',inboundCatalog.length)+'<div class="tblwrap"><table class="tbl"><thead><tr><th>入站 / 节点</th><th>协议</th><th>端口 / 传输</th><th>安全</th><th>用户</th><th>连通性</th><th></th></tr></thead><tbody data-list="inbounds-list">'+(rows||'<tr><td colspan="7" class="empty">暂无入站</td></tr>')+'</tbody></table><div class="filtered-empty" data-filter-empty="inbounds-list">没有匹配的入站</div></div></div>';
   restoreListFilter('inbounds-list');
 }
 function renderResourceHub() {
   const section = sel.section === 'certificates' ? 'certificates' : 'subscriptions';
-  const subCards=subsData.map(s=>'<div class="resource-card" data-search-row><span class="badge blue">'+formatName(s.format)+'</span><h3>'+esc(s.name)+'</h3><code>'+((s.mode==='acl4ssr'||s.mode==='acl4ssr_online')?'ACL4SSR ROUTED':'DIRECT PROFILE')+'</code><div class="btnrow"><button class="secondary small" onclick="copyText(location.origin+\'/api/v1/sub/'+s.token+'\')">复制链接</button><button class="secondary small" onclick="selectSub('+s.id+')">管理</button></div></div>').join('');
+  const subCards=subsData.map(s=>'<div class="resource-card" data-search-row><span class="badge blue">'+formatName(s.format)+'</span><h3>'+esc(s.name)+'</h3><code>'+((s.mode==='acl4ssr'||s.mode==='acl4ssr_online')?'已启用 ACL4SSR 规则':'直连配置')+'</code><div class="btnrow"><button class="secondary small" onclick="copyText(location.origin+\'/api/v1/sub/'+s.token+'\')">复制链接</button><button class="secondary small" onclick="selectSub('+s.id+')">管理</button></div></div>').join('');
   const certRows=certsData.map(c=>'<tr data-search-row><td><b>'+esc(c.domain)+'</b></td><td>'+certPill(c)+'</td><td>'+esc((c.expires_at||'').replace('T',' ').slice(0,10)||'—')+'</td><td>'+(c.auto_renew?'<span class="pill ok">自动</span>':'<span class="pill warn">手动</span>')+'</td><td><button class="secondary small" onclick="selectCert('+c.id+')">管理</button></td></tr>').join('');
   let body='';
   if(section==='subscriptions') body='<div class="card"><h2>订阅分组</h2>'+listToolbar('subscriptions-list','搜索订阅名称、格式或规则…',subsData.length)+'<div class="resource-grid" data-list="subscriptions-list">'+(subCards||'<div class="resource-card"><h3>暂无订阅分组</h3><code>创建第一个订阅分组</code></div>')+'</div><div class="filtered-empty" data-filter-empty="subscriptions-list">没有匹配的订阅</div></div>';
