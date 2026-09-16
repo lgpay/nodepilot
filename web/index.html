@@ -315,6 +315,7 @@
   .fleet-row .node-region { display:block; margin-top:2px; font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .world-map { position:relative; width:100%; aspect-ratio:2/1; min-height:220px; overflow:hidden; background:radial-gradient(circle at 50% 42%,rgba(6,182,212,.07),transparent 62%),var(--bg); border:1px solid var(--border); }
   .world-map svg { display:block; width:100%; height:100%; }
+  .world-map .map-ocean { fill:color-mix(in srgb,var(--primary-soft) 32%,var(--bg)); stroke:var(--border); stroke-width:1; }
   .world-map .map-land { fill:rgba(127,141,163,.18); stroke:rgba(127,141,163,.42); stroke-width:.7; vector-effect:non-scaling-stroke; }
   .world-map .map-grid { fill:none; stroke:rgba(127,141,163,.13); stroke-width:.55; vector-effect:non-scaling-stroke; }
   .map-marker { cursor:pointer; }
@@ -323,7 +324,7 @@
   .map-marker.online .map-dot,.map-marker.online .map-halo{fill:var(--ok)}
   .map-marker.offline .map-dot,.map-marker.offline .map-halo{fill:var(--danger)}
   .map-marker.mixed .map-dot,.map-marker.mixed .map-halo{fill:var(--warn)}
-  .map-marker text { fill:var(--text); font:600 10px/1 "JetBrains Mono",Consolas,monospace; text-anchor:middle; pointer-events:none; }
+  .map-marker text { fill:var(--text); stroke:var(--card); stroke-width:3px; paint-order:stroke; font:600 11px/1 inherit; text-anchor:middle; pointer-events:none; }
   .map-legend { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:9px; color:var(--muted); font-size:11px; }
   .map-legend .key { display:inline-flex; align-items:center; gap:5px; }
   .map-legend .swatch { width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 7px currentColor; }
@@ -445,6 +446,10 @@
   .world-map .map-land { fill:color-mix(in srgb,var(--muted) 22%,transparent); stroke:color-mix(in srgb,var(--muted) 48%,transparent); stroke-width:.55; }
   .world-map .map-grid { stroke:color-mix(in srgb,var(--muted) 20%,transparent); stroke-dasharray:2 3; }
   .map-marker .map-dot { r:5; stroke-width:2.5; }
+  .map-tools { position:absolute; right:12px; top:12px; z-index:2; display:flex; flex-direction:column; gap:5px; }
+  .map-tools button { width:32px; min-height:32px; padding:0; margin:0; border:1px solid var(--border); background:color-mix(in srgb,var(--card) 90%,transparent); color:var(--text); font-size:18px; line-height:1; }
+  .map-tools button:hover { background:var(--primary-soft); color:var(--primary); }
+  .map-hint { position:absolute; left:12px; bottom:10px; z-index:2; padding:4px 8px; border-radius:5px; color:var(--muted); background:color-mix(in srgb,var(--card) 76%,transparent); font-size:12px; pointer-events:none; }
   .spark { height:160px; background:none; gap:5px; }
   .spark span { background:var(--primary); border-radius:3px 3px 0 0; opacity:.75; }
   .login-wrap { background:var(--bg); }
@@ -1070,8 +1075,11 @@ function nodeCoords(n) {
 function worldMapMarkup() {
   const located = nodesData.filter(n => nodeCoords(n)).length;
   const unlocated = nodesData.length - located;
-  return '<div id="worldMap" class="world-map" role="img" aria-label="节点全球分布地图"><div class="empty compact">正在加载地图…</div></div><div class="map-legend"><span class="key"><i class="swatch"></i>在线</span><span class="key"><i class="swatch offline"></i>离线</span><span class="key"><i class="swatch mixed"></i>同区域多节点</span>' + (unlocated ? '<span class="map-unlocated">' + unlocated + ' 个节点暂无区域坐标</span>' : '') + '</div>';
+  return '<div id="worldMap" class="world-map" role="application" aria-label="可缩放的节点全球分布地图"><div class="empty compact">正在加载地图…</div><div class="map-tools" aria-label="地图控制"><button type="button" onclick="mapZoomBy(1.5)" aria-label="放大地图">+</button><button type="button" onclick="mapZoomBy(0.67)" aria-label="缩小地图">−</button><button type="button" onclick="resetWorldMap()" aria-label="重置地图" title="重置视图">⌂</button></div><div class="map-hint">滚轮缩放 · 拖拽移动</div></div><div class="map-legend"><span class="key"><i class="swatch"></i>在线</span><span class="key"><i class="swatch offline"></i>离线</span><span class="key"><i class="swatch mixed"></i>同区域多节点</span>' + (unlocated ? '<span class="map-unlocated">' + unlocated + ' 个节点暂无区域坐标</span>' : '') + '</div>';
 }
+let worldMapSvg=null, worldMapZoom=null;
+function mapZoomBy(factor) { if(worldMapSvg&&worldMapZoom) worldMapSvg.transition().duration(220).call(worldMapZoom.scaleBy,factor); }
+function resetWorldMap() { if(worldMapSvg&&worldMapZoom) worldMapSvg.transition().duration(260).call(worldMapZoom.transform,d3.zoomIdentity); }
 async function drawWorldMap() {
   const root = document.getElementById('worldMap');
   if (!root || !window.d3 || !window.topojson) return;
@@ -1079,14 +1087,18 @@ async function drawWorldMap() {
   try {
     const world = await fetch('/land-110m.json').then(r => r.json());
     const land = topojson.feature(world, world.objects.land);
-    const projection = d3.geoEquirectangular().fitSize([width, height], land);
+    const projection = d3.geoNaturalEarth1().fitExtent([[14,14],[width-14,height-14]], land);
     const path = d3.geoPath(projection);
     const groups = {};
     nodesData.forEach(n => { const c = nodeCoords(n); if (!c) return; const p = projection(c); if (!p) return; const key = p.map(v => Math.round(v / 8)).join(':'); (groups[key] ||= { x:p[0], y:p[1], nodes:[] }).nodes.push(n); });
-    let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="节点全球分布"><path class="map-land" d="' + path(land) + '"/>';
-    for (let lon=-150; lon<=150; lon+=30) { const a=projection([lon,-60]), b=projection([lon,75]); svg += '<path class="map-grid" d="M'+a[0].toFixed(1)+','+a[1].toFixed(1)+' L'+b[0].toFixed(1)+','+b[1].toFixed(1)+'"/>'; }
-    for (const g of Object.values(groups)) { const online=g.nodes.filter(n=>n.status==='online').length, cls=online===g.nodes.length?'online':online?'mixed':'offline'; const label=g.nodes.length>1?String(g.nodes.length):''; const tip=g.nodes.map(n=>n.name+'（'+(n.status==='online'?'在线':'离线')+'）').join('、'); const first=g.nodes[0]; svg += '<g class="map-marker '+cls+'" tabindex="0" role="button" onclick="selectNode('+first.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();selectNode('+first.id+')}" aria-label="'+esc(tip)+'"><title>'+esc(tip)+'</title><circle class="map-halo" cx="'+g.x.toFixed(1)+'" cy="'+g.y.toFixed(1)+'" r="7"/><circle class="map-dot" cx="'+g.x.toFixed(1)+'" cy="'+g.y.toFixed(1)+'" r="4"/>'+(label?'<text x="'+g.x.toFixed(1)+'" y="'+(g.y-9).toFixed(1)+'">'+label+'</text>':'')+'</g>'; }
-    svg += '</svg>'; root.innerHTML = svg;
+    const sphere={type:'Sphere'}, graticule=d3.geoGraticule10();
+    let svg = '<svg viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet" role="img" aria-label="节点全球分布"><g class="map-viewport"><path class="map-ocean" d="'+path(sphere)+'"/><path class="map-grid" d="'+path(graticule)+'"/><path class="map-land" d="' + path(land) + '"/></g><g class="map-markers">';
+    for (const g of Object.values(groups)) { const online=g.nodes.filter(n=>n.status==='online').length, cls=online===g.nodes.length?'online':online?'mixed':'offline'; const label=g.nodes.length>1?String(g.nodes.length):g.nodes[0].name; const tip=g.nodes.map(n=>n.name+'（'+(n.status==='online'?'在线':'离线')+'）').join('、'); const first=g.nodes[0]; svg += '<g class="map-marker '+cls+'" data-x="'+g.x.toFixed(2)+'" data-y="'+g.y.toFixed(2)+'" transform="translate('+g.x.toFixed(2)+' '+g.y.toFixed(2)+')" tabindex="0" role="button" onclick="selectNode('+first.id+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();selectNode('+first.id+')}" aria-label="'+esc(tip)+'"><title>'+esc(tip)+'</title><circle class="map-halo" r="9"/><circle class="map-dot" r="5"/><text y="-12">'+esc(label)+'</text></g>'; }
+    svg += '</g></svg><div class="map-tools" aria-label="地图控制"><button type="button" onclick="mapZoomBy(1.5)" aria-label="放大地图">+</button><button type="button" onclick="mapZoomBy(0.67)" aria-label="缩小地图">−</button><button type="button" onclick="resetWorldMap()" aria-label="重置地图" title="重置视图">⌂</button></div><div class="map-hint">滚轮缩放 · 拖拽移动</div>'; root.innerHTML = svg;
+    worldMapSvg=d3.select(root).select('svg');
+    const viewport=worldMapSvg.select('.map-viewport'), markers=worldMapSvg.selectAll('.map-marker');
+    worldMapZoom=d3.zoom().scaleExtent([1,8]).translateExtent([[-width*.35,-height*.35],[width*1.35,height*1.35]]).on('zoom',event=>{ const t=event.transform;viewport.attr('transform',t);markers.attr('transform',function(){return 'translate('+t.applyX(+this.dataset.x)+' '+t.applyY(+this.dataset.y)+')';}); });
+    worldMapSvg.call(worldMapZoom).on('dblclick.zoom',null);
     hydrateMissingMapCoords();
   } catch (e) { root.innerHTML = '<div class="empty compact">地图数据加载失败</div>'; }
 }
