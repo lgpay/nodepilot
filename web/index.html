@@ -452,6 +452,19 @@
   .map-hint { position:absolute; left:12px; bottom:10px; z-index:2; padding:4px 8px; border-radius:5px; color:var(--muted); background:color-mix(in srgb,var(--card) 76%,transparent); font-size:12px; pointer-events:none; }
   .spark { height:160px; background:none; gap:5px; }
   .spark span { background:var(--primary); border-radius:3px 3px 0 0; opacity:.75; }
+  .traffic-line { width:100%; height:190px; display:block; overflow:visible; }
+  .traffic-line .grid { stroke:var(--border); stroke-width:1; stroke-dasharray:3 5; }
+  .traffic-line .axis { stroke:var(--border); stroke-width:1; }
+  .traffic-line .line-up,.traffic-line .line-down { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+  .traffic-line .line-up { stroke:var(--primary); } .traffic-line .line-down { stroke:var(--ok); }
+  .traffic-line .area-up { fill:var(--primary-soft); opacity:.55; }
+  .traffic-line .point-up { fill:var(--card); stroke:var(--primary); stroke-width:2; }
+  .traffic-line .point-down { fill:var(--card); stroke:var(--ok); stroke-width:2; }
+  .traffic-line text { fill:var(--muted); font:12px inherit; }
+  .traffic-legend { display:flex; gap:16px; color:var(--muted); font-size:12px; margin-top:8px; }
+  .traffic-legend span { display:inline-flex; align-items:center; gap:6px; }
+  .traffic-legend i { width:8px; height:8px; border-radius:50%; background:var(--primary); }
+  .traffic-legend i.down { background:var(--ok); }
   .login-wrap { background:var(--bg); }
   .login-card { border-color:var(--border); max-width:420px; padding:32px; }
   .qr img { max-width:100%; height:auto; }
@@ -904,8 +917,7 @@ function renderSidebar() {
   const online = nodesData.filter(n => n.status === 'online').length;
   const clients = Object.values(clientsCache).reduce((n, a) => n + (a || []).length, 0);
   const pendingDeploys = nodesData.filter(n => deployState[n.id] && deployState[n.id].pending).length;
-  let h = '<div class="sb-logo"><div class="sb-kicker">NodePilot 控制中心</div><div class="sb-title">基础设施运维平台</div></div>' +
-    '<div class="sb-head">核心导航</div>' +
+  let h = '<div class="sb-head">核心导航</div>' +
     navItem(!sel.type, '01', '运行概览', '', 'selectOverview()') +
     navItem(sel.type === 'nodes' || sel.type === 'node', '02', '节点管理', online + '/' + nodesData.length, 'selectNodeHub()') +
     navItem(sel.type === 'inbounds' || sel.type === 'inbound' || sel.type === 'client', '03', '入站管理', clients || inboundCatalog.length, 'selectInboundHub()') +
@@ -1059,7 +1071,7 @@ function renderWelcome() {
     telemetry('待关注资源', attention, attention ? offline + ' 节点 · ' + certIssues + ' 证书' : '暂无已知异常', attention ? 'amber' : 'green') + '</div>' +
     '<div class="dash-grid"><div class="dash-stack">' +
     '<div class="card"><h2>节点运行状态</h2>' + worldMapMarkup() + '<div class="section-gap">' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0)).slice(0,5)) + '</div></div></div>' +
-    '<div class="dash-stack"><div class="card"><h2>近 30 天流量</h2>' + sparkBars(statsData && statsData.daily) + '<div class="btnrow"><button class="secondary small" onclick="selectStats()">查看流量统计</button></div></div>' +
+    '<div class="dash-stack"><div class="card"><h2>近 30 天流量</h2>' + trafficLineChart(statsData && statsData.daily) + '<div class="btnrow"><button class="secondary small" onclick="selectStats()">查看流量统计</button></div></div>' +
     '<div class="card"><h2>待处理事项</h2>' + attentionRows(offline, certIssues) + '</div></div></div>';
   document.getElementById('main').innerHTML = h;
   drawWorldMap();
@@ -1121,6 +1133,17 @@ async function hydrateMissingMapCoords() {
 function pageHead(kicker, title, desc, actions) { return '<div class="page-head"><div><h1>' + title + '</h1><p>' + desc + '</p></div><div class="btnrow">' + (actions || '') + '</div></div>'; }
 function telemetry(label, value, note, cls) { return '<div class="telemetry ' + cls + '"><div class="t-label">' + label + '</div><div class="t-value">' + value + '</div><div class="t-note">' + note + '</div></div>'; }
 function sparkBars(daily) { const ds = daily || []; if (!ds.length) return '<div class="empty compact">暂无流量上报数据</div>'; let max=Math.max(...ds.map(x=>(+x.up||0)+(+x.down||0)),1); return '<div class="spark">'+ds.map(x=>'<span title="'+esc(x.date||'')+' '+fmtBytes((+x.up||0)+(+x.down||0))+'" style="height:'+Math.max(4,(((+x.up||0)+(+x.down||0))/max*100))+'%"></span>').join('')+'</div>'; }
+function trafficLineChart(daily) {
+  const ds=(daily||[]).slice(-30); if(!ds.length) return '<div class="empty compact">暂无流量上报数据</div>';
+  const W=720,H=190,L=42,R=14,T=12,B=28, iw=W-L-R, ih=H-T-B;
+  const max=Math.max(...ds.flatMap(x=>[+x.up||0,+x.down||0]),1), x=i=>L+(ds.length===1?iw/2:i*iw/(ds.length-1)), y=v=>T+ih-(Math.max(0,+v||0)/max*ih);
+  const up=ds.map((d,i)=>x(i).toFixed(1)+','+y(d.up).toFixed(1)).join(' '), down=ds.map((d,i)=>x(i).toFixed(1)+','+y(d.down).toFixed(1)).join(' ');
+  const area=L+','+(T+ih)+' '+up+' '+(L+iw)+','+(T+ih);
+  const grid=[0,.5,1].map(v=>'<line class="grid" x1="'+L+'" x2="'+(L+iw)+'" y1="'+y(max*v)+'" y2="'+y(max*v)+'"/>').join('');
+  const points=ds.map((d,i)=>'<circle class="point-up" cx="'+x(i).toFixed(1)+'" cy="'+y(d.up).toFixed(1)+'" r="3"><title>'+esc(d.date||'')+' · 上行 '+fmtBytes(d.up)+'</title></circle><circle class="point-down" cx="'+x(i).toFixed(1)+'" cy="'+y(d.down).toFixed(1)+'" r="3"><title>'+esc(d.date||'')+' · 下行 '+fmtBytes(d.down)+'</title></circle>').join('');
+  const labels=ds.map((d,i)=>{if(i!==0&&i!==ds.length-1&&i!==Math.floor((ds.length-1)/2))return '';return '<text x="'+x(i).toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle">'+esc((d.date||'').slice(5))+'</text>';}).join('');
+  return '<svg class="traffic-line" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="近 30 天上行与下行流量曲线">'+grid+'<line class="axis" x1="'+L+'" x2="'+(L+iw)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'"/><path class="area-up" d="M'+area+'Z"/><polyline class="line-up" points="'+up+'"/><polyline class="line-down" points="'+down+'"/>'+points+labels+'</svg><div class="traffic-legend"><span><i></i>上行</span><span><i class="down"></i>下行</span></div>';
+}
 function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';const region=regionLabel(n);return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><span class="node-region">'+esc(region)+'</span></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
 function attentionRows(offline, certIssues) { if (!offline && !certIssues) return '<div class="empty compact">暂无已知异常</div>'; let h=''; if(offline) h+='<div class="attention-row"><span>离线或未上报节点</span><span class="pill off">'+offline+'</span><button class="secondary small" onclick="selectNodeHub()">查看</button></div>'; if(certIssues) h+='<div class="attention-row"><span>失败或 30 天内到期证书</span><span class="pill warn">'+certIssues+'</span><button class="secondary small" onclick="selectCertificateHub()">查看</button></div>'; return h; }
 async function loadOverviewStats() { const d=await api('GET','/stats/overview'); if(d){statsData=d;if(!sel.type)renderWelcome();} }
