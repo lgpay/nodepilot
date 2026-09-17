@@ -455,16 +455,13 @@
   .traffic-line { width:100%; height:190px; display:block; overflow:visible; }
   .traffic-line .grid { stroke:var(--border); stroke-width:1; stroke-dasharray:3 5; }
   .traffic-line .axis { stroke:var(--border); stroke-width:1; }
-  .traffic-line .line-up,.traffic-line .line-down { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
-  .traffic-line .line-up { stroke:var(--primary); } .traffic-line .line-down { stroke:var(--ok); }
-  .traffic-line .area-up { fill:var(--primary-soft); opacity:.55; }
-  .traffic-line .point-up { fill:var(--card); stroke:var(--primary); stroke-width:2; }
-  .traffic-line .point-down { fill:var(--card); stroke:var(--ok); stroke-width:2; }
-  .traffic-line text { fill:var(--muted); font:12px inherit; }
+  .traffic-line .line-total { fill:none; stroke:var(--primary); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+  .traffic-line .area-total { fill:var(--primary-soft); opacity:.58; }
+  .traffic-line .point-total { fill:var(--card); stroke:var(--primary); stroke-width:2; }
+  .traffic-line text { fill:var(--muted); font-size:12px; }
   .traffic-legend { display:flex; gap:16px; color:var(--muted); font-size:12px; margin-top:8px; }
   .traffic-legend span { display:inline-flex; align-items:center; gap:6px; }
   .traffic-legend i { width:8px; height:8px; border-radius:50%; background:var(--primary); }
-  .traffic-legend i.down { background:var(--ok); }
   .login-wrap { background:var(--bg); }
   .login-card { border-color:var(--border); max-width:420px; padding:32px; }
   .qr img { max-width:100%; height:auto; }
@@ -1136,13 +1133,15 @@ function sparkBars(daily) { const ds = daily || []; if (!ds.length) return '<div
 function trafficLineChart(daily) {
   const ds=(daily||[]).slice(-30); if(!ds.length) return '<div class="empty compact">暂无流量上报数据</div>';
   const W=720,H=190,L=42,R=14,T=12,B=28, iw=W-L-R, ih=H-T-B;
-  const max=Math.max(...ds.flatMap(x=>[+x.up||0,+x.down||0]),1), x=i=>L+(ds.length===1?iw/2:i*iw/(ds.length-1)), y=v=>T+ih-(Math.max(0,+v||0)/max*ih);
-  const up=ds.map((d,i)=>x(i).toFixed(1)+','+y(d.up).toFixed(1)).join(' '), down=ds.map((d,i)=>x(i).toFixed(1)+','+y(d.down).toFixed(1)).join(' ');
-  const area=L+','+(T+ih)+' '+up+' '+(L+iw)+','+(T+ih);
+  const totals=ds.map(d=>(+d.up||0)+(+d.down||0));
+  const max=Math.max(...totals,1), x=i=>L+(ds.length===1?iw/2:i*iw/(ds.length-1)), y=v=>T+ih-(Math.max(0,+v||0)/max*ih);
+  const pts=totals.map((v,i)=>[x(i),y(v)]);
+  const smooth=(p)=>{if(p.length<2)return p.length?'M'+p[0][0].toFixed(1)+','+p[0][1].toFixed(1):'';let d='M'+p[0][0].toFixed(1)+','+p[0][1].toFixed(1);for(let i=0;i<p.length-1;i++){const a=p[i-1]||p[i],b=p[i],c=p[i+1],e=p[i+2]||c;d+=' C'+(b[0]+(c[0]-a[0])/6).toFixed(1)+','+(b[1]+(c[1]-a[1])/6).toFixed(1)+' '+(c[0]-(e[0]-b[0])/6).toFixed(1)+','+(c[1]-(e[1]-b[1])/6).toFixed(1)+' '+c[0].toFixed(1)+','+c[1].toFixed(1);}return d;};
+  const line=smooth(pts), area=line+' L'+(L+iw).toFixed(1)+','+(T+ih)+' L'+L+','+(T+ih)+' Z';
   const grid=[0,.5,1].map(v=>'<line class="grid" x1="'+L+'" x2="'+(L+iw)+'" y1="'+y(max*v)+'" y2="'+y(max*v)+'"/>').join('');
-  const points=ds.map((d,i)=>'<circle class="point-up" cx="'+x(i).toFixed(1)+'" cy="'+y(d.up).toFixed(1)+'" r="3"><title>'+esc(d.date||'')+' · 上行 '+fmtBytes(d.up)+'</title></circle><circle class="point-down" cx="'+x(i).toFixed(1)+'" cy="'+y(d.down).toFixed(1)+'" r="3"><title>'+esc(d.date||'')+' · 下行 '+fmtBytes(d.down)+'</title></circle>').join('');
+  const points=ds.map((d,i)=>'<circle class="point-total" cx="'+x(i).toFixed(1)+'" cy="'+y(totals[i]).toFixed(1)+'" r="3"><title>'+esc(d.date||'')+' · 总流量 '+fmtBytes(totals[i])+'</title></circle>').join('');
   const labels=ds.map((d,i)=>{if(i!==0&&i!==ds.length-1&&i!==Math.floor((ds.length-1)/2))return '';return '<text x="'+x(i).toFixed(1)+'" y="'+(H-7)+'" text-anchor="middle">'+esc((d.date||'').slice(5))+'</text>';}).join('');
-  return '<svg class="traffic-line" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="近 30 天上行与下行流量曲线">'+grid+'<line class="axis" x1="'+L+'" x2="'+(L+iw)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'"/><path class="area-up" d="M'+area+'Z"/><polyline class="line-up" points="'+up+'"/><polyline class="line-down" points="'+down+'"/>'+points+labels+'</svg><div class="traffic-legend"><span><i></i>上行</span><span><i class="down"></i>下行</span></div>';
+  return '<svg class="traffic-line" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="近 30 天总流量曲线">'+grid+'<line class="axis" x1="'+L+'" x2="'+(L+iw)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'"/><path class="area-total" d="'+area+'"/><path class="line-total" d="'+line+'"/>'+points+labels+'</svg><div class="traffic-legend"><span><i></i>总流量（入站 + 出站）</span></div>';
 }
 function fleetRows(ns) { if (!ns.length) return '<div class="empty">暂无节点</div>'; return ns.map(n=>{const online=n.status==='online';const heartbeat=n.last_heartbeat?new Date(n.last_heartbeat).toLocaleString():'尚未上报';const region=regionLabel(n);return '<div class="fleet-row" data-search-row><span><span class="dot '+dotOf(n)+'"></span> &nbsp;<b>'+esc(n.name)+'</b><span class="node-region">'+esc(region)+'</span></span><span><span class="pill '+(online?'ok':'off')+'">'+(online?'在线':'离线')+'</span></span><span>最近心跳<br><code>'+esc(heartbeat)+'</code></span><span>'+deployPill(n.id)+'</span><button class="secondary small" onclick="selectNode('+n.id+')">管理</button></div>'}).join(''); }
 function attentionRows(offline, certIssues) { if (!offline && !certIssues) return '<div class="empty compact">暂无已知异常</div>'; let h=''; if(offline) h+='<div class="attention-row"><span>离线或未上报节点</span><span class="pill off">'+offline+'</span><button class="secondary small" onclick="selectNodeHub()">查看</button></div>'; if(certIssues) h+='<div class="attention-row"><span>失败或 30 天内到期证书</span><span class="pill warn">'+certIssues+'</span><button class="secondary small" onclick="selectCertificateHub()">查看</button></div>'; return h; }
