@@ -83,3 +83,21 @@ func TestGenUUIDFormat(t *testing.T) {
 		t.Errorf("非 v4 UUID: %s", u)
 	}
 }
+
+func TestBuildXrayConfigPreservesObfuscationSettings(t *testing.T) {
+	node := model.Node{ID: 1}
+	inbounds := []model.Inbound{
+		{ID: 1, Protocol: "vmess", Port: 10001, Transport: "tcp", StreamSettings: `{"tcpSettings":{"header":{"type":"http","request":{"path":["/health"],"headers":{"Host":["example.com"]}}}}}`, Enabled: true},
+		{ID: 2, Protocol: "vmess", Port: 10002, Transport: "ws", StreamSettings: `{"wsSettings":{"path":"/edge","headers":{"Host":"example.com"}}}`, Enabled: true},
+	}
+	clients := map[uint][]model.Client{1: {{UUID: "11111111-1111-1111-1111-111111111111", Enabled: true}}, 2: {{UUID: "22222222-2222-2222-2222-222222222222", Enabled: true}}}
+	s, err := BuildXrayConfig(node, inbounds, clients)
+	if err != nil { t.Fatal(err) }
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(s), &cfg); err != nil { t.Fatal(err) }
+	list := cfg["inbounds"].([]interface{})
+	tcp := list[0].(map[string]interface{})["streamSettings"].(map[string]interface{})
+	if tcp["tcpSettings"].(map[string]interface{})["header"].(map[string]interface{})["type"] != "http" { t.Fatal("TCP HTTP obfuscation not preserved") }
+	ws := list[1].(map[string]interface{})["streamSettings"].(map[string]interface{})
+	if ws["wsSettings"].(map[string]interface{})["path"] != "/edge" { t.Fatal("WS path not preserved") }
+}

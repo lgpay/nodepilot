@@ -78,10 +78,18 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		var ss struct {
 			WsPath     string `json:"wsPath"`
 			WsSettings struct {
-				Path string `json:"path"`
+				Path    string                 `json:"path"`
+				Headers map[string]interface{} `json:"headers"`
 			} `json:"wsSettings"`
+			TcpSettings struct {
+				Header struct {
+					Type    string                 `json:"type"`
+					Request map[string]interface{} `json:"request"`
+				} `json:"header"`
+			} `json:"tcpSettings"`
 			GrpcSettings struct {
 				ServiceName string `json:"serviceName"`
+				Mode        string `json:"mode"`
 			} `json:"grpcSettings"`
 		}
 		_ = json.Unmarshal([]byte(in.StreamSettings), &ss)
@@ -99,9 +107,25 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		stream := map[string]interface{}{"network": network}
 		switch network {
 		case "ws":
-			stream["wsSettings"] = map[string]interface{}{"path": wsPath}
+			ws := map[string]interface{}{"path": wsPath}
+			if len(ss.WsSettings.Headers) > 0 {
+				ws["headers"] = ss.WsSettings.Headers
+			}
+			stream["wsSettings"] = ws
+		case "tcp":
+			if ss.TcpSettings.Header.Type != "" && ss.TcpSettings.Header.Type != "none" {
+				tcp := map[string]interface{}{"type": ss.TcpSettings.Header.Type}
+				if len(ss.TcpSettings.Header.Request) > 0 {
+					tcp["request"] = ss.TcpSettings.Header.Request
+				}
+				stream["tcpSettings"] = map[string]interface{}{"header": tcp}
+			}
 		case "grpc":
-			stream["grpcSettings"] = map[string]interface{}{"serviceName": grpcSvc}
+			grpc := map[string]interface{}{"serviceName": grpcSvc}
+			if ss.GrpcSettings.Mode != "" {
+				grpc["mode"] = ss.GrpcSettings.Mode
+			}
+			stream["grpcSettings"] = grpc
 		}
 		if in.TLSEnabled {
 			stream["security"] = "tls"
