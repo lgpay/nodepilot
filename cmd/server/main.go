@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"nodepilot/internal/config"
+	"nodepilot/internal/logging"
 	"nodepilot/internal/notify"
 	"nodepilot/internal/server"
 	"nodepilot/internal/store"
@@ -31,7 +32,7 @@ func main() {
 	flag.Parse()
 
 	// 结构化日志（文本格式，带时间/级别/调用点）
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	logging.Setup()
 	slog.Info("[server] NodePilot control plane starting", "version", Version)
 
 	// 密钥必须在 store.Init 之前就绪（token 迁移、AES 加解密依赖）

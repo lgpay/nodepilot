@@ -9,6 +9,7 @@ import (
 
 	"nodepilot/internal/agent"
 	"nodepilot/internal/config"
+	"nodepilot/internal/logging"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,7 @@ func main() {
 	xrayBin := flag.String("xray", "/usr/local/bin/xray", "path to xray binary")
 	heartbeat := flag.Int("heartbeat", 30, "heartbeat interval in seconds")
 	flag.Parse()
+	logging.Setup()
 
 	if *token == "" || *nodeID == "" {
 		log.Fatal("--token and --node-id are required")
