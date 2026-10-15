@@ -98,5 +98,6 @@ func main() {
 			slog.Error("graceful shutdown failed", "err", err)
 		}
 	}
+	server.StopDeploymentWorker()
 	slog.Info("[server] stopped")
 }

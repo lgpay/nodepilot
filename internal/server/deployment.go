@@ -31,6 +31,8 @@ const deploymentQueueSize = 64
 var (
 	deploymentQueue    = make(chan deploymentJob, deploymentQueueSize)
 	deploymentWorkerWg sync.WaitGroup
+	deploymentQueueMu  sync.RWMutex
+	deploymentStopOnce sync.Once
 )
 
 func init() {
@@ -39,12 +41,25 @@ func init() {
 }
 
 func enqueueDeployment(in model.Inbound, security string) bool {
+	deploymentQueueMu.RLock()
+	defer deploymentQueueMu.RUnlock()
 	select {
 	case deploymentQueue <- deploymentJob{in: in, security: security}:
 		return true
 	default:
 		return false
 	}
+}
+
+// StopDeploymentWorker stops accepting new jobs, drains queued deployments,
+// and waits for the worker to finish. It is safe to call more than once.
+func StopDeploymentWorker() {
+	deploymentStopOnce.Do(func() {
+		deploymentQueueMu.Lock()
+		close(deploymentQueue)
+		deploymentQueueMu.Unlock()
+		deploymentWorkerWg.Wait()
+	})
 }
 
 func runDeploymentWorker() {
