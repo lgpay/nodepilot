@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
@@ -18,6 +19,63 @@ type inboundDeployment struct {
 	Version     int    `json:"version,omitempty"`
 	BaseVersion int    `json:"base_version,omitempty"`
 	Error       string `json:"error,omitempty"`
+}
+
+type deploymentJob struct {
+	in       model.Inbound
+	security string
+}
+
+const deploymentQueueSize = 64
+
+var (
+	deploymentQueue    = make(chan deploymentJob, deploymentQueueSize)
+	deploymentWorkerWg sync.WaitGroup
+)
+
+func init() {
+	deploymentWorkerWg.Add(1)
+	go runDeploymentWorker()
+}
+
+func enqueueDeployment(in model.Inbound, security string) bool {
+	select {
+	case deploymentQueue <- deploymentJob{in: in, security: security}:
+		return true
+	default:
+		return false
+	}
+}
+
+func runDeploymentWorker() {
+	defer deploymentWorkerWg.Done()
+	for job := range deploymentQueue {
+		executeDeployment(job)
+	}
+}
+
+func executeDeployment(job deploymentJob) {
+	in := job.in
+	security := job.security
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[deployment] worker panic recovered: %v", r)
+		}
+	}()
+	var node model.Node
+	if err := store.DB.First(&node, in.NodeID).Error; err != nil {
+		log.Printf("[deployment] node #%d not found, skipping", in.NodeID)
+		return
+	}
+	if security == model.SecurityTLS && in.TLSCertID > 0 {
+		pushCertToNode(node, in.TLSCertID)
+	}
+	version, err := syncNode(node)
+	if err != nil {
+		log.Printf("[deployment] node #%d sync failed: %v", node.ID, err)
+		return
+	}
+	log.Printf("[deployment] node #%d sync completed (version=%d)", node.ID, version)
 }
 
 func afterInboundSave(in model.Inbound) inboundDeployment {
@@ -36,27 +94,9 @@ func afterInboundSave(in model.Inbound) inboundDeployment {
 	store.DB.Model(&model.ConfigVersion{}).
 		Where("node_id = ?", in.NodeID).
 		Select("COALESCE(MAX(version),0)").Scan(&maxVersion)
-	go func(in model.Inbound) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[inbound] 异步下发 panic 恢复: %v", r)
-			}
-		}()
-		var node model.Node
-		if err := store.DB.First(&node, in.NodeID).Error; err != nil {
-			log.Printf("[inbound] 节点 #%d 不存在，跳过配置下发", in.NodeID)
-			return
-		}
-		if security == model.SecurityTLS && in.TLSCertID > 0 {
-			pushCertToNode(node, in.TLSCertID)
-		}
-		version, err := syncNode(node)
-		if err != nil {
-			log.Printf("[inbound] 节点 #%d 异步配置下发失败: %v", node.ID, err)
-			return
-		}
-		log.Printf("[inbound] 节点 #%d 异步配置下发完成 (version=%d)", node.ID, version)
-	}(in)
+	if !enqueueDeployment(in, security) {
+		return inboundDeployment{Attempted: true, Status: "failed", Error: "deployment queue is full"}
+	}
 	return inboundDeployment{Attempted: true, Status: "queued", BaseVersion: maxVersion}
 }
 
