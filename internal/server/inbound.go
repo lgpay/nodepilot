@@ -3,10 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -37,14 +34,6 @@ func validateInbound(protocol, transport string, tlsEnabled bool, certID uint) e
 		}
 	}
 	return nil
-}
-
-type inboundDeployment struct {
-	Attempted   bool   `json:"attempted"`
-	Status      string `json:"status,omitempty"`
-	Version     int    `json:"version,omitempty"`
-	BaseVersion int    `json:"base_version,omitempty"`
-	Error       string `json:"error,omitempty"`
 }
 
 // ---- 入站 CRUD ----
@@ -351,88 +340,6 @@ func UpdateInbound(c *gin.Context) {
 	deployment := afterInboundSave(in)
 	slog.Info("audit", "action", "inbound_update", "id", in.ID)
 	c.JSON(200, gin.H{"ok": true, "deployment": deployment})
-}
-
-// afterInboundSave 入站保存后：若使用 TLS 证书，把证书产物分发到该节点并触发配置下发（保存即生效）。
-// 免去「保存入站 → 证书页手动分发 → 再下发配置」的步骤。
-//
-// 注意：证书分发(agentPut 30s 超时) + 配置同步(syncNode 15s 超时) 是网络往返，先前在保存的 HTTP
-// 请求内同步阻塞，节点 agent 慢/不可达时保存会卡 45s+。改为异步下发：入站落库后立即返回，
-// 下发结果通过 ConfigVersion 记录查看（syncNode 内部会写入），前端可在配置版本页轮询状态。
-func afterInboundSave(in model.Inbound) inboundDeployment {
-	security := in.Security
-	if security == "" {
-		if in.TLSEnabled {
-			security = model.SecurityTLS
-		} else {
-			security = model.SecurityNone
-		}
-	}
-	// 仅 TLS / REALITY 入站由服务端主动下发；其余（如裸 vmess/ws）交由前端 afterConfigSaved 触发同步。
-	if security != model.SecurityTLS && security != model.SecurityReality {
-		return inboundDeployment{}
-	}
-	// 在启动异步任务前记录基线版本，避免任务完成得太快时前端把新版本误当成旧版本。
-	var maxVersion int
-	store.DB.Model(&model.ConfigVersion{}).
-		Where("node_id = ?", in.NodeID).
-		Select("COALESCE(MAX(version),0)").Scan(&maxVersion)
-	go func(in model.Inbound) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[inbound] 异步下发 panic 恢复: %v", r)
-			}
-		}()
-		var node model.Node
-		if err := store.DB.First(&node, in.NodeID).Error; err != nil {
-			log.Printf("[inbound] 节点 #%d 不存在，跳过配置下发", in.NodeID)
-			return
-		}
-		// TLS 入站才分发证书；REALITY 不使用证书。
-		if security == model.SecurityTLS && in.TLSCertID > 0 {
-			pushCertToNode(node, in.TLSCertID)
-		}
-		version, err := syncNode(node)
-		if err != nil {
-			log.Printf("[inbound] 节点 #%d 异步配置下发失败: %v", node.ID, err)
-			return
-		}
-		log.Printf("[inbound] 节点 #%d 异步配置下发完成 (version=%d)", node.ID, version)
-	}(in)
-	return inboundDeployment{Attempted: true, Status: "queued", BaseVersion: maxVersion}
-}
-
-// pushCertToNode 把证书签发产物推送到单个节点 agent（幂等；失败仅记录，不阻断保存）。
-func pushCertToNode(node model.Node, certID uint) {
-	if certID == 0 {
-		return
-	}
-	var cert model.Certificate
-	if err := store.DB.First(&cert, certID).Error; err != nil {
-		log.Printf("[inbound] 证书 #%d 不存在，跳过对节点 %d 的分发", certID, node.ID)
-		return
-	}
-	if cert.Status != "issued" {
-		log.Printf("[inbound] 证书 #%d 状态 %s，跳过对节点 %d 的分发", certID, cert.Status, node.ID)
-		return
-	}
-	base := filepath.Join(ctrlCertDir, "certificates", sanitize(cert.Domain))
-	certPEM, err1 := os.ReadFile(base + ".crt")
-	keyPEM, err2 := os.ReadFile(base + ".key")
-	if err1 != nil || err2 != nil {
-		log.Printf("[inbound] 读取证书产物失败(crt=%v key=%v)，跳过对节点 %d 的分发", err1, err2, node.ID)
-		return
-	}
-	caPEM, _ := os.ReadFile(base + ".issuer.crt")
-	if _, err := agentPut(node, "/agent/v1/cert", map[string]string{
-		"cert_pem": string(certPEM),
-		"key_pem":  string(keyPEM),
-		"ca_pem":   string(caPEM),
-	}); err != nil {
-		log.Printf("[inbound] 证书分发到节点 %d 失败: %v", node.ID, err)
-		return
-	}
-	log.Printf("[inbound] 证书 #%d 已分发到节点 %d", certID, node.ID)
 }
 
 func DeleteInbound(c *gin.Context) {
