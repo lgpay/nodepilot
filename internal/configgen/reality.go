@@ -103,15 +103,15 @@ func destHost(dest string) string {
 func NormalizeReality(in *model.Inbound) error {
 	if in.Security == "" {
 		if in.TLSEnabled {
-			in.Security = "tls"
+			in.Security = model.SecurityTLS
 		} else {
-			in.Security = "none"
+			in.Security = model.SecurityNone
 		}
 	}
-	if in.Security != "none" && in.Security != "tls" && in.Security != "reality" {
+	if in.Security != model.SecurityNone && in.Security != model.SecurityTLS && in.Security != model.SecurityReality {
 		return fmt.Errorf("不支持的安全层: %s（仅支持 none、tls、reality）", in.Security)
 	}
-	if in.Security != "reality" {
+	if in.Security != model.SecurityReality {
 		return nil
 	}
 	if in.Protocol != "vless" {

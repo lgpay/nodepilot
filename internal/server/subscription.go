@@ -334,9 +334,9 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		sec := in.Security
 		if sec == "" {
 			if in.TLSEnabled {
-				sec = "tls"
+				sec = model.SecurityTLS
 			} else {
-				sec = "none"
+				sec = model.SecurityNone
 			}
 		}
 		sni := ""
@@ -346,7 +346,7 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		// REALITY 客户端链接参数：由私钥派生公钥(pbk)，取首个 shortId 作 sid、
 		// 首个 serverName 作 sni（缺省取 dest host）、spiderX 默认 "/"。
 		var rPub, rSid, rSni, rSpx string
-		if sec == "reality" {
+		if sec == model.SecurityReality {
 			rSpx = in.RealitySpiderX
 			if rSpx == "" {
 				rSpx = "/"

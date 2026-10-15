@@ -64,15 +64,21 @@ type Inbound struct {
 
 	// REALITY（security=reality 时生效；仅 VLESS+TCP）。服务端用 privateKey/shortIds，
 	// 客户端链接用由 privateKey 派生的公钥(pbk)与其中一个 shortId。
-	RealityDest         string `gorm:"size:256" json:"reality_dest"`          // 借用握手的目标，如 service.sh.189.cn:443
-	RealityServerNames  string `gorm:"size:512" json:"reality_server_names"`  // SNI 白名（逗号分隔），默认取 dest host
-	RealityPrivateKey   string `gorm:"size:256" json:"reality_private_key"`   // X25519 私钥（base64url 无填充）
-	RealityShortIds     string `gorm:"size:256" json:"reality_short_ids"`     // shortId 列表（逗号分隔）
-	RealitySpiderX      string `gorm:"size:256" json:"reality_spider_x"`      // spiderX，默认 "/"
+	RealityDest        string `gorm:"size:256" json:"reality_dest"`         // 借用握手的目标，如 service.sh.189.cn:443
+	RealityServerNames string `gorm:"size:512" json:"reality_server_names"` // SNI 白名（逗号分隔），默认取 dest host
+	RealityPrivateKey  string `gorm:"size:256" json:"-"`                    // X25519 私钥（base64url 无填充），禁止通过 API 返回
+	RealityShortIds    string `gorm:"size:256" json:"reality_short_ids"`    // shortId 列表（逗号分隔）
+	RealitySpiderX     string `gorm:"size:256" json:"reality_spider_x"`     // spiderX，默认 "/"
 
 	// Connectivity 入站端口连通状态(ok/fail/空=未知)，由控制面探测维护，不入库
 	Connectivity string `gorm:"-" json:"connectivity"`
 }
+
+const (
+	SecurityNone    = "none"
+	SecurityTLS     = "tls"
+	SecurityReality = "reality"
+)
 
 // Client 代理用户（vmess 等客户端账号）
 type Client struct {

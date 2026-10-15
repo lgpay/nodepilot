@@ -336,7 +336,7 @@ func UpdateInbound(c *gin.Context) {
 	updates["reality_private_key"] = eff.RealityPrivateKey
 	updates["reality_short_ids"] = eff.RealityShortIds
 	updates["reality_spider_x"] = eff.RealitySpiderX
-	if eff.Security == "reality" {
+	if eff.Security == model.SecurityReality {
 		updates["tls_enabled"] = false
 	}
 	store.DB.Model(&in).Updates(updates)
@@ -364,13 +364,13 @@ func afterInboundSave(in model.Inbound) inboundDeployment {
 	security := in.Security
 	if security == "" {
 		if in.TLSEnabled {
-			security = "tls"
+			security = model.SecurityTLS
 		} else {
-			security = "none"
+			security = model.SecurityNone
 		}
 	}
 	// 仅 TLS / REALITY 入站由服务端主动下发；其余（如裸 vmess/ws）交由前端 afterConfigSaved 触发同步。
-	if security != "tls" && security != "reality" {
+	if security != model.SecurityTLS && security != model.SecurityReality {
 		return inboundDeployment{}
 	}
 	// 在启动异步任务前记录基线版本，避免任务完成得太快时前端把新版本误当成旧版本。
@@ -390,7 +390,7 @@ func afterInboundSave(in model.Inbound) inboundDeployment {
 			return
 		}
 		// TLS 入站才分发证书；REALITY 不使用证书。
-		if security == "tls" && in.TLSCertID > 0 {
+		if security == model.SecurityTLS && in.TLSCertID > 0 {
 			pushCertToNode(node, in.TLSCertID)
 		}
 		version, err := syncNode(node)

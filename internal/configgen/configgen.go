@@ -66,12 +66,12 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		security := in.Security
 		if security == "" {
 			if in.TLSEnabled {
-				security = "tls"
+				security = model.SecurityTLS
 			} else {
-				security = "none"
+				security = model.SecurityNone
 			}
 		}
-		isReality := security == "reality"
+		isReality := security == model.SecurityReality
 		clientList := []map[string]interface{}{}
 		clientFlow := ""
 		if isReality && in.Protocol == "vless" {
@@ -114,96 +114,96 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		if wsPath == "" {
 			wsPath = "/v2ray"
 		}
-	grpcSvc := ss.GrpcSettings.ServiceName
-	if grpcSvc == "" {
-		grpcSvc = "xray"
-	}
-	stream := map[string]interface{}{"network": network}
-	switch network {
-	case "ws":
-		ws := map[string]interface{}{"path": wsPath}
-		if len(ss.WsSettings.Headers) > 0 {
-			ws["headers"] = ss.WsSettings.Headers
+		grpcSvc := ss.GrpcSettings.ServiceName
+		if grpcSvc == "" {
+			grpcSvc = "xray"
 		}
-		stream["wsSettings"] = ws
-	case "tcp":
-		// REALITY 走裸 TCP（TLS 由 reality 层承载），不能再叠加 tcp http 伪饰。
-		if !isReality && ss.TcpSettings.Header.Type != "" && ss.TcpSettings.Header.Type != "none" {
-			tcp := map[string]interface{}{"type": ss.TcpSettings.Header.Type}
-			if len(ss.TcpSettings.Header.Request) > 0 {
-				tcp["request"] = ss.TcpSettings.Header.Request
+		stream := map[string]interface{}{"network": network}
+		switch network {
+		case "ws":
+			ws := map[string]interface{}{"path": wsPath}
+			if len(ss.WsSettings.Headers) > 0 {
+				ws["headers"] = ss.WsSettings.Headers
 			}
-			stream["tcpSettings"] = map[string]interface{}{"header": tcp}
-		}
-	case "grpc":
-		grpc := map[string]interface{}{"serviceName": grpcSvc}
-		if ss.GrpcSettings.Mode != "" {
-			grpc["mode"] = ss.GrpcSettings.Mode
-		}
-		stream["grpcSettings"] = grpc
-	}
-	switch security {
-	case "reality":
-		stream["security"] = "reality"
-		stream["realitySettings"] = buildRealitySettings(in)
-	case "tls":
-		stream["security"] = "tls"
-		// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
-		certFile, keyFile := agentCertFile, agentKeyFile
-		if in.TLSCertID > 0 && store.DB != nil {
-			var cert model.Certificate
-			if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
-				certFile, keyFile = cert.CertPath, cert.KeyPath
+			stream["wsSettings"] = ws
+		case "tcp":
+			// REALITY 走裸 TCP（TLS 由 reality 层承载），不能再叠加 tcp http 伪饰。
+			if !isReality && ss.TcpSettings.Header.Type != "" && ss.TcpSettings.Header.Type != "none" {
+				tcp := map[string]interface{}{"type": ss.TcpSettings.Header.Type}
+				if len(ss.TcpSettings.Header.Request) > 0 {
+					tcp["request"] = ss.TcpSettings.Header.Request
+				}
+				stream["tcpSettings"] = map[string]interface{}{"header": tcp}
 			}
+		case "grpc":
+			grpc := map[string]interface{}{"serviceName": grpcSvc}
+			if ss.GrpcSettings.Mode != "" {
+				grpc["mode"] = ss.GrpcSettings.Mode
+			}
+			stream["grpcSettings"] = grpc
 		}
-		stream["tlsSettings"] = map[string]interface{}{
-			"certificates": []map[string]interface{}{
-				{"certificateFile": certFile, "keyFile": keyFile},
-			},
+		switch security {
+		case model.SecurityReality:
+			stream["security"] = model.SecurityReality
+			stream["realitySettings"] = buildRealitySettings(in)
+		case model.SecurityTLS:
+			stream["security"] = model.SecurityTLS
+			// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
+			certFile, keyFile := agentCertFile, agentKeyFile
+			if in.TLSCertID > 0 && store.DB != nil {
+				var cert model.Certificate
+				if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
+					certFile, keyFile = cert.CertPath, cert.KeyPath
+				}
+			}
+			stream["tlsSettings"] = map[string]interface{}{
+				"certificates": []map[string]interface{}{
+					{"certificateFile": certFile, "keyFile": keyFile},
+				},
+			}
+		default:
+			stream["security"] = model.SecurityNone
 		}
-	default:
-		stream["security"] = "none"
-	}
 
-	// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
-	settings := map[string]interface{}{}
-	switch in.Protocol {
-	case "vmess", "vless", "trojan":
-		settings["clients"] = clientList
-		if in.Protocol == "vless" {
-			settings["decryption"] = "none"
-		}
-	case "ss":
-		// SS 不支持 clients 数组，取第一个客户端的 UUID 作为密码（method 用默认 aes-256-gcm）
-		pwd := ""
-		if len(clientList) > 0 {
-			if p, ok := clientList[0]["password"].(string); ok {
-				pwd = p
+		// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
+		settings := map[string]interface{}{}
+		switch in.Protocol {
+		case "vmess", "vless", "trojan":
+			settings["clients"] = clientList
+			if in.Protocol == "vless" {
+				settings["decryption"] = "none"
 			}
-		}
-		settings["method"] = "aes-256-gcm"
-		settings["password"] = pwd
-		if pwd == "" {
-			continue // 无客户端则跳过该入站，避免生成无效配置
-		}
-	case "socks", "http":
-		// SOCKS/HTTP 用 accounts 做用户名密码认证（user 固定 uuid, pass 用 uuid）
-		accounts := []map[string]interface{}{}
-		for _, c := range clientList {
-			uid, _ := c["id"].(string)
-			if uid == "" {
+		case "ss":
+			// SS 不支持 clients 数组，取第一个客户端的 UUID 作为密码（method 用默认 aes-256-gcm）
+			pwd := ""
+			if len(clientList) > 0 {
+				if p, ok := clientList[0]["password"].(string); ok {
+					pwd = p
+				}
+			}
+			settings["method"] = "aes-256-gcm"
+			settings["password"] = pwd
+			if pwd == "" {
+				continue // 无客户端则跳过该入站，避免生成无效配置
+			}
+		case "socks", "http":
+			// SOCKS/HTTP 用 accounts 做用户名密码认证（user 固定 uuid, pass 用 uuid）
+			accounts := []map[string]interface{}{}
+			for _, c := range clientList {
+				uid, _ := c["id"].(string)
+				if uid == "" {
+					continue
+				}
+				accounts = append(accounts, map[string]interface{}{"user": uid, "pass": uid})
+			}
+			if len(accounts) == 0 {
 				continue
 			}
-			accounts = append(accounts, map[string]interface{}{"user": uid, "pass": uid})
+			settings["accounts"] = accounts
+			settings["ip"] = "0.0.0.0"
+			settings["userLevel"] = 0
 		}
-		if len(accounts) == 0 {
-			continue
-		}
-		settings["accounts"] = accounts
-		settings["ip"] = "0.0.0.0"
-		settings["userLevel"] = 0
-	}
-	ib := map[string]interface{}{
+		ib := map[string]interface{}{
 			"listen":         "0.0.0.0",
 			"port":           in.Port,
 			"protocol":       in.Protocol,
