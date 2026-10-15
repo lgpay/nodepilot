@@ -33,6 +33,14 @@ func enqueueDeployment(in model.Inbound, security string) bool {
 	return deploymentQueue.Submit(func() { executeDeployment(job) })
 }
 
+func enqueueRecoverySync(node model.Node) bool {
+	return deploymentQueue.Submit(func() {
+		if _, err := syncNode(node); err != nil {
+			log.Printf("[heartbeat] auto-sync on recovery node=%d failed: %v", node.ID, err)
+		}
+	})
+}
+
 // StopDeploymentWorker stops accepting new jobs, drains queued deployments,
 // and waits for the worker to finish. It is safe to call more than once.
 func StopDeploymentWorker() {

@@ -92,9 +92,9 @@ go build -ldflags "-X main.Version=$VERSION" -o bin/agent  ./cmd/agent
 |----------|------|------|
 | `NP_JWT_SECRET` | JWT 签名密钥（HS256）。未设置时在数据库同目录生成随机密钥文件 `.nodepilot_jwt_secret`（权限 `0600`）并持久化 | 随机生成 |
 | `NP_MASTER_KEY` | AES-256 主密钥，用于加密 Cloudflare API Token、节点 token 与订阅 token。未设置时在数据库同目录生成 `.nodepilot_master_key` | 随机生成 |
-| `NP_AGENT_TLS_VERIFY` | 管理端↔agent 通信是否校验 TLS 证书（`true`/`false`）。默认 `false`（MVP 兼容，跳过校验），关闭时启动会打印醒目警告 | `false` |
+| `NP_AGENT_TLS_VERIFY` | 管理端↔agent 通信是否校验 TLS 证书。默认开启；仅显式设置为 `false` 时关闭，关闭时启动会打印醒目警告 | `true` |
 
-> 生产环境建议：设置上述密钥环境变量（或备份好密钥文件），并将 `NP_AGENT_TLS_VERIFY=true`（配合可信证书）。
+> 生产环境建议：设置上述密钥环境变量（或备份好密钥文件），并使用 HTTPS 与可信证书；仅在临时兼容自签名/明文环境时设置 `NP_AGENT_TLS_VERIFY=false`。
 > 节点 token 在数据库内仅以 `sha256` 哈希 + AES 加密形式存储；订阅 token 以 AES 密文存储，均不保存明文。
 > 关键操作（登录 / 节点 / 入站 / 用户 / 订阅 / 证书 / 通知 / 配置下发）均输出结构化审计日志（slog，`msg=audit`）。
 
@@ -231,7 +231,7 @@ NP_SERVER=http://<管理端IP>:8080 NP_TOKEN=<节点TOKEN> NP_NODE_ID=1 \
 
 ## 已知限制
 
-- 管理端与 agent 间 MVP 使用 HTTP + 默认跳过 TLS 校验，生产应启用 HTTPS 并设置 `NP_AGENT_TLS_VERIFY=true`
+- 管理端与 agent 间默认使用配置中的地址；HTTPS 默认校验证书，临时兼容自签名证书可设置 `NP_AGENT_TLS_VERIFY=false`
 - 节点 agent 热重载采用重启 xray 进程（秒级中断），后续可升级为 xray api reload
 - 节点 agent 一键脚本会自动安装 xray-core（官方 XTLS 脚本）
 - 尚未实现：2FA、agent 自更新、配置一键回滚接口、手动连通测试与持久化自愈日志；CPU/内存指标当前固定为 0，不作为运行看板数据

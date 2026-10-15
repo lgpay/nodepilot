@@ -40,7 +40,7 @@ func main() {
 
 	// 安全提示：TLS 校验默认关闭（MVP 兼容），生产环境应启用
 	if !config.AgentTLSVerify {
-		slog.Warn("⚠️  NP_AGENT_TLS_VERIFY 未设为 true：管理端→agent 通信将跳过 TLS 证书校验，存在中间人风险！生产环境请设置 NP_AGENT_TLS_VERIFY=true 并配合可信证书")
+		slog.Warn("⚠️  NP_AGENT_TLS_VERIFY=false：管理端→agent 通信将跳过 TLS 证书校验，存在中间人风险")
 	}
 
 	if err := store.Init(*dbPath); err != nil {

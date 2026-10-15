@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -68,10 +69,17 @@ func IssueJWT(username string, tokenVersion int) (string, error) {
 // ParseJWT 校验并返回 claims
 func ParseJWT(tokenStr string) (jwt.MapClaims, error) {
 	t, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("unexpected jwt signing method: %s", t.Method.Alg())
+		}
 		return config.JWTSecret, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return t.Claims.(jwt.MapClaims), nil
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok || !t.Valid {
+		return nil, fmt.Errorf("invalid jwt claims")
+	}
+	return claims, nil
 }

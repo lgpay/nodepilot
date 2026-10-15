@@ -125,7 +125,10 @@ func UpdateSubscription(c *gin.Context) {
 	if body.Enabled != nil {
 		updates["enabled"] = *body.Enabled
 	}
-	store.DB.Model(&g).Updates(updates)
+	if err := store.DB.Model(&g).Updates(updates).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	slog.Info("audit", "action", "subscription_update", "id", g.ID)
 	c.JSON(200, gin.H{"ok": true})
 }

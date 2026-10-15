@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -104,6 +105,11 @@ func ListAllInbounds(c *gin.Context) {
 
 func CreateInbound(c *gin.Context) {
 	nodeID := c.Param("id")
+	var node model.Node
+	if err := store.DB.First(&node, nodeID).Error; err != nil {
+		c.JSON(404, gin.H{"error": "node not found"})
+		return
+	}
 	var body struct {
 		Name               *string `json:"name"`
 		Protocol           string  `json:"protocol"`
@@ -145,6 +151,10 @@ func CreateInbound(c *gin.Context) {
 		RealityPrivateKey:  body.RealityPrivateKey,
 		RealityShortIds:    body.RealityShortIds,
 		RealitySpiderX:     body.RealitySpiderX,
+	}
+	if err := validateInboundPort(in.NodeID, in.Port, 0); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
 	}
 	if err := service.PrepareInbound(&in); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -241,6 +251,12 @@ func UpdateInbound(c *gin.Context) {
 	if body.RealitySpiderX != nil {
 		updates["reality_spider_x"] = *body.RealitySpiderX
 	}
+	if body.Port != nil {
+		if err := validateInboundPort(in.NodeID, *body.Port, in.ID); err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	}
 	// 校验更新后的最终状态（trojan 必须 TLS + 证书），防止生成非法配置拖垮节点
 	effCert := in.TLSCertID
 	if body.TLSCertID != nil {
@@ -331,6 +347,23 @@ func DeleteInbound(c *gin.Context) {
 	}
 	slog.Info("audit", "action", "inbound_delete", "id", id)
 	c.JSON(200, gin.H{"ok": true})
+}
+
+func validateInboundPort(nodeID uint, port int, excludeID uint) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("端口必须在 1-65535 范围内")
+	}
+	query := store.DB.Where("node_id = ? AND port = ?", nodeID, port)
+	if excludeID > 0 {
+		query = query.Where("id <> ?", excludeID)
+	}
+	var existing model.Inbound
+	if err := query.First(&existing).Error; err == nil {
+		return fmt.Errorf("节点已有入站使用端口 %d", port)
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("检查端口占用失败: %w", err)
+	}
+	return nil
 }
 
 // removeInboundFromSubscriptionFilters 从所有订阅分组的 filters JSON 的 inbound_ids 中移除该入站，

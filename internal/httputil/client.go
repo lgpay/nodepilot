@@ -11,8 +11,8 @@ import (
 )
 
 // AgentClient 返回带超时的 HTTP 客户端。
-// 当 config.AgentTLSVerify 为 false（默认，MVP 兼容）时跳过对端证书校验；
-// 生产环境建议设为 true，此时使用系统根证书池做正常校验。
+// 当 config.AgentTLSVerify 为 false（需显式配置）时跳过对端证书校验；
+// 默认使用系统根证书池做正常校验。
 func AgentClient(timeout time.Duration) *http.Client {
 	transport := &http.Transport{}
 	if !config.AgentTLSVerify {

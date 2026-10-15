@@ -23,6 +23,11 @@ func ListClients(c *gin.Context) {
 
 func CreateClient(c *gin.Context) {
 	inboundID := c.Param("id")
+	var inbound model.Inbound
+	if err := store.DB.First(&inbound, inboundID).Error; err != nil {
+		c.JSON(404, gin.H{"error": "inbound not found"})
+		return
+	}
 	var body struct {
 		Alias             string `json:"alias"`
 		TrafficLimitBytes int64  `json:"traffic_limit_bytes"`

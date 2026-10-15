@@ -12,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
+	"nodepilot/internal/auth"
+	"nodepilot/internal/config"
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
 )
@@ -81,6 +83,60 @@ func TestCreateInboundPersistsLegacySecurityDefaults(t *testing.T) {
 	}
 	if in.Security != model.SecurityNone {
 		t.Fatalf("security = %q, want %q", in.Security, model.SecurityNone)
+	}
+}
+
+func TestCreateInboundValidatesNodePortAndUniqueness(t *testing.T) {
+	oldDB := store.DB
+	store.DB = newServerTestDB(t)
+	defer func() { store.DB = oldDB }()
+	if err := store.DB.Create(&model.Node{ID: 1, Name: "test", Enabled: true}).Error; err != nil {
+		t.Fatal(err)
+	}
+	missing := callJSON(t, CreateInbound, http.MethodPost, "/api/v1/nodes/99/inbounds", gin.Params{{Key: "id", Value: "99"}}, map[string]interface{}{"protocol": "vmess", "port": 10086})
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing node status = %d, want 404", missing.Code)
+	}
+	badPort := callJSON(t, CreateInbound, http.MethodPost, "/api/v1/nodes/1/inbounds", gin.Params{{Key: "id", Value: "1"}}, map[string]interface{}{"protocol": "vmess", "port": 0})
+	if badPort.Code != http.StatusBadRequest {
+		t.Fatalf("bad port status = %d, want 400", badPort.Code)
+	}
+	first := callJSON(t, CreateInbound, http.MethodPost, "/api/v1/nodes/1/inbounds", gin.Params{{Key: "id", Value: "1"}}, map[string]interface{}{"protocol": "vmess", "port": 10086})
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first create status = %d, want 201", first.Code)
+	}
+	second := callJSON(t, CreateInbound, http.MethodPost, "/api/v1/nodes/1/inbounds", gin.Params{{Key: "id", Value: "1"}}, map[string]interface{}{"protocol": "vless", "port": 10086})
+	if second.Code != http.StatusBadRequest {
+		t.Fatalf("duplicate port status = %d, want 400", second.Code)
+	}
+}
+
+func TestCreateClientRejectsMissingInbound(t *testing.T) {
+	oldDB := store.DB
+	store.DB = newServerTestDB(t)
+	defer func() { store.DB = oldDB }()
+	w := callJSON(t, CreateClient, http.MethodPost, "/api/v1/inbounds/99/clients", gin.Params{{Key: "id", Value: "99"}}, map[string]interface{}{"alias": "orphan"})
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("missing inbound status = %d, want 404", w.Code)
+	}
+}
+
+func TestAuthMiddlewareRejectsUnknownSubject(t *testing.T) {
+	oldDB, oldSecret := store.DB, config.JWTSecret
+	store.DB = newServerTestDB(t)
+	config.JWTSecret = []byte("test-secret")
+	defer func() { store.DB, config.JWTSecret = oldDB, oldSecret }()
+	token, err := auth.IssueJWT("unknown", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/nodes", nil)
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+	AuthMiddleware()(c)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
 	}
 }
 

@@ -49,11 +49,15 @@ func syncNode(node model.Node) (int, error) {
 	defer mu.(*sync.Mutex).Unlock()
 
 	var inbounds []model.Inbound
-	store.DB.Where("node_id = ?", node.ID).Find(&inbounds)
+	if err := store.DB.Where("node_id = ?", node.ID).Find(&inbounds).Error; err != nil {
+		return 0, fmt.Errorf("load inbounds: %w", err)
+	}
 	clientsByInbound := map[uint][]model.Client{}
 	for _, in := range inbounds {
 		var cls []model.Client
-		store.DB.Where("inbound_id = ?", in.ID).Find(&cls)
+		if err := store.DB.Where("inbound_id = ?", in.ID).Find(&cls).Error; err != nil {
+			return 0, fmt.Errorf("load clients for inbound %d: %w", in.ID, err)
+		}
 		clientsByInbound[in.ID] = cls
 	}
 
@@ -63,21 +67,28 @@ func syncNode(node model.Node) (int, error) {
 	}
 
 	var maxVer int
-	store.DB.Model(&model.ConfigVersion{}).
+	if result := store.DB.Model(&model.ConfigVersion{}).
 		Where("node_id = ?", node.ID).
-		Select("COALESCE(MAX(version),0)").Scan(&maxVer)
+		Select("COALESCE(MAX(version),0)").Scan(&maxVer); result.Error != nil {
+		return 0, fmt.Errorf("load config version: %w", result.Error)
+	}
 	version := maxVer + 1
 
-	payload, _ := json.Marshal(map[string]interface{}{
+	payload, err := json.Marshal(map[string]interface{}{
 		"version":     version,
 		"xray_config": json.RawMessage(jsonStr),
 	})
+	if err != nil {
+		return 0, fmt.Errorf("marshal config payload: %w", err)
+	}
 
 	// 推送需携带明文 token（从密文解密），用于通过 agent 的 Bearer 校验
 	token, err := secret.Decrypt(node.TokenEnc)
 	if err != nil {
 		cv := model.ConfigVersion{NodeID: node.ID, Version: version, ContentJSON: jsonStr, AppliedAt: time.Now(), Status: "failed", Error: "decrypt token failed"}
-		store.DB.Create(&cv)
+		if dbErr := store.DB.Create(&cv).Error; dbErr != nil {
+			return 0, fmt.Errorf("record deployment failure: %w (original: %v)", dbErr, err)
+		}
 		return 0, err
 	}
 
@@ -100,7 +111,9 @@ func syncNode(node model.Node) (int, error) {
 	if err != nil {
 		cv.Status = "failed"
 		cv.Error = err.Error()
-		store.DB.Create(&cv)
+		if dbErr := store.DB.Create(&cv).Error; dbErr != nil {
+			return 0, fmt.Errorf("record deployment failure: %w (original: %v)", dbErr, err)
+		}
 		return 0, err
 	}
 	defer resp.Body.Close()
@@ -108,11 +121,15 @@ func syncNode(node model.Node) (int, error) {
 		b, _ := io.ReadAll(resp.Body)
 		cv.Status = "failed"
 		cv.Error = string(b)
-		store.DB.Create(&cv)
+		if dbErr := store.DB.Create(&cv).Error; dbErr != nil {
+			return 0, fmt.Errorf("record deployment failure: %w (original: agent rejected)", dbErr)
+		}
 		return 0, fmt.Errorf("agent rejected: %s", string(b))
 	}
 	cv.Status = "applied"
-	store.DB.Create(&cv)
+	if err := store.DB.Create(&cv).Error; err != nil {
+		return 0, fmt.Errorf("record applied deployment: %w", err)
+	}
 	return version, nil
 }
 

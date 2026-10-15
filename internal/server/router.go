@@ -160,25 +160,26 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(401, gin.H{"error": "invalid token"})
 			return
 		}
-		// 首次启动随机密码未修改前，仅放行修改密码接口（强制改密）
-		if strings.HasSuffix(c.FullPath(), "/auth/change-password") {
-			c.Next()
+		username, ok := claims["sub"].(string)
+		if !ok || strings.TrimSpace(username) == "" {
+			c.AbortWithStatusJSON(401, gin.H{"error": "invalid token subject"})
 			return
 		}
-		if username, _ := claims["sub"].(string); username != "" {
-			var admin model.Admin
-			if store.DB.Where("username = ?", username).First(&admin).Error == nil {
-				if admin.MustChangePwd {
-					c.AbortWithStatusJSON(403, gin.H{"error": "please change password first", "must_change_pwd": true})
-					return
-				}
-				// JWT 版本校验：改密后 Admin.TokenVersion 递增，旧 token（ver 缺失或不匹配）立即失效
-				ver, ok := claims["ver"].(float64)
-				if !ok || int(ver) != admin.TokenVersion {
-					c.AbortWithStatusJSON(401, gin.H{"error": "token revoked, please login again"})
-					return
-				}
-			}
+		var admin model.Admin
+		if err := store.DB.Where("username = ?", username).First(&admin).Error; err != nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": "admin not found"})
+			return
+		}
+		// JWT 版本校验：改密后 Admin.TokenVersion 递增，旧 token（ver 缺失或不匹配）立即失效。
+		ver, ok := claims["ver"].(float64)
+		if !ok || int(ver) != admin.TokenVersion {
+			c.AbortWithStatusJSON(401, gin.H{"error": "token revoked, please login again"})
+			return
+		}
+		// 首次启动随机密码未修改前，仅放行修改密码接口（强制改密）。
+		if admin.MustChangePwd && !strings.HasSuffix(c.FullPath(), "/auth/change-password") {
+			c.AbortWithStatusJSON(403, gin.H{"error": "please change password first", "must_change_pwd": true})
+			return
 		}
 		c.Next()
 	}

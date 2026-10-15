@@ -327,7 +327,10 @@ func UpdateNode(c *gin.Context) {
 			updates["expires_at"] = t
 		}
 	}
-	store.DB.Model(&node).Updates(updates)
+	if err := store.DB.Model(&node).Updates(updates).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	slog.Info("audit", "action", "node_update", "id", node.ID)
 	c.JSON(200, gin.H{"ok": true})
 }
@@ -465,7 +468,10 @@ func Heartbeat(c *gin.Context) {
 		XrayRunning       bool    `json:"xray_running"`
 		HeartbeatInterval int     `json:"heartbeat_interval"`
 	}
-	c.ShouldBindJSON(&body)
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 	hb := body.HeartbeatInterval
 	if hb < 5 || hb > 86400 {
 		hb = 0 // 无效值不更新，保留原值
@@ -482,16 +488,17 @@ func Heartbeat(c *gin.Context) {
 	}
 	// 记录恢复前是否离线：用于「离线期间改了配置 → 恢复后自动重推」
 	wasOffline := node.Status == "offline"
-	store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(updates)
+	if err := store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	// 节点从离线恢复：自动把当前(可能离线期间改动过的)配置重推一次，
 	// 避免「面板改了但不生效」的困惑。后台 goroutine 执行，不阻塞心跳响应；
 	// syncNode 自身有按节点互斥锁，不会与手动同步并发冲突。
 	if wasOffline {
-		go func(n model.Node) {
-			if _, err := syncNode(n); err != nil {
-				log.Printf("[heartbeat] auto-sync on recovery node=%d failed: %v", n.ID, err)
-			}
-		}(node)
+		if !enqueueRecoverySync(node) {
+			log.Printf("[heartbeat] recovery sync queue full for node=%d", node.ID)
+		}
 	}
 	// 响应中携带控制面配置的心跳间隔(秒)，agent 据此动态调整，无需重启
 	want := 30
