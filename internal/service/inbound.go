@@ -1,6 +1,11 @@
 package service
 
-import "fmt"
+import (
+	"fmt"
+
+	"nodepilot/internal/configgen"
+	"nodepilot/internal/model"
+)
 
 // ValidateInbound checks protocol-level constraints that are independent of
 // HTTP or persistence. Security-specific normalization remains in configgen
@@ -26,4 +31,17 @@ func ValidateInbound(protocol, transport string, tlsEnabled bool, certID uint) e
 		}
 	}
 	return nil
+}
+
+// PrepareInbound validates and normalizes an inbound before persistence or
+// configuration generation. Keeping this boundary in service prevents HTTP
+// handlers from depending on config-generation details.
+func PrepareInbound(in *model.Inbound) error {
+	if in == nil {
+		return fmt.Errorf("入站不能为空")
+	}
+	if err := ValidateInbound(in.Protocol, in.Transport, in.TLSEnabled, in.TLSCertID); err != nil {
+		return err
+	}
+	return configgen.NormalizeReality(in)
 }

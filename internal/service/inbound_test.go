@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"nodepilot/internal/model"
+)
 
 func TestValidateInbound(t *testing.T) {
 	tests := []struct {
@@ -24,5 +28,15 @@ func TestValidateInbound(t *testing.T) {
 				t.Fatalf("ValidateInbound() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestPrepareInboundNormalizesReality(t *testing.T) {
+	in := &model.Inbound{Protocol: "vless", Transport: "tcp", Security: model.SecurityReality, RealityDest: "example.com:443"}
+	if err := PrepareInbound(in); err != nil {
+		t.Fatalf("PrepareInbound() error = %v", err)
+	}
+	if in.RealityPrivateKey == "" || in.RealityShortIds == "" {
+		t.Fatal("reality defaults were not generated")
 	}
 }

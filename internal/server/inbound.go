@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"nodepilot/internal/configgen"
 	"nodepilot/internal/model"
 	"nodepilot/internal/service"
 	"nodepilot/internal/store"
@@ -147,12 +146,7 @@ func CreateInbound(c *gin.Context) {
 		RealityShortIds:    body.RealityShortIds,
 		RealitySpiderX:     body.RealitySpiderX,
 	}
-	if err := service.ValidateInbound(in.Protocol, in.Transport, in.TLSEnabled, in.TLSCertID); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	// 归一化安全层并补全 REALITY 参数（校验协议/传输，按需生成密钥/shortId）
-	if err := configgen.NormalizeReality(&in); err != nil {
+	if err := service.PrepareInbound(&in); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -248,25 +242,9 @@ func UpdateInbound(c *gin.Context) {
 		updates["reality_spider_x"] = *body.RealitySpiderX
 	}
 	// 校验更新后的最终状态（trojan 必须 TLS + 证书），防止生成非法配置拖垮节点
-	effProto := in.Protocol
-	if body.Protocol != nil {
-		effProto = *body.Protocol
-	}
-	effTLS := in.TLSEnabled
-	if body.TLSEnabled != nil {
-		effTLS = *body.TLSEnabled
-	}
 	effCert := in.TLSCertID
 	if body.TLSCertID != nil {
 		effCert = *body.TLSCertID
-	}
-	effTransport := in.Transport
-	if body.Transport != nil {
-		effTransport = *body.Transport
-	}
-	if err := service.ValidateInbound(effProto, effTransport, effTLS, effCert); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
 	}
 	// 用更新后的生效值归一化安全层 / 补全 REALITY 参数（可能生成私钥/shortId）
 	eff := in
@@ -300,7 +278,7 @@ func UpdateInbound(c *gin.Context) {
 	if body.RealitySpiderX != nil {
 		eff.RealitySpiderX = *body.RealitySpiderX
 	}
-	if err := configgen.NormalizeReality(&eff); err != nil {
+	if err := service.PrepareInbound(&eff); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
