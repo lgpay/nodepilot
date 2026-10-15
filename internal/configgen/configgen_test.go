@@ -92,12 +92,55 @@ func TestBuildXrayConfigPreservesObfuscationSettings(t *testing.T) {
 	}
 	clients := map[uint][]model.Client{1: {{UUID: "11111111-1111-1111-1111-111111111111", Enabled: true}}, 2: {{UUID: "22222222-2222-2222-2222-222222222222", Enabled: true}}}
 	s, err := BuildXrayConfig(node, inbounds, clients)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	var cfg map[string]interface{}
-	if err := json.Unmarshal([]byte(s), &cfg); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal([]byte(s), &cfg); err != nil {
+		t.Fatal(err)
+	}
 	list := cfg["inbounds"].([]interface{})
 	tcp := list[0].(map[string]interface{})["streamSettings"].(map[string]interface{})
-	if tcp["tcpSettings"].(map[string]interface{})["header"].(map[string]interface{})["type"] != "http" { t.Fatal("TCP HTTP obfuscation not preserved") }
+	if tcp["tcpSettings"].(map[string]interface{})["header"].(map[string]interface{})["type"] != "http" {
+		t.Fatal("TCP HTTP obfuscation not preserved")
+	}
 	ws := list[1].(map[string]interface{})["streamSettings"].(map[string]interface{})
-	if ws["wsSettings"].(map[string]interface{})["path"] != "/edge" { t.Fatal("WS path not preserved") }
+	if ws["wsSettings"].(map[string]interface{})["path"] != "/edge" {
+		t.Fatal("WS path not preserved")
+	}
+}
+
+func TestBuildXrayConfigRealityUsesDest(t *testing.T) {
+	in := model.Inbound{
+		ID: 1, Protocol: "vless", Transport: "tcp", Port: 443, Enabled: true,
+		Security: "reality", RealityDest: "example.com:443",
+		RealityPrivateKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		RealityShortIds:   "01234567", RealityServerNames: "example.com",
+	}
+	s, err := BuildXrayConfig(model.Node{ID: 1}, []model.Inbound{in}, map[uint][]model.Client{
+		1: {{UUID: "11111111-1111-1111-1111-111111111111", Enabled: true}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(s), &cfg); err != nil {
+		t.Fatal(err)
+	}
+	ib := cfg["inbounds"].([]interface{})[0].(map[string]interface{})
+	ss := ib["streamSettings"].(map[string]interface{})
+	reality := ss["realitySettings"].(map[string]interface{})
+	if reality["dest"] != "example.com:443" {
+		t.Fatalf("REALITY dest incorrect: %#v", reality)
+	}
+	if _, ok := reality["target"]; ok {
+		t.Fatal("REALITY must not emit obsolete target field")
+	}
+}
+
+func TestNormalizeRealityRejectsUnknownSecurity(t *testing.T) {
+	in := model.Inbound{Security: "bogus"}
+	if err := NormalizeReality(&in); err == nil {
+		t.Fatal("unknown security should be rejected")
+	}
 }

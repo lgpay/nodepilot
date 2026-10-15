@@ -68,7 +68,7 @@ func buildRealitySettings(in model.Inbound) map[string]interface{} {
 	}
 	return map[string]interface{}{
 		"show":        false,
-		"target":      in.RealityDest,
+		"dest":        in.RealityDest,
 		"xver":        0,
 		"serverNames": serverNames,
 		"privateKey":  in.RealityPrivateKey,
@@ -107,6 +107,9 @@ func NormalizeReality(in *model.Inbound) error {
 		} else {
 			in.Security = "none"
 		}
+	}
+	if in.Security != "none" && in.Security != "tls" && in.Security != "reality" {
+		return fmt.Errorf("不支持的安全层: %s（仅支持 none、tls、reality）", in.Security)
 	}
 	if in.Security != "reality" {
 		return nil

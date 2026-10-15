@@ -41,10 +41,11 @@ func validateInbound(protocol, transport string, tlsEnabled bool, certID uint) e
 }
 
 type inboundDeployment struct {
-	Attempted bool   `json:"attempted"`
-	Status    string `json:"status,omitempty"`
-	Version   int    `json:"version,omitempty"`
-	Error     string `json:"error,omitempty"`
+	Attempted   bool   `json:"attempted"`
+	Status      string `json:"status,omitempty"`
+	Version     int    `json:"version,omitempty"`
+	BaseVersion int    `json:"base_version,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 // ---- 入站 CRUD ----
@@ -130,41 +131,41 @@ func ListAllInbounds(c *gin.Context) {
 func CreateInbound(c *gin.Context) {
 	nodeID := c.Param("id")
 	var body struct {
-		Name             *string `json:"name"`
-		Protocol         string  `json:"protocol"`
-		Port             int     `json:"port"`
-		Transport        string  `json:"transport"`
-		Security         string  `json:"security"` // "" | none | tls | reality
-		TLSEnabled       bool    `json:"tls_enabled"`
-		TLSCertID        uint    `json:"cert_id"`
-		StreamSettings   string  `json:"stream_settings"`    // JSON 字符串
-		Fallback         string  `json:"fallback"`           // JSON 字符串
-		AutoHeal         *bool   `json:"auto_heal"`          // 端口不通时自动换端口（默认 true）
-		AutoHealInterval int     `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
-		RealityDest      string  `json:"reality_dest"`
-		RealityServerNames string `json:"reality_server_names"`
-		RealityPrivateKey  string `json:"reality_private_key"`
-		RealityShortIds    string `json:"reality_short_ids"`
-		RealitySpiderX     string `json:"reality_spider_x"`
+		Name               *string `json:"name"`
+		Protocol           string  `json:"protocol"`
+		Port               int     `json:"port"`
+		Transport          string  `json:"transport"`
+		Security           string  `json:"security"` // "" | none | tls | reality
+		TLSEnabled         bool    `json:"tls_enabled"`
+		TLSCertID          uint    `json:"cert_id"`
+		StreamSettings     string  `json:"stream_settings"`    // JSON 字符串
+		Fallback           string  `json:"fallback"`           // JSON 字符串
+		AutoHeal           *bool   `json:"auto_heal"`          // 端口不通时自动换端口（默认 true）
+		AutoHealInterval   int     `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
+		RealityDest        string  `json:"reality_dest"`
+		RealityServerNames string  `json:"reality_server_names"`
+		RealityPrivateKey  string  `json:"reality_private_key"`
+		RealityShortIds    string  `json:"reality_short_ids"`
+		RealitySpiderX     string  `json:"reality_spider_x"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 	in := model.Inbound{
-		NodeID:           uint(atoiSafe(nodeID)),
-		Name:             derefStr(body.Name),
-		Protocol:         body.Protocol,
-		Port:             body.Port,
-		Transport:        body.Transport,
-		Security:         body.Security,
-		TLSEnabled:       body.TLSEnabled,
-		TLSCertID:        body.TLSCertID,
-		StreamSettings:   body.StreamSettings,
-		Fallback:         body.Fallback,
-		Enabled:          true,
-		AutoHeal:         derefBool(body.AutoHeal, true),
-		AutoHealInterval: body.AutoHealInterval,
+		NodeID:             uint(atoiSafe(nodeID)),
+		Name:               derefStr(body.Name),
+		Protocol:           body.Protocol,
+		Port:               body.Port,
+		Transport:          body.Transport,
+		Security:           body.Security,
+		TLSEnabled:         body.TLSEnabled,
+		TLSCertID:          body.TLSCertID,
+		StreamSettings:     body.StreamSettings,
+		Fallback:           body.Fallback,
+		Enabled:            true,
+		AutoHeal:           derefBool(body.AutoHeal, true),
+		AutoHealInterval:   body.AutoHealInterval,
 		RealityDest:        body.RealityDest,
 		RealityServerNames: body.RealityServerNames,
 		RealityPrivateKey:  body.RealityPrivateKey,
@@ -197,23 +198,23 @@ func UpdateInbound(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Name             *string `json:"name"`
-		Protocol         *string `json:"protocol"`
-		Port             *int    `json:"port"`
-		Transport        *string `json:"transport"`
-		Security         *string `json:"security"` // "" | none | tls | reality
-		TLSEnabled       *bool   `json:"tls_enabled"`
-		TLSCertID        *uint   `json:"cert_id"`
-		StreamSettings   *string `json:"stream_settings"`
-		Fallback         *string `json:"fallback"`
-		Enabled          *bool   `json:"enabled"`
-		AutoHeal         *bool   `json:"auto_heal"`
-		AutoHealInterval *int    `json:"auto_heal_interval"`
-		RealityDest         *string `json:"reality_dest"`
-		RealityServerNames  *string `json:"reality_server_names"`
-		RealityPrivateKey   *string `json:"reality_private_key"`
-		RealityShortIds     *string `json:"reality_short_ids"`
-		RealitySpiderX      *string `json:"reality_spider_x"`
+		Name               *string `json:"name"`
+		Protocol           *string `json:"protocol"`
+		Port               *int    `json:"port"`
+		Transport          *string `json:"transport"`
+		Security           *string `json:"security"` // "" | none | tls | reality
+		TLSEnabled         *bool   `json:"tls_enabled"`
+		TLSCertID          *uint   `json:"cert_id"`
+		StreamSettings     *string `json:"stream_settings"`
+		Fallback           *string `json:"fallback"`
+		Enabled            *bool   `json:"enabled"`
+		AutoHeal           *bool   `json:"auto_heal"`
+		AutoHealInterval   *int    `json:"auto_heal_interval"`
+		RealityDest        *string `json:"reality_dest"`
+		RealityServerNames *string `json:"reality_server_names"`
+		RealityPrivateKey  *string `json:"reality_private_key"`
+		RealityShortIds    *string `json:"reality_short_ids"`
+		RealitySpiderX     *string `json:"reality_spider_x"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -372,6 +373,11 @@ func afterInboundSave(in model.Inbound) inboundDeployment {
 	if security != "tls" && security != "reality" {
 		return inboundDeployment{}
 	}
+	// 在启动异步任务前记录基线版本，避免任务完成得太快时前端把新版本误当成旧版本。
+	var maxVersion int
+	store.DB.Model(&model.ConfigVersion{}).
+		Where("node_id = ?", in.NodeID).
+		Select("COALESCE(MAX(version),0)").Scan(&maxVersion)
 	go func(in model.Inbound) {
 		defer func() {
 			if r := recover(); r != nil {
@@ -394,7 +400,7 @@ func afterInboundSave(in model.Inbound) inboundDeployment {
 		}
 		log.Printf("[inbound] 节点 #%d 异步配置下发完成 (version=%d)", node.ID, version)
 	}(in)
-	return inboundDeployment{Attempted: true, Status: "queued"}
+	return inboundDeployment{Attempted: true, Status: "queued", BaseVersion: maxVersion}
 }
 
 // pushCertToNode 把证书签发产物推送到单个节点 agent（幂等；失败仅记录，不阻断保存）。

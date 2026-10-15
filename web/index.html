@@ -666,7 +666,7 @@ async function afterInboundSaved(nodeId, label, deployment) {
       // 服务端异步下发（证书分发 + 配置同步）：先提示进行中，再轮询配置版本确认真实结果
       showToast(label + '已保存，服务端下发中…', 'warn');
       markDeployPending(nodeId, label + ' 服务端下发中');
-      pollInboundDeploy(nodeId, label);
+      pollInboundDeploy(nodeId, label, deployment.base_version || 0);
     } else {
       markDeployPending(nodeId, '服务端自动下发失败');
       showToast(label + '已保存，但自动下发失败：' + (deployment.error || '未知错误'), 'err');
@@ -677,12 +677,8 @@ async function afterInboundSaved(nodeId, label, deployment) {
 }
 // pollInboundDeploy 轮询节点配置版本，确认异步下发的真实结果（applied/failed）。
 // 以保存前的最新版本为基线，只认「更高版本」的记录，避免把上一次的成功误判为本次结果。
-async function pollInboundDeploy(nodeId, label) {
-  let base = 0;
-  try {
-    const v0 = await (await fetch(API + '/nodes/' + nodeId + '/config/versions', { headers: authH() })).json();
-    if (Array.isArray(v0) && v0.length) base = v0[0].version || 0;
-  } catch (e) {}
+async function pollInboundDeploy(nodeId, label, base) {
+  base = Number(base) || 0;
   const started = Date.now();
   for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 1500));
