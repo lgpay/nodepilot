@@ -55,7 +55,7 @@ func GenShortId() string {
 
 // buildRealitySettings 生成 REALITY 服务端 realitySettings：
 // 借用目标握手(target/dest)、SNI 白名(serverNames)、私钥、shortId 列表、spiderX。
-func buildRealitySettings(in model.Inbound) map[string]interface{} {
+func buildRealitySettings(in model.Inbound) *XrayRealitySettings {
 	serverNames := splitCSV(in.RealityServerNames)
 	if len(serverNames) == 0 {
 		if h := destHost(in.RealityDest); h != "" {
@@ -66,14 +66,10 @@ func buildRealitySettings(in model.Inbound) map[string]interface{} {
 	if spiderX == "" {
 		spiderX = "/"
 	}
-	return map[string]interface{}{
-		"show":        false,
-		"dest":        in.RealityDest,
-		"xver":        0,
-		"serverNames": serverNames,
-		"privateKey":  in.RealityPrivateKey,
-		"shortIds":    splitCSV(in.RealityShortIds),
-		"spiderX":     spiderX,
+	return &XrayRealitySettings{
+		Show: false, Dest: in.RealityDest, Xver: 0,
+		ServerNames: serverNames, PrivateKey: in.RealityPrivateKey,
+		ShortIds: splitCSV(in.RealityShortIds), SpiderX: spiderX,
 	}
 }
 
