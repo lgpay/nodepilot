@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"nodepilot/internal/config"
+	"nodepilot/internal/notify"
 	"nodepilot/internal/server"
 	"nodepilot/internal/store"
 )
@@ -99,5 +100,6 @@ func main() {
 		}
 	}
 	server.StopDeploymentWorker()
+	notify.Stop()
 	slog.Info("[server] stopped")
 }

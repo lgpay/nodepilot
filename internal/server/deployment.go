@@ -4,10 +4,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
+	"nodepilot/internal/taskqueue"
 )
 
 // inboundDeployment describes the asynchronous deployment started after an
@@ -26,47 +26,17 @@ type deploymentJob struct {
 	security string
 }
 
-const deploymentQueueSize = 64
-
-var (
-	deploymentQueue    = make(chan deploymentJob, deploymentQueueSize)
-	deploymentWorkerWg sync.WaitGroup
-	deploymentQueueMu  sync.RWMutex
-	deploymentStopOnce sync.Once
-)
-
-func init() {
-	deploymentWorkerWg.Add(1)
-	go runDeploymentWorker()
-}
+var deploymentQueue = taskqueue.New(64, 1)
 
 func enqueueDeployment(in model.Inbound, security string) bool {
-	deploymentQueueMu.RLock()
-	defer deploymentQueueMu.RUnlock()
-	select {
-	case deploymentQueue <- deploymentJob{in: in, security: security}:
-		return true
-	default:
-		return false
-	}
+	job := deploymentJob{in: in, security: security}
+	return deploymentQueue.Submit(func() { executeDeployment(job) })
 }
 
 // StopDeploymentWorker stops accepting new jobs, drains queued deployments,
 // and waits for the worker to finish. It is safe to call more than once.
 func StopDeploymentWorker() {
-	deploymentStopOnce.Do(func() {
-		deploymentQueueMu.Lock()
-		close(deploymentQueue)
-		deploymentQueueMu.Unlock()
-		deploymentWorkerWg.Wait()
-	})
-}
-
-func runDeploymentWorker() {
-	defer deploymentWorkerWg.Done()
-	for job := range deploymentQueue {
-		executeDeployment(job)
-	}
+	deploymentQueue.Stop()
 }
 
 func executeDeployment(job deploymentJob) {

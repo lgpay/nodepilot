@@ -18,12 +18,18 @@ import (
 
 	"nodepilot/internal/model"
 	"nodepilot/internal/store"
+	"nodepilot/internal/taskqueue"
 )
 
 // Sender 单渠道发送器
 type Sender interface {
 	Send(title, body string) error
 }
+
+var notifyQueue = taskqueue.New(128, 2)
+
+// Stop drains queued notifications during graceful shutdown.
+func Stop() { notifyQueue.Stop() }
 
 // BuildSender 按渠道类型解析 Config JSON，构造对应 Sender
 func BuildSender(ch model.NotificationChannel) (Sender, error) {
@@ -102,7 +108,7 @@ func Dispatch(event, title, body string) {
 		if !ch.Subscribes(event) {
 			continue
 		}
-		go func(ch model.NotificationChannel) {
+		job := func() {
 			s, err := BuildSender(ch)
 			if err != nil {
 				log.Printf("[notify] channel #%d (%s) config invalid: %v", ch.ID, ch.Type, err)
@@ -113,7 +119,10 @@ func Dispatch(event, title, body string) {
 				return
 			}
 			log.Printf("[notify] channel #%d (%s) sent: %s", ch.ID, ch.Type, title)
-		}(ch)
+		}
+		if !notifyQueue.Submit(job) {
+			log.Printf("[notify] queue full, dropped channel #%d event: %s", ch.ID, title)
+		}
 	}
 }
 
