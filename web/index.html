@@ -545,6 +545,7 @@
 <script src="d3.min.js"></script>
 <script src="topojson-client.min.js"></script>
 <script src="inbound-config.js"></script>
+<script src="inbound-ui.js"></script>
 <script>
 const API = '/api/v1';
 let token = localStorage.getItem('np_token') || '';
@@ -921,7 +922,7 @@ document.getElementById('confirmLayer').addEventListener('click', e => {
 
 // ---- 侧边栏 ----
 function dotOf(n) { return n.status === 'online' ? 'on' : (n.status === 'offline' ? 'off' : (n.connectivity === 'offline' ? 'off' : (n.connectivity === 'ok' ? 'on' : 'warn'))); }
-function inboundLabel(inb) { return inb.name || ((inb.protocol || '?') + ':' + (inb.port || '?')); }
+function inboundLabel(inb) { return NodePilotInboundUI.label(inb); }
 // 节点在线状态徽标：仅基于 agent 心跳 status（不含端口连通）
 function onlinePill(n) {
   if (n.status === 'online') return '<span class="pill ok">在线</span>';
@@ -1038,11 +1039,7 @@ async function ensureClients(id) {
 }
 // 由入站 id 反查所属节点 id（弹窗内操作时 sel 可能是节点类型）
 function inboundNodeId(inboundId) {
-  for (const nid in inboundsCache) {
-    const arr = inboundsCache[nid] || [];
-    if (arr.some(x => x.id === inboundId)) return Number(nid);
-  }
-  return sel.type === 'inbound' ? sel.parentId : null;
+  return NodePilotInboundUI.nodeId(inboundId, inboundsCache, sel.type === 'inbound' ? sel.parentId : null);
 }
 function selectClient(id, inboundId) { navigate('/clients/' + id + '?inbound=' + inboundId); }
 function selectOverview() { navigate('/overview'); }

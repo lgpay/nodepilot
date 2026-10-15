@@ -35,6 +35,7 @@ jobs:
       - name: Frontend syntax check
         run: |
           node --check web/inbound-config.js
+          node --check web/inbound-ui.js
           node - <<'NODE'
           const fs = require('fs');
           const html = fs.readFileSync('web/index.html', 'utf8');

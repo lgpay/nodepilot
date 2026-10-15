@@ -133,6 +133,9 @@ func NewRouter(webDir string) *gin.Engine {
 		if fp := filepath.Join(webDir, "inbound-config.js"); fileExists(fp) {
 			r.StaticFile("/inbound-config.js", fp)
 		}
+		if fp := filepath.Join(webDir, "inbound-ui.js"); fileExists(fp) {
+			r.StaticFile("/inbound-ui.js", fp)
+		}
 	}
 
 	return r
