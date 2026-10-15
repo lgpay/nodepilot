@@ -46,10 +46,10 @@ type Node struct {
 // Inbound 入站（协议配置）
 type Inbound struct {
 	ID               uint   `gorm:"primaryKey" json:"id"`
-	NodeID           uint   `gorm:"index" json:"node_id"`
+	NodeID           uint   `gorm:"index;index:idx_inbound_node_port" json:"node_id"`
 	Name             string `gorm:"size:128" json:"name"`    // 别名/备注（用于订阅分组精确选择）
 	Protocol         string `gorm:"size:16" json:"protocol"` // vmess|vless|trojan|ss|socks|http
-	Port             int    `json:"port"`
+	Port             int    `gorm:"index:idx_inbound_node_port" json:"port"`
 	Transport        string `gorm:"size:16" json:"transport"` // tcp|ws|grpc
 	Security         string `gorm:"size:16" json:"security"`  // "" | none | tls | reality；空则按 TLSEnabled 派生（向后兼容）
 	TLSCertID        uint   `json:"tls_cert_id"`
@@ -84,7 +84,7 @@ const (
 type Client struct {
 	ID                uint      `gorm:"primaryKey" json:"id"`
 	InboundID         uint      `gorm:"index" json:"inbound_id"`
-	UUID              string    `gorm:"size:64" json:"uuid"`
+	UUID              string    `gorm:"size:64;uniqueIndex:uk_client_uuid" json:"uuid"`
 	Alias             string    `gorm:"size:128" json:"alias"`                // 别名/备注（vmess ps），仅展示用；xray 统计键固定用 UUID
 	TrafficLimitBytes int64     `gorm:"default:0" json:"traffic_limit_bytes"` // 0 表示不限（历史 -1 亦按不限处理）
 	ExpireTime        time.Time `json:"expire_time"`
@@ -95,8 +95,8 @@ type Client struct {
 // ConfigVersion 下发配置版本（用于回滚与状态追踪）
 type ConfigVersion struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
-	NodeID      uint      `gorm:"index" json:"node_id"`
-	Version     int       `json:"version"`
+	NodeID      uint      `gorm:"index;index:idx_config_version_node_version" json:"node_id"`
+	Version     int       `gorm:"index:idx_config_version_node_version" json:"version"`
 	ContentJSON string    `gorm:"type:text" json:"content_json"`
 	Status      string    `gorm:"size:16" json:"status"` // applied|failed
 	AppliedAt   time.Time `json:"applied_at"`
