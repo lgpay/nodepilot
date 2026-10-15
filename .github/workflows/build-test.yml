@@ -16,6 +16,10 @@ jobs:
           go-version: "1.21"
           cache: true
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Build
         run: CGO_ENABLED=0 go build ./...
 
@@ -24,3 +28,19 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Race test
+        run: go test -race ./...
+
+      - name: Frontend syntax check
+        run: |
+          node --check web/inbound-config.js
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('web/index.html', 'utf8');
+          const start = html.indexOf('<script>');
+          const end = html.indexOf('</script>', start);
+          if (start < 0 || end < 0) throw new Error('inline script not found');
+          new Function(html.slice(start + 8, end));
+          console.log('inline script syntax ok');
+          NODE
