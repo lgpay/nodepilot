@@ -19,7 +19,10 @@ import (
 func ListInbounds(c *gin.Context) {
 	id := c.Param("id")
 	var inbounds []model.Inbound
-	store.DB.Where("node_id = ?", id).Find(&inbounds)
+	if err := store.DB.Where("node_id = ?", id).Find(&inbounds).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	// 填充每个入站端口的连通状态（探测结果，控制面内存态）
 	for i := range inbounds {
 		inbounds[i].Connectivity = ps.getConn(inbounds[i].ID)
@@ -51,7 +54,10 @@ type InboundView struct {
 // ListAllInbounds 列出全部入站并附带所属节点名（供订阅分组精确选择）
 func ListAllInbounds(c *gin.Context) {
 	var inbounds []model.Inbound
-	store.DB.Order("node_id, id").Find(&inbounds)
+	if err := store.DB.Order("node_id, id").Find(&inbounds).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	// 批量加载节点名，避免 N+1 查询
 	nodeNames := map[uint]string{}
 	nodeIDs := map[uint]bool{}
@@ -64,7 +70,10 @@ func ListAllInbounds(c *gin.Context) {
 			ids = append(ids, id)
 		}
 		var nodes []model.Node
-		store.DB.Where("id IN ?", ids).Find(&nodes)
+		if err := store.DB.Where("id IN ?", ids).Find(&nodes).Error; err != nil {
+			c.JSON(500, gin.H{"error": "internal error"})
+			return
+		}
 		for _, n := range nodes {
 			nodeNames[n.ID] = n.Name
 		}
@@ -305,7 +314,10 @@ func UpdateInbound(c *gin.Context) {
 	if eff.Security == model.SecurityReality {
 		updates["tls_enabled"] = false
 	}
-	store.DB.Model(&in).Updates(updates)
+	if err := store.DB.Model(&in).Updates(updates).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	// 用更新后的生效值触发后续动作
 	in.Security = eff.Security
 	in.RealityDest = eff.RealityDest
