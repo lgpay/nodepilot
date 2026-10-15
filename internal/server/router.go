@@ -130,6 +130,9 @@ func NewRouter(webDir string) *gin.Engine {
 		if fp := filepath.Join(webDir, "topojson-client.min.js"); fileExists(fp) {
 			r.StaticFile("/topojson-client.min.js", fp)
 		}
+		if fp := filepath.Join(webDir, "inbound-config.js"); fileExists(fp) {
+			r.StaticFile("/inbound-config.js", fp)
+		}
 	}
 
 	return r

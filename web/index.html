@@ -544,6 +544,7 @@
 
 <script src="d3.min.js"></script>
 <script src="topojson-client.min.js"></script>
+<script src="inbound-config.js"></script>
 <script>
 const API = '/api/v1';
 let token = localStorage.getItem('np_token') || '';
@@ -1551,7 +1552,7 @@ function showCreateInbound(nodeId) {
 }
 function onNewInboundNode() { const p=document.getElementById('m_i_port'); if(p) p.value=randomPortForNode(Number(val('m_i_node'))); }
 function onNewInboundProtocol() { if(val('m_i_proto')==='trojan'){const t=document.getElementById('m_i_tls');if(t&&!t.checked){t.checked=true;toggleInboundCert();}} }
-function parseInboundSettings(raw) { try { return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; } }
+function parseInboundSettings(raw) { return NodePilotInboundConfig.parse(raw); }
 function inboundAdvancedFields(prefix, inb) {
   const ss = parseInboundSettings(inb && inb.stream_settings);
   const wsPath = ss.wsPath || (ss.wsSettings && ss.wsSettings.path) || '/v2ray';
@@ -1581,21 +1582,19 @@ function toggleInboundTransport(prefix) {
 }
 function collectInboundAdvanced(prefix) {
   const trans = val(prefix + '_trans');
-  let stream = {};
-  if (trans === 'ws') {
-    stream = { wsSettings: { path: val(prefix + '_ws') || '/v2ray' } };
-    const host = val(prefix + '_ws_host').trim(); if (host) stream.wsSettings.headers = { Host: host };
-  }
-  if (trans === 'tcp' && val(prefix + '_tcp_obfs') === 'http') {
-    const request = { version: '1.1', method: 'GET', path: [val(prefix + '_tcp_path') || '/'], headers: { Connection: ['keep-alive'] } };
-    const host = val(prefix + '_tcp_host').trim(); if (host) request.headers.Host = [host];
-    stream.tcpSettings = { header: { type: 'http', request } };
-  }
-  if (trans === 'grpc') stream = { grpcSettings: { serviceName: val(prefix + '_grpc') || 'xray' } };
-  if (trans === 'grpc' && chk(prefix + '_grpc_multi')) stream.grpcSettings.mode = 'multi';
+  const streamSettings = NodePilotInboundConfig.advanced({
+    transport: trans,
+    wsPath: val(prefix + '_ws') || '/v2ray',
+    wsHost: val(prefix + '_ws_host').trim(),
+    tcpObfs: val(prefix + '_tcp_obfs'),
+    tcpPath: val(prefix + '_tcp_path') || '/',
+    tcpHost: val(prefix + '_tcp_host').trim(),
+    grpcName: val(prefix + '_grpc') || 'xray',
+    grpcMulti: chk(prefix + '_grpc_multi')
+  });
   const fallback = val(prefix + '_fallback').trim();
   if (fallback) { try { JSON.parse(fallback); } catch (e) { showToast('Fallback JSON 格式不正确', 'err'); return null; } }
-  return { streamSettings: Object.keys(stream).length ? JSON.stringify(stream) : '', fallback };
+  return { streamSettings, fallback };
 }
 // REALITY：入站表单的“REALITY”勾选 + 参数字段（create/edit 共用，prefix 区分）。
 function inboundRealityBlock(prefix, inb) {
