@@ -65,9 +65,16 @@ jobs:
           echo "=== agent ==="
           tar -tzf nodepilot-agent-linux-${{ matrix.arch }}.tar.gz
 
+      - name: Generate SHA256 checksums
+        run: |
+          sha256sum nodepilot-server-linux-${{ matrix.arch }}.tar.gz > nodepilot-server-linux-${{ matrix.arch }}.tar.gz.sha256
+          sha256sum nodepilot-agent-linux-${{ matrix.arch }}.tar.gz > nodepilot-agent-linux-${{ matrix.arch }}.tar.gz.sha256
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
           files: |
             nodepilot-server-linux-${{ matrix.arch }}.tar.gz
             nodepilot-agent-linux-${{ matrix.arch }}.tar.gz
+            nodepilot-server-linux-${{ matrix.arch }}.tar.gz.sha256
+            nodepilot-agent-linux-${{ matrix.arch }}.tar.gz.sha256

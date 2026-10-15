@@ -23,7 +23,7 @@ blue()   { echo -e "\033[34m$1\033[0m"; }
 # ---------- 常量 ----------
 REPO_OWNER="lgpay"
 REPO_NAME="nodepilot"
-RELEASE_TAG="v1.2.4"
+RELEASE_TAG="v1.2.5"
 LEGO_VERSION="${NP_LEGO_VERSION:-v5.3.1}"
 INSTALL_DIR="${NP_INSTALL_DIR:-/opt/nodepilot}"
 WEB_DIR="${NP_WEB_DIR:-$INSTALL_DIR/web}"
@@ -41,6 +41,22 @@ need_root() {
   fi
 }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+fetch_url() {
+  local url="$1" dest="$2"
+  if command_exists curl; then curl -fsSL --max-time 180 "$url" -o "$dest"; return $?; fi
+  if command_exists wget; then wget -q -T 180 -O "$dest" "$url"; return $?; fi
+  return 127
+}
+
+verify_checksum() {
+  local url="$1" file="$2" checksum
+  command_exists sha256sum || { red "未找到 sha256sum，无法校验下载文件"; return 1; }
+  fetch_url "${url}.sha256" "${file}.sha256" || { red "未找到发布包校验文件"; return 1; }
+  checksum=$(awk 'NF {print $1; exit}' "${file}.sha256")
+  printf '%s  %s\n' "$checksum" "$file" | sha256sum -c - >/dev/null 2>&1 || { red "SHA256 校验失败: $url"; return 1; }
+  rm -f "${file}.sha256"
+}
 
 detect_arch() {
   case "$(uname -m)" in
@@ -68,18 +84,22 @@ get_server_binary() {
   fi
   yellow "下载管理端二进制: $url"
   local tmp; tmp=$(mktemp -d)
-  if command_exists curl; then
-    curl -L "$url" -o "$tmp/srv.tgz" || true
-  elif command_exists wget; then
-    wget -O "$tmp/srv.tgz" "$url" || true
-  else
-    red "未找到 curl/wget，无法下载"; exit 1
-  fi
-  if [ -s "$tmp/srv.tgz" ]; then
-    tar -xzf "$tmp/srv.tgz" -C "$INSTALL_DIR"
+  if ! fetch_url "$url" "$tmp/srv.tgz"; then
+    rm -rf "$tmp"
+    red "管理端下载失败"
+  elif [ -z "$NP_BINARY_URL" ] && ! verify_checksum "$url" "$tmp/srv.tgz"; then
+    rm -rf "$tmp"
+    red "管理端下载校验失败"
+  elif tar -xzf "$tmp/srv.tgz" -C "$INSTALL_DIR"; then
     rm -rf "$tmp"
     green "管理端二进制已下载并解压到 $INSTALL_DIR"
     return
+  else
+    rm -rf "$tmp"
+    red "管理端压缩包解压失败"
+  fi
+  if ! command_exists curl && ! command_exists wget; then
+    red "未找到 curl/wget，无法下载"; exit 1
   fi
   # 3) 回退：本地 go build（纯 Go 实现，无 CGO/GLIBC 依赖，仅需 Go 工具链）
   red "下载失败，尝试本地 go build 回退..."
@@ -108,11 +128,7 @@ get_lego() {
   local url="https://github.com/go-acme/lego/releases/download/${LEGO_VERSION}/${fname}"
   yellow "下载 lego (${LEGO_VERSION}) 用于证书签发: $url"
   local tmp; tmp=$(mktemp -d)
-  if command_exists curl; then
-    curl -L "$url" -o "$tmp/lego.tgz" || true
-  elif command_exists wget; then
-    wget -O "$tmp/lego.tgz" "$url" || true
-  else
+  if ! fetch_url "$url" "$tmp/lego.tgz"; then
     red "未找到 curl/wget，无法下载 lego"; return
   fi
   if [ -s "$tmp/lego.tgz" ]; then

@@ -32,7 +32,10 @@ var certScheduler *taskqueue.Periodic
 // ListCerts 列出全局证书
 func ListCerts(c *gin.Context) {
 	var certs []model.Certificate
-	store.DB.Order("id desc").Find(&certs)
+	if err := store.DB.Order("id desc").Find(&certs).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	c.JSON(200, certs)
 }
 
@@ -81,12 +84,17 @@ func CreateCert(c *gin.Context) {
 	if err != nil {
 		cert.Status = "failed"
 		cert.LastError = err.Error()
-		store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()})
+		if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()}).Error; dbErr != nil {
+			log.Printf("[cert] persist failure status failed: %v", dbErr)
+		}
 		log.Printf("[cert] issue failed: %v", err)
 		c.JSON(502, gin.H{"error": "证书签发失败，详见服务端日志", "id": cert.ID, "status": "failed"})
 		return
 	}
-	store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""})
+	if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""}).Error; dbErr != nil {
+		c.JSON(500, gin.H{"error": "证书已签发但状态保存失败"})
+		return
+	}
 	cert.ExpiresAt = exp
 	cert.Status = "issued"
 	if err := distributeCert(cert); err != nil {
@@ -134,12 +142,17 @@ func RenewCert(c *gin.Context) {
 	}
 	exp, err := issueCert(cert.Domain, cert.CFEmail, token)
 	if err != nil {
-		store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()})
+		if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()}).Error; dbErr != nil {
+			log.Printf("[cert] persist renewal failure status failed: %v", dbErr)
+		}
 		log.Printf("[cert] renew failed: %v", err)
 		c.JSON(502, gin.H{"error": "证书续签失败，详见服务端日志"})
 		return
 	}
-	store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""})
+	if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""}).Error; dbErr != nil {
+		c.JSON(500, gin.H{"error": "证书已签发但状态保存失败"})
+		return
+	}
 	if err := distributeCert(cert); err != nil {
 		log.Printf("[cert] distribute warning: %v", err)
 	}
@@ -209,7 +222,9 @@ func distributeCert(cert model.Certificate) error {
 	}
 	caPEM, _ := os.ReadFile(base + ".issuer.crt")
 	var nodes []model.Node
-	store.DB.Where("enabled = ?", true).Find(&nodes)
+	if err := store.DB.Where("enabled = ?", true).Find(&nodes).Error; err != nil {
+		return fmt.Errorf("load enabled nodes: %w", err)
+	}
 	var lastErr error
 	for _, n := range nodes {
 		_, err := agentPut(n, "/agent/v1/cert", map[string]string{
@@ -248,7 +263,10 @@ func stopCertRenewScheduler() {
 
 func renewDueCerts() {
 	var certs []model.Certificate
-	store.DB.Where("auto_renew = ? AND status = ?", true, "issued").Find(&certs)
+	if err := store.DB.Where("auto_renew = ? AND status = ?", true, "issued").Find(&certs).Error; err != nil {
+		log.Printf("[cert] load renewal candidates failed: %v", err)
+		return
+	}
 	threshold := time.Now().Add(30 * 24 * time.Hour)
 	for _, cert := range certs {
 		if !cert.ExpiresAt.IsZero() && cert.ExpiresAt.Before(threshold) {
@@ -260,10 +278,15 @@ func renewDueCerts() {
 			exp, err := issueCert(cert.Domain, cert.CFEmail, token)
 			if err != nil {
 				log.Printf("[cert] 证书 #%d 续签失败: %v", cert.ID, err)
-				store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()})
+				if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "failed", "last_error": err.Error()}).Error; dbErr != nil {
+					log.Printf("[cert] persist renewal failure status failed: %v", dbErr)
+				}
 				continue
 			}
-			store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""})
+			if dbErr := store.DB.Model(&cert).Updates(map[string]interface{}{"status": "issued", "expires_at": exp, "last_error": ""}).Error; dbErr != nil {
+				log.Printf("[cert] persist renewal success failed: %v", dbErr)
+				continue
+			}
 			if err := distributeCert(cert); err != nil {
 				log.Printf("[cert] 证书 #%d 续签后分发警告: %v", cert.ID, err)
 			}

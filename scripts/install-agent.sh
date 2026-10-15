@@ -30,7 +30,7 @@ blue()   { echo -e "\033[34m$1\033[0m"; }
 # ---------- 常量 ----------
 REPO_OWNER="lgpay"
 REPO_NAME="nodepilot"
-RELEASE_TAG="v1.2.4"
+RELEASE_TAG="v1.2.5"
 INSTALL_DIR="${NP_INSTALL_DIR:-/opt/nodepilot-agent}"
 CONFIG_DIR="${NP_CONFIG_DIR:-$INSTALL_DIR/xray}"
 CERT_DIR="${NP_CERT_DIR:-$INSTALL_DIR/certs}"
@@ -94,6 +94,21 @@ try_download() {
   return 1
 }
 
+verify_checksum() {
+  local url="$1" file="$2" checksum
+  if ! command_exists sha256sum; then
+    red "未找到 sha256sum，无法校验下载文件"; return 1
+  fi
+  if ! fetch_url "${url}.sha256" "${file}.sha256"; then
+    red "未找到发布包校验文件: ${url}.sha256"; return 1
+  fi
+  checksum=$(awk 'NF {print $1; exit}' "${file}.sha256")
+  if ! printf '%s  %s\n' "$checksum" "$file" | sha256sum -c - >/dev/null 2>&1; then
+    red "SHA256 校验失败: $url"; return 1
+  fi
+  rm -f "${file}.sha256"
+}
+
 # ---------- 步骤 ----------
 install_xray() {
   if [ -x "$XRAY_BIN" ]; then
@@ -102,7 +117,7 @@ install_xray() {
   fi
   yellow "正在安装 xray-core（官方脚本）..."
   if command_exists curl; then
-    bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) || {
+    bash <(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh) || {
       red "xray 安装失败，请手动安装到 $XRAY_BIN 后重试"; exit 1
     }
   else
@@ -134,6 +149,10 @@ get_agent_binary() {
     )
   fi
   if try_download "${urls[@]}"; then
+    if [ -z "$NP_BINARY_URL" ] && ! verify_checksum "${urls[0]}" /tmp/$BINARY_NAME.tar.gz; then
+      rm -f /tmp/$BINARY_NAME.tar.gz
+      exit 1
+    fi
     if tar -xzf /tmp/$BINARY_NAME.tar.gz -C "$INSTALL_DIR/bin"; then
       rm -f /tmp/$BINARY_NAME.tar.gz
       green "agent 二进制已下载并解压"

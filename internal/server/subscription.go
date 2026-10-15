@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"strings"
@@ -63,7 +64,10 @@ func CreateSubscription(c *gin.Context) {
 
 func ListSubscriptions(c *gin.Context) {
 	var groups []model.SubscriptionGroup
-	store.DB.Find(&groups)
+	if err := store.DB.Find(&groups).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	// token 以密文存储，返回给前端前解密为明文（用于拼订阅链接）
 	for i := range groups {
 		if t, err := secret.Decrypt(groups[i].Token); err == nil {
@@ -83,7 +87,11 @@ func GetSubscriptionDetail(c *gin.Context) {
 	if t, err := secret.Decrypt(g.Token); err == nil {
 		g.Token = t
 	}
-	items, _ := aggregate(g)
+	items, err := aggregate(g)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	c.JSON(200, gin.H{"group": g, "members": items})
 }
 
@@ -162,7 +170,9 @@ func schemeHost(c *gin.Context) string {
 // 逐个解密比对（订阅组数量少，遍历成本可忽略）。
 func findSubscriptionByToken(token string) (model.SubscriptionGroup, bool) {
 	var groups []model.SubscriptionGroup
-	store.DB.Find(&groups)
+	if err := store.DB.Find(&groups).Error; err != nil {
+		return model.SubscriptionGroup{}, false
+	}
 	for _, g := range groups {
 		// 兼容旧库：能解密则比对明文；解密失败（历史明文 token）直接比对存储值
 		if t, err := secret.Decrypt(g.Token); err == nil {
@@ -310,7 +320,9 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		}
 	}
 	var inbounds []model.Inbound
-	q.Find(&inbounds)
+	if err := q.Find(&inbounds).Error; err != nil {
+		return nil, fmt.Errorf("load inbounds: %w", err)
+	}
 
 	items := []subscription.ExportItem{}
 	for _, in := range inbounds {
@@ -328,9 +340,13 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		var clients []model.Client
 		if len(f.ClientIDs) > 0 {
 			// 精确到客户端：仅取选中的客户端（按 id 过滤）
-			store.DB.Where("inbound_id = ? AND enabled = ? AND id IN ?", in.ID, true, f.ClientIDs).Find(&clients)
+			if err := store.DB.Where("inbound_id = ? AND enabled = ? AND id IN ?", in.ID, true, f.ClientIDs).Find(&clients).Error; err != nil {
+				return nil, fmt.Errorf("load clients for inbound %d: %w", in.ID, err)
+			}
 		} else {
-			store.DB.Where("inbound_id = ? AND enabled = ?", in.ID, true).Find(&clients)
+			if err := store.DB.Where("inbound_id = ? AND enabled = ?", in.ID, true).Find(&clients).Error; err != nil {
+				return nil, fmt.Errorf("load clients for inbound %d: %w", in.ID, err)
+			}
 		}
 		host := hostOf(node.Address)
 		wsPath := parseWsPath(in.StreamSettings)

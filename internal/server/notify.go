@@ -35,7 +35,10 @@ func validateNotifyEvents(s string) (string, error) {
 
 func ListNotifiers(c *gin.Context) {
 	var chs []model.NotificationChannel
-	store.DB.Order("id").Find(&chs)
+	if err := store.DB.Order("id").Find(&chs).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	c.JSON(http.StatusOK, chs)
 }
 
@@ -126,7 +129,10 @@ func UpdateNotifier(c *gin.Context) {
 		}
 		updates["events"] = ev
 	}
-	store.DB.Model(&ch).Updates(updates)
+	if err := store.DB.Model(&ch).Updates(updates).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	slog.Info("audit", "action", "notifier_update", "id", ch.ID)
 	c.JSON(200, gin.H{"ok": true})
 }

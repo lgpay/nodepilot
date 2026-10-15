@@ -5,6 +5,7 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -192,7 +193,10 @@ func GetNode(c *gin.Context) {
 		return
 	}
 	var versions []model.ConfigVersion
-	store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions)
+	if err := store.DB.Where("node_id = ?", node.ID).Order("version desc").Limit(20).Find(&versions).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
 	node.Flag = subscription.FlagEmoji(node.Region)
 	// 不再返回明文 token；需要重新获取部署命令请调用 /nodes/:id/install
 	c.JSON(200, gin.H{"node": node, "config_versions": versions})
@@ -220,6 +224,10 @@ func NodeInstall(c *gin.Context) {
 		}
 		panelURL = scheme + "://" + c.Request.Host
 	}
+	if err := validatePanelURL(panelURL); err != nil {
+		c.JSON(500, gin.H{"error": "invalid panel_base_url"})
+		return
+	}
 	// agent 监听端口：取节点 address 的端口部分；缺省 :8081。
 	addr := ":8081"
 	if i := strings.LastIndex(node.Address, ":"); i >= 0 {
@@ -232,8 +240,11 @@ func NodeInstall(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "internal error"})
 		return
 	}
-	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%d NP_ADDR=%s NP_HEARTBEAT=%s bash <(curl -L %s)",
-		panelURL, token, node.ID, addr, hbInterval(), scriptURL)
+	// 所有值都进入 shell 命令，必须逐项使用 POSIX 单引号转义，避免
+	// Host、token 或设置值中的特殊字符改变命令语义。
+	command := fmt.Sprintf("NP_SERVER=%s NP_TOKEN=%s NP_NODE_ID=%s NP_ADDR=%s NP_HEARTBEAT=%s bash <(curl -fsSL %s)",
+		shellQuote(panelURL), shellQuote(token), shellQuote(strconv.FormatUint(uint64(node.ID), 10)),
+		shellQuote(addr), shellQuote(hbInterval()), shellQuote(scriptURL))
 	c.JSON(200, gin.H{
 		"node_id":    node.ID,
 		"token":      token,
@@ -242,6 +253,19 @@ func NodeInstall(c *gin.Context) {
 		"script_url": scriptURL,
 		"command":    command,
 	})
+}
+
+func validatePanelURL(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return fmt.Errorf("panel URL must be an http(s) URL without user info")
+	}
+	return nil
+}
+
+// shellQuote quotes one argument for a POSIX shell command.
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // hbInterval 读取控制面设置的心跳间隔(秒)，默认 30
@@ -447,17 +471,21 @@ func Heartbeat(c *gin.Context) {
 		return
 	}
 	if !node.Enabled {
-		store.DB.Model(&node).Updates(map[string]interface{}{"status": "offline", "connectivity": "offline"})
+		if err := store.DB.Model(&node).Updates(map[string]interface{}{"status": "offline", "connectivity": "offline"}).Error; err != nil {
+			log.Printf("[heartbeat] mark disabled node=%s failed: %v", id, err)
+		}
 		c.JSON(403, gin.H{"error": "node disabled"})
 		return
 	}
 	// 到期节点：拒绝心跳并停用，agent 端应停止服务
 	if node.ExpiresAt != nil && !node.ExpiresAt.IsZero() && time.Now().After(*node.ExpiresAt) {
-		store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
+		if err := store.DB.Model(&model.Node{}).Where("id = ?", id).Updates(map[string]interface{}{
 			"enabled":      false,
 			"status":       "offline",
 			"connectivity": "offline",
-		})
+		}).Error; err != nil {
+			log.Printf("[heartbeat] disable expired node=%s failed: %v", id, err)
+		}
 		c.JSON(403, gin.H{"error": "node expired", "expires_at": node.ExpiresAt.Format(time.RFC3339)})
 		return
 	}
