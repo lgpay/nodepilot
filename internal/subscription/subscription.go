@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -11,29 +12,93 @@ import (
 
 // ExportItem 一个可导出为订阅链接的客户端配置
 type ExportItem struct {
-	Host       string // 节点接入 IP（客户端连接用）
-	Port       int    // 入站端口
-	Protocol   string // vmess|vless|trojan|ss|socks|http
-	Transport  string // tcp|ws|grpc
-	TLSEnabled bool
-	WsPath     string // ws 路径（tcp/grpc 时为空）
-	SNI        string // TLS SNI / ws Host 头（tls 时=节点接入 host）
-	UUID       string
-	Alias      string // 别名/备注（vmess ps）
-	Region     string // 节点区域（ISO 两位国家码或常见中英文地区名），用于生成旗帜前缀
+	Host          string // 节点接入 IP（客户端连接用）
+	Port          int    // 入站端口
+	Protocol      string // vmess|vless|trojan|ss|socks|http
+	Transport     string // tcp|ws|grpc
+	TLSEnabled    bool
+	WsPath        string // ws 路径（tcp/grpc 时为空）
+	SNI           string // TLS SNI / ws Host 头（tls 时=节点接入 host）
+	UUID          string
+	Alias         string // 别名/备注（vmess ps）
+	Region        string // 节点区域（ISO 两位国家码或常见中英文地区名），用于生成旗帜前缀
+	TCPHeaderType string // tcp 传输的 HTTP 伪装类型（""|"http"|"none"）；tcp+http 伪饰时客户端链接需带 headerType 才能连通
+	Security      string // none|tls|reality（reality 时下列 reality 字段生效）
+	// REALITY 客户端链接参数（Security=reality 时填充）
+	RealityPublicKey string // pbk：由服务端私钥派生的公钥
+	RealityShortId   string // sid：服务端 shortIds 之一
+	RealitySni       string // sni：serverNames 之一（借用目标的域名）
+	RealitySpiderX   string // spx：spiderX
 }
 
 // BuildVMess 生成 vmess 订阅内容：各 client 的 vmess:// 链接用 \n 连接后整体 base64
 func BuildVMess(items []ExportItem) (string, error) {
 	links := []string{}
 	for _, it := range items {
-		if it.Protocol != "vmess" {
-			continue
+		switch it.Protocol {
+		case "vmess":
+			links = append(links, vmessLink(it))
+		case "vless":
+			links = append(links, vlessLink(it))
 		}
-		links = append(links, vmessLink(it))
 	}
 	raw := strings.Join(links, "\n")
 	return base64.StdEncoding.EncodeToString([]byte(raw)), nil
+}
+
+// vlessLink 生成 vless:// 分享链接（V2RayNG / v2rayN 等 V2Ray 系客户端均可识别）。
+// vmess 订阅此前只输出 vmess:// 链接、静默丢弃 vless 节点，导致只含 vless 入站的订阅为空。
+func vlessLink(it ExportItem) string {
+	q := url.Values{}
+	q.Set("encryption", "none")
+	net := it.Transport
+	if net == "" {
+		net = "tcp"
+	}
+	q.Set("type", net)
+	if it.Security == "reality" {
+		// REALITY：security=reality + vision flow + pbk/sid/sni/fp/spx（V2RayNG/clash.meta/sing-box 等支持）
+		q.Set("security", "reality")
+		q.Set("flow", "xtls-rprx-vision")
+		if it.RealityPublicKey != "" {
+			q.Set("pbk", it.RealityPublicKey)
+		}
+		if it.RealityShortId != "" {
+			q.Set("sid", it.RealityShortId)
+		}
+		if it.RealitySni != "" {
+			q.Set("sni", it.RealitySni)
+		}
+		q.Set("fp", "chrome")
+		if it.RealitySpiderX != "" {
+			q.Set("spx", it.RealitySpiderX)
+		}
+		return fmt.Sprintf("vless://%s@%s:%d?%s#%s", it.UUID, it.Host, it.Port, q.Encode(), url.QueryEscape(displayName(it)))
+	}
+	if it.TLSEnabled {
+		q.Set("security", "tls")
+		if it.SNI != "" {
+			q.Set("sni", it.SNI)
+		}
+	} else {
+		q.Set("security", "none")
+	}
+	// tcp + HTTP 伪饰：服务端入站带 tcpSettings.header.type=http 时，客户端链接必须带
+	// headerType=http 才能让伪装头匹配，否则 TLS 握手前的字节被服务端按 HTTP 解析失败、连不通。
+	if net == "tcp" && it.TCPHeaderType == "http" {
+		q.Set("headerType", "http")
+	}
+	if net == "ws" {
+		path := it.WsPath
+		if path == "" {
+			path = "/v2ray"
+		}
+		q.Set("path", path)
+		if it.SNI != "" {
+			q.Set("host", it.SNI)
+		}
+	}
+	return fmt.Sprintf("vless://%s@%s:%d?%s#%s", it.UUID, it.Host, it.Port, q.Encode(), url.QueryEscape(displayName(it)))
 }
 
 func vmessLink(it ExportItem) string {
@@ -74,8 +139,10 @@ func BuildClash(items []ExportItem) (string, error) {
 		ExternalController: "127.0.0.1:9090",
 	}
 	groupMembers := []string{}
+	seen := map[string]int{}
 	for _, it := range items {
 		pr := buildClashProxy(it)
+		pr.Name = uniqueName(pr.Name, seen)
 		cfg.Proxies = append(cfg.Proxies, pr)
 		groupMembers = append(groupMembers, pr.Name)
 	}
@@ -107,6 +174,18 @@ func displayName(it ExportItem) string {
 		return f + " " + proxyName(it)
 	}
 	return proxyName(it)
+}
+
+// uniqueName 保证同一订阅内代理名唯一。Clash / Surge / Loon / SIP008 均要求代理名
+// 不重复，否则配置校验失败（典型报错 "proxy X is the duplicate name"）。重名时追加
+// 序号 #2、#3…，序号计入 seen 计数。客户端别名（Alias）或同协议同端口回退都可能出现重名。
+func uniqueName(name string, seen map[string]int) string {
+	if n, ok := seen[name]; ok {
+		seen[name] = n + 1
+		return fmt.Sprintf("%s #%d", name, n+1)
+	}
+	seen[name] = 1
+	return name
 }
 
 // flagEmoji 根据区域生成旗帜 emoji（ISO 3166 两位码 → 区域指示符）。
@@ -160,12 +239,42 @@ func regionCode(upper string) string {
 		"马来西亚": "MY", "MALAYSIA": "MY",
 		"印度尼西亚": "ID", "INDONESIA": "ID",
 		"土耳其": "TR", "TURKEY": "TR",
+		"菲律宾": "PH", "PHILIPPINES": "PH",
 		"阿联酋": "AE", "迪拜": "AE", "UAE": "AE",
 	}
 	if v, ok := m[upper]; ok {
 		return v
 	}
 	return ""
+}
+
+// isoToChineseName ISO 两位国家码 -> 中文国家/地区名（节点 region 统一存中文的规范来源）。
+var isoToChineseName = map[string]string{
+	"DE": "德国", "JP": "日本", "HK": "香港", "TW": "台湾", "SG": "新加坡",
+	"US": "美国", "KR": "韩国", "GB": "英国", "FR": "法国", "RU": "俄罗斯",
+	"CA": "加拿大", "AU": "澳大利亚", "AT": "奥地利", "IN": "印度", "NL": "荷兰",
+	"IT": "意大利", "ES": "西班牙", "BR": "巴西", "CH": "瑞士", "SE": "瑞典",
+	"FI": "芬兰", "PL": "波兰", "VN": "越南", "TH": "泰国", "MY": "马来西亚",
+	"ID": "印度尼西亚", "TR": "土耳其", "AE": "阿联酋",
+	"PH": "菲律宾",
+}
+
+// ChineseName 返回 ISO 两位国家码对应的中文国家名；无法识别返回空串。
+func ChineseName(iso string) string {
+	iso = strings.ToUpper(strings.TrimSpace(iso))
+	if len(iso) != 2 {
+		return ""
+	}
+	return isoToChineseName[iso]
+}
+
+// RegionToChinese 把任意区域（中文名 / 英文名 / ISO 码）规范化为中文国家名；
+// 无法识别（RegionCode 返回空）则原样返回。
+func RegionToChinese(region string) string {
+	if cn := ChineseName(RegionCode(region)); cn != "" {
+		return cn
+	}
+	return region
 }
 
 // buildClashProxy 构造单个代理（vmess/vless/trojan/ss/socks/http），含 sni / tls / ws headers。
@@ -241,13 +350,15 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 	// DIRECT 是 Surge/Surfboard 内置策略；参考订阅中显式声明为 direct，使分组可指向 DIRECT。
 	sb.WriteString("DIRECT = direct\n")
 	names := []string{}
+	seen := map[string]int{}
 	for _, it := range items {
-		line, ok := buildSurgeProxyLine(it)
+		name := uniqueName(displayName(it), seen)
+		line, ok := buildSurgeProxyLine(it, name)
 		if !ok {
 			continue // 跳过 Surfboard 不支持的协议（vless / grpc / ssr 等）
 		}
 		sb.WriteString(line + "\n")
-		names = append(names, displayName(it))
+		names = append(names, name)
 	}
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Surfboard 支持的代理（仅支持 vmess/trojan/ss/socks5/http）")
@@ -269,8 +380,7 @@ func BuildSurfboard(items []ExportItem, subURL, rulesBaseURL string) (string, er
 }
 
 // buildSurgeProxyLine 生成单条 Surge 风格代理定义行。ok=false 表示该协议/传输不被 Surfboard 支持。
-func buildSurgeProxyLine(it ExportItem) (string, bool) {
-	name := displayName(it)
+func buildSurgeProxyLine(it ExportItem, name string) (string, bool) {
 	path := it.WsPath
 	if path == "" {
 		path = "/v2ray"
@@ -339,6 +449,7 @@ func buildSurgeProxyLine(it ExportItem) (string, bool) {
 // BuildSIP008 生成 SIP008 订阅（JSON）
 func BuildSIP008(items []ExportItem) (string, error) {
 	sip := sip008{Version: 1}
+	seen := map[string]int{}
 	for _, it := range items {
 		if it.Protocol != "vmess" {
 			continue
@@ -349,7 +460,7 @@ func BuildSIP008(items []ExportItem) (string, error) {
 		}
 		server := sipServer{
 			ID:       it.UUID,
-			Remarks:  displayName(it),
+			Remarks:  uniqueName(displayName(it), seen),
 			Address:  it.Host,
 			Port:     it.Port,
 			Protocol: "vmess",
@@ -385,8 +496,10 @@ func BuildClashACL4SSR(items []ExportItem, rulesBaseURL string) (string, error) 
 		ExternalController: "127.0.0.1:9090",
 	}
 	proxyNames := []string{}
+	seen := map[string]int{}
 	for _, it := range items {
 		pr := buildClashProxy(it)
+		pr.Name = uniqueName(pr.Name, seen)
 		cfg.Proxies = append(cfg.Proxies, pr)
 		proxyNames = append(proxyNames, pr.Name)
 	}
@@ -447,13 +560,15 @@ func BuildLoon(items []ExportItem, subURL, rulesBaseURL, geoipURL string) (strin
 	// DIRECT 是 Loon 内置策略；显式声明为 direct，与 Surfboard 订阅保持一致（分组可指向 DIRECT）。
 	sb.WriteString("DIRECT = direct\n")
 	names := []string{}
+	seen := map[string]int{}
 	for _, it := range items {
-		line, ok := buildLoonProxyLine(it)
+		name := uniqueName(displayName(it), seen)
+		line, ok := buildLoonProxyLine(it, name)
 		if !ok {
 			continue
 		}
 		sb.WriteString(line + "\n")
-		names = append(names, displayName(it))
+		names = append(names, name)
 	}
 	if len(names) == 0 {
 		return "", fmt.Errorf("没有 Loon 支持的代理")
@@ -549,8 +664,7 @@ func buildLoonRemoteRules(rulesBaseURL string) string {
 //   - ss:     Shadowsocks, server, port, method, "password"
 //
 // ok=false 表示该协议/传输不被 Loon 支持（如 gRPC）。
-func buildLoonProxyLine(it ExportItem) (string, bool) {
-	name := displayName(it)
+func buildLoonProxyLine(it ExportItem, name string) (string, bool) {
 	path := it.WsPath
 	if path == "" {
 		path = "/v2ray"

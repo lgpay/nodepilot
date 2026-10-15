@@ -10,7 +10,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"nodepilot/internal/model"
+	"nodepilot/internal/store"
+	"nodepilot/internal/subscription"
 )
+
+// geoRefreshIPDelay 刷新节点归属时，相邻外部 geo 查询之间的间隔，降低免费服务速率压力。
+const geoRefreshIPDelay = 200 * time.Millisecond
 
 // geoClient 带超时，避免外部 IP 归属查询挂起拖慢请求
 var geoClient = &http.Client{Timeout: 6 * time.Second}
@@ -128,4 +134,91 @@ func geoLookup(ip string) (code, name, city, region string, latitude, longitude 
 		return strings.ToUpper(codeV), nameV, cityV, regionV, latV, lonV
 	}
 	return "", "", "", "", 0, 0
+}
+
+// resolveHostIP 把 host（IP 或域名）解析为 IPv4/IPv6 地址，供 geo 查询使用。
+// 优先 IPv4；无法解析返回错误（与 GeoLookup 的取值逻辑一致）。
+func resolveHostIP(host string) (net.IP, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		return ip, nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil || len(ips) == 0 {
+		return nil, fmt.Errorf("无法解析主机名 %s", host)
+	}
+	for _, v := range ips {
+		if v4 := v.To4(); v4 != nil {
+			return v4, nil
+		}
+	}
+	return ips[0], nil
+}
+
+// RefreshNodeRegions 重新识别所有节点的地理归属（国家/城市/经纬度）并写回节点记录。
+// 用于节点 IP 迁移后地理缓存/记录失准时的维护：强制重查外部服务（绕过内存 geo 缓存，
+// 因其无过期时间），并把成功结果回写缓存，避免后续请求命中过期数据。
+// 节点按解析后的 IP 去重查询，降低外部免费服务的速率压力。
+func RefreshNodeRegions(c *gin.Context) {
+	var nodes []model.Node
+	if err := store.DB.Find(&nodes).Error; err != nil {
+		c.JSON(500, gin.H{"error": "internal error"})
+		return
+	}
+	type geoResult struct{ code, name, city, region string; lat, lon float64 }
+	geoByIP := map[string]geoResult{} // 已查得的 IP -> 地理结果
+	nodeIP := map[uint]string{}       // nodeID -> 解析到的 IP 字符串
+	unresolved := []uint{}
+	for _, n := range nodes {
+		host := hostOf(n.Address)
+		ip, err := resolveHostIP(host)
+		if err != nil {
+			unresolved = append(unresolved, n.ID)
+			continue
+		}
+		ipStr := ip.String()
+		nodeIP[n.ID] = ipStr
+		if _, ok := geoByIP[ipStr]; !ok {
+			code, name, city, region, lat, lon := geoLookup(ipStr)
+			if code != "" {
+				geoByIP[ipStr] = geoResult{code, name, city, region, lat, lon}
+				// 回写内存缓存，避免后续请求落到过期数据
+				geoCacheMu.Lock()
+				geoCache[ipStr] = geoCacheEntry{code, name, city, region, lat, lon}
+				geoCacheMu.Unlock()
+			}
+			time.Sleep(geoRefreshIPDelay) // 降低外部免费服务速率压力
+		}
+	}
+	updated := 0
+	failed := []uint{}
+	for _, n := range nodes {
+		ipStr, ok := nodeIP[n.ID]
+		if !ok {
+			failed = append(failed, n.ID)
+			continue
+		}
+		g, ok := geoByIP[ipStr]
+		if !ok {
+			failed = append(failed, n.ID)
+			continue
+		}
+		// region 统一存中文国家名（geo 查询可能返回英文名，归一化为中文，便于旗帜与地图标点）。
+		updates := map[string]interface{}{
+			"region":    subscription.RegionToChinese(g.name),
+			"city":      g.city,
+			"latitude":  g.lat,
+			"longitude": g.lon,
+		}
+		if err := store.DB.Model(&model.Node{}).Where("id = ?", n.ID).Updates(updates).Error; err != nil {
+			failed = append(failed, n.ID)
+			continue
+		}
+		updated++
+	}
+	c.JSON(200, gin.H{
+		"total":      len(nodes),
+		"updated":    updated,
+		"unresolved": unresolved,
+		"failed":     failed,
+	})
 }

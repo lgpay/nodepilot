@@ -662,6 +662,11 @@ async function afterInboundSaved(nodeId, label, deployment) {
     if (deployment.status === 'applied') {
       clearDeployPending(nodeId, deployment.version);
       showToast(label + '已保存并应用' + (deployment.version ? ' · v' + deployment.version : ''), 'ok');
+    } else if (deployment.status === 'queued') {
+      // 服务端异步下发（证书分发 + 配置同步）：先提示进行中，再轮询配置版本确认真实结果
+      showToast(label + '已保存，服务端下发中…', 'warn');
+      markDeployPending(nodeId, label + ' 服务端下发中');
+      pollInboundDeploy(nodeId, label);
     } else {
       markDeployPending(nodeId, '服务端自动下发失败');
       showToast(label + '已保存，但自动下发失败：' + (deployment.error || '未知错误'), 'err');
@@ -669,6 +674,38 @@ async function afterInboundSaved(nodeId, label, deployment) {
     return deployment;
   }
   return afterConfigSaved(nodeId, label);
+}
+// pollInboundDeploy 轮询节点配置版本，确认异步下发的真实结果（applied/failed）。
+// 以保存前的最新版本为基线，只认「更高版本」的记录，避免把上一次的成功误判为本次结果。
+async function pollInboundDeploy(nodeId, label) {
+  let base = 0;
+  try {
+    const v0 = await (await fetch(API + '/nodes/' + nodeId + '/config/versions', { headers: authH() })).json();
+    if (Array.isArray(v0) && v0.length) base = v0[0].version || 0;
+  } catch (e) {}
+  const started = Date.now();
+  for (let i = 0; i < 40; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    let vers;
+    try {
+      vers = await (await fetch(API + '/nodes/' + nodeId + '/config/versions', { headers: authH() })).json();
+    } catch (e) { continue; }
+    if (Array.isArray(vers)) {
+      const rec = vers.find(v => (v.version || 0) > base);
+      if (rec && rec.status === 'applied') {
+        clearDeployPending(nodeId, rec.version);
+        showToast(label + '已保存并下发 · v' + rec.version, 'ok');
+        return;
+      }
+      if (rec && rec.status === 'failed') {
+        markDeployPending(nodeId, '服务端自动下发失败');
+        showToast(label + '已保存，但自动下发失败：' + (rec.error || '未知错误'), 'err');
+        return;
+      }
+    }
+    if (Date.now() - started > 90000) break;
+  }
+  showToast(label + '已保存，下发状态请到「配置版本」页查看', 'warn');
 }
 
 // ---- 主题 ----
@@ -1067,7 +1104,7 @@ function renderWelcome() {
     telemetry('本月流量', statsData ? fmtBytes(monthTraffic) : '—', '按 UTC 月统计', '') +
     telemetry('待关注资源', attention, attention ? offline + ' 节点 · ' + certIssues + ' 证书' : '暂无已知异常', attention ? 'amber' : 'green') + '</div>' +
     '<div class="dash-grid"><div class="dash-stack">' +
-    '<div class="card"><h2>节点运行状态</h2>' + worldMapMarkup() + '<div class="section-gap">' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0)).slice(0,5)) + '</div></div></div>' +
+    '<div class="card"><h2>节点运行状态</h2>' + worldMapMarkup() + '<div class="section-gap">' + fleetRows(nodesData.slice().sort((a,b)=>(a.status==='online'?1:0)-(b.status==='online'?1:0))) + '</div></div></div>' +
     '<div class="dash-stack"><div class="card"><h2>近 30 天流量</h2>' + trafficLineChart(statsData && statsData.daily) + '<div class="btnrow"><button class="secondary small" onclick="selectStats()">查看流量统计</button></div></div>' +
     '<div class="card"><h2>待处理事项</h2>' + attentionRows(offline, certIssues) + '</div></div></div>';
   document.getElementById('main').innerHTML = h;
@@ -1461,7 +1498,10 @@ async function createInbound(nodeId) {
   const port = parseInt(val('m_i_port'), 10);
   if (!port || port < 1 || port > 65535) return showToast('请填写有效端口（1-65535）', 'err');
   const advanced = collectInboundAdvanced('m_i'); if (!advanced) return;
-  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('m_i_name'), protocol: val('m_i_proto'), port, transport: val('m_i_trans'), tls_enabled: tls, cert_id: certId, stream_settings: advanced.streamSettings, fallback: advanced.fallback });
+  const r = collectInboundReality('m_i');
+  const rerr = validateInboundReality('m_i', r); if (rerr) return showToast(rerr, 'err');
+  const isReality = r.security === 'reality';
+  const d = await api('POST', '/nodes/' + nodeId + '/inbounds', { name: val('m_i_name'), protocol: val('m_i_proto'), port, transport: val('m_i_trans'), tls_enabled: isReality ? false : tls, cert_id: isReality ? 0 : certId, security: r.security, reality_dest: r.reality_dest, reality_server_names: r.reality_server_names, reality_spider_x: r.reality_spider_x, reality_short_ids: r.reality_short_ids, stream_settings: advanced.streamSettings, fallback: advanced.fallback });
   if (d) { closeModal(); inboundsCache[nodeId] = await api('GET', '/nodes/' + nodeId + '/inbounds') || []; await loadAllInbounds(); await afterInboundSaved(nodeId, '入站', d.deployment); renderSidebar(); if (sel.type === 'inbounds') renderInboundHub(); else renderNodeDetail(nodeId); }
 }
 // 在节点端口范围内随机选一个未占用端口（已用端口=该节点已有入站端口）。
@@ -1508,6 +1548,7 @@ function showCreateInbound(nodeId) {
     '<div id="m_i_grpc_row" style="display:none"><label>gRPC ServiceName</label><input id="m_i_grpc" value="xray" placeholder="xray"><label><input id="m_i_grpc_multi" type="checkbox"> gRPC 多路复用模式</label></div>' +
     '<details><summary>高级配置</summary><label>Fallback JSON（可选）</label><textarea id="m_i_fallback" rows="3" placeholder="[]"></textarea></details>' +
     '<div id="i_cert_wrap" style="display:none"><label>证书（TLS 必选）</label><select id="m_i_cert"><option value="">未选择</option>' + (certsData || []).map(c => '<option value="' + c.id + '">' + esc(c.domain) + '</option>').join('') + '</select></div>' +
+    inboundRealityBlock('m_i', null) +
     '<div class="btnrow"><button onclick="withBusy(this, () => createInbound(' + fixedNode + '))">添加</button><button class="secondary" onclick="closeModal()">取消</button></div>');
   toggleInboundTransport('m_i');
   const el = document.getElementById('m_i_name'); if (el) el.focus();
@@ -1559,6 +1600,51 @@ function collectInboundAdvanced(prefix) {
   const fallback = val(prefix + '_fallback').trim();
   if (fallback) { try { JSON.parse(fallback); } catch (e) { showToast('Fallback JSON 格式不正确', 'err'); return null; } }
   return { streamSettings: Object.keys(stream).length ? JSON.stringify(stream) : '', fallback };
+}
+// REALITY：入站表单的“REALITY”勾选 + 参数字段（create/edit 共用，prefix 区分）。
+function inboundRealityBlock(prefix, inb) {
+  const on = !!(inb && inb.security === 'reality');
+  const dest = (inb && inb.reality_dest) || '';
+  const sni = (inb && inb.reality_server_names) || '';
+  const spx = (inb && inb.reality_spider_x) || '';
+  const sid = (inb && inb.reality_short_ids) || '';
+  return '<div><label><input id="' + prefix + '_reality" type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleInboundReality(\'' + prefix + '\')"> REALITY（XTLS 抗探测，仅 VLESS+TCP）</label></div>' +
+    '<div id="' + prefix + '_reality_row" style="' + (on ? '' : 'display:none') + '">' +
+    '<label>目标 dest（如 service.sh.189.cn:443）</label><input id="' + prefix + '_rdest" value="' + esc(dest) + '" placeholder="service.sh.189.cn:443">' +
+    '<label>SNI / serverNames（可选，默认取 dest 域名）</label><input id="' + prefix + '_rsni" value="' + esc(sni) + '" placeholder="service.sh.189.cn">' +
+    '<label>spiderX（可选，默认 /）</label><input id="' + prefix + '_rspx" value="' + esc(spx) + '" placeholder="/">' +
+    '<label>shortId（可选，留空由服务端自动生成）</label><input id="' + prefix + '_rsid" value="' + esc(sid) + '" placeholder="留空自动生成">' +
+    '<p class="muted">自动 flow=xtls-rprx-vision · fingerprint=chrome · 私钥由服务端生成。</p></div>';
+}
+function toggleInboundReality(prefix) {
+  const on = chk(prefix + '_reality');
+  const row = document.getElementById(prefix + '_reality_row');
+  if (row) row.style.display = on ? '' : 'none';
+  // REALITY 不使用证书：选中时隐藏证书行，取消时按 TLS 勾选恢复
+  const certId = (prefix === 'm_i') ? 'i_cert_wrap' : (prefix + '_cert_row');
+  const cert = document.getElementById(certId);
+  if (cert) cert.style.display = on ? 'none' : (chk(prefix + '_tls') ? '' : 'none');
+}
+// 收集安全层与 REALITY 参数；reality 勾选时返回 security=reality 及各参数字段。
+function collectInboundReality(prefix) {
+  if (!chk(prefix + '_reality')) {
+    return { security: chk(prefix + '_tls') ? 'tls' : 'none' };
+  }
+  return {
+    security: 'reality',
+    reality_dest: val(prefix + '_rdest').trim(),
+    reality_server_names: val(prefix + '_rsni').trim(),
+    reality_spider_x: val(prefix + '_rspx').trim(),
+    reality_short_ids: val(prefix + '_rsid').trim(),
+  };
+}
+// 校验 REALITY 前置条件（VLESS + TCP + dest），返回错误信息或空串。
+function validateInboundReality(prefix, r) {
+  if (r.security !== 'reality') return '';
+  if (val(prefix + '_proto') !== 'vless') return 'REALITY 仅支持 VLESS 协议';
+  if (val(prefix + '_trans') !== 'tcp') return 'REALITY 仅支持 TCP 传输';
+  if (!r.reality_dest) return '请填写 REALITY 目标 dest（如 service.sh.189.cn:443）';
+  return '';
 }
 // 切换入站启用状态（入站列表启用勾选框）
 async function toggleInbound(id, nodeId) {
@@ -1634,7 +1720,7 @@ async function showEditInbound(id, nodeId) {
     '<div><label>传输</label><select id="ib_trans" onchange="toggleInboundTransport(\'ib\')">' + transOptions(inb.transport) + '</select></div>' +
     '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div>' +
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '"><label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
-    '</div>' + inboundAdvancedFields('ib', inb) +
+    '</div>' + inboundAdvancedFields('ib', inb) + inboundRealityBlock('ib', inb) +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInboundModal(' + id + ',' + nodeId + '))">保存入站</button>' +
     '<button onclick="withBusy(this, () => syncNode(' + nodeId + '))">下发并应用</button>' +
@@ -1653,10 +1739,13 @@ async function saveInboundModal(id, nodeId) {
   const port = parseInt(val('ib_port'), 10);
   if (!port || port < 1 || port > 65535) return showToast('请填写有效端口（1-65535）', 'err');
   const advanced = collectInboundAdvanced('ib'); if (!advanced) return;
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null), stream_settings: advanced.streamSettings, fallback: advanced.fallback });
+  const r = collectInboundReality('ib');
+  const rerr = validateInboundReality('ib', r); if (rerr) return showToast(rerr, 'err');
+  const isReality = r.security === 'reality';
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: isReality ? false : chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: isReality ? 0 : (val('ib_cert') ? +val('ib_cert') : null), security: r.security, reality_dest: r.reality_dest, reality_server_names: r.reality_server_names, reality_spider_x: r.reality_spider_x, reality_short_ids: r.reality_short_ids, stream_settings: advanced.streamSettings, fallback: advanced.fallback });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null), stream_settings: advanced.streamSettings, fallback: advanced.fallback };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: isReality ? false : chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: isReality ? 0 : (val('ib_cert') ? +val('ib_cert') : null), security: r.security, reality_dest: r.reality_dest, reality_server_names: r.reality_server_names, reality_spider_x: r.reality_spider_x, reality_short_ids: r.reality_short_ids, stream_settings: advanced.streamSettings, fallback: advanced.fallback };
     await afterInboundSaved(nodeId, '入站', d.deployment); renderSidebar(); await showEditInbound(id, nodeId);
   }
 }
@@ -1687,7 +1776,7 @@ async function renderInboundDetail(id) {
     '<div><label>TLS</label><input id="ib_tls" type="checkbox" ' + (inb.tls_enabled ? 'checked' : '') + ' onchange="toggleCertRow()"></div>' +
     '<div id="ib_cert_row" style="' + (inb.tls_enabled ? '' : 'display:none;') + '"><label>TLS 证书（可选）</label><select id="ib_cert">' + certOptions(inb.tls_cert_id) + '</select></div>' +
     '<div>' + (inb.port_auto_fixed ? '<span class="badge warn">已自动更换端口</span>' : '<span></span>') + '</div>' +
-    '</div>' + inboundAdvancedFields('ib', inb) +
+    '</div>' + inboundAdvancedFields('ib', inb) + inboundRealityBlock('ib', inb) +
     '<p class="muted" style="margin-top:12px">停用的入站不会下发给节点；开启自动下发时，保存后会立即应用。</p>' +
     '<div class="btnrow">' +
     '<button onclick="withBusy(this, () => saveInbound(' + id + '))">保存入站</button>' +
@@ -1707,10 +1796,13 @@ async function saveInbound(id) {
   let nodeId = sel.parentId;
   if (!nodeId) nodeId = inboundNodeId(id);
   const advanced = collectInboundAdvanced('ib'); if (!advanced) return;
-  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: (val('ib_cert') ? +val('ib_cert') : null), stream_settings: advanced.streamSettings, fallback: advanced.fallback });
+  const r = collectInboundReality('ib');
+  const rerr = validateInboundReality('ib', r); if (rerr) return showToast(rerr, 'err');
+  const isReality = r.security === 'reality';
+  const d = await api('PUT', '/inbounds/' + id, { name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: isReality ? false : chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), cert_id: isReality ? 0 : (val('ib_cert') ? +val('ib_cert') : null), security: r.security, reality_dest: r.reality_dest, reality_server_names: r.reality_server_names, reality_spider_x: r.reality_spider_x, reality_short_ids: r.reality_short_ids, stream_settings: advanced.streamSettings, fallback: advanced.fallback });
   if (d) {
     const arr = inboundsCache[nodeId] || []; const i = arr.findIndex(x => x.id === id);
-    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: (val('ib_cert') ? +val('ib_cert') : null), stream_settings: advanced.streamSettings, fallback: advanced.fallback };
+    if (i >= 0) arr[i] = { ...arr[i], name: val('ib_name'), protocol: val('ib_proto'), port, transport: val('ib_trans'), tls_enabled: isReality ? false : chk('ib_tls'), enabled: chk('ib_enabled'), auto_heal_interval: +val('ib_ahinterval'), tls_cert_id: isReality ? 0 : (val('ib_cert') ? +val('ib_cert') : null), security: r.security, reality_dest: r.reality_dest, reality_server_names: r.reality_server_names, reality_spider_x: r.reality_spider_x, reality_short_ids: r.reality_short_ids, stream_settings: advanced.streamSettings, fallback: advanced.fallback };
     await afterInboundSaved(nodeId, '入站', d.deployment); renderSidebar(); renderInboundDetail(id);
   }
 }

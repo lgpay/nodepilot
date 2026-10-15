@@ -134,12 +134,18 @@ func CreateInbound(c *gin.Context) {
 		Protocol         string  `json:"protocol"`
 		Port             int     `json:"port"`
 		Transport        string  `json:"transport"`
+		Security         string  `json:"security"` // "" | none | tls | reality
 		TLSEnabled       bool    `json:"tls_enabled"`
 		TLSCertID        uint    `json:"cert_id"`
 		StreamSettings   string  `json:"stream_settings"`    // JSON 字符串
 		Fallback         string  `json:"fallback"`           // JSON 字符串
 		AutoHeal         *bool   `json:"auto_heal"`          // 端口不通时自动换端口（默认 true）
 		AutoHealInterval int     `json:"auto_heal_interval"` // 自动修复最小间隔(秒)，0=不自动修复
+		RealityDest      string  `json:"reality_dest"`
+		RealityServerNames string `json:"reality_server_names"`
+		RealityPrivateKey  string `json:"reality_private_key"`
+		RealityShortIds    string `json:"reality_short_ids"`
+		RealitySpiderX     string `json:"reality_spider_x"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -151,6 +157,7 @@ func CreateInbound(c *gin.Context) {
 		Protocol:         body.Protocol,
 		Port:             body.Port,
 		Transport:        body.Transport,
+		Security:         body.Security,
 		TLSEnabled:       body.TLSEnabled,
 		TLSCertID:        body.TLSCertID,
 		StreamSettings:   body.StreamSettings,
@@ -158,8 +165,18 @@ func CreateInbound(c *gin.Context) {
 		Enabled:          true,
 		AutoHeal:         derefBool(body.AutoHeal, true),
 		AutoHealInterval: body.AutoHealInterval,
+		RealityDest:        body.RealityDest,
+		RealityServerNames: body.RealityServerNames,
+		RealityPrivateKey:  body.RealityPrivateKey,
+		RealityShortIds:    body.RealityShortIds,
+		RealitySpiderX:     body.RealitySpiderX,
 	}
 	if err := validateInbound(in.Protocol, in.Transport, in.TLSEnabled, in.TLSCertID); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	// 归一化安全层并补全 REALITY 参数（校验协议/传输，按需生成密钥/shortId）
+	if err := configgen.NormalizeReality(&in); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -184,6 +201,7 @@ func UpdateInbound(c *gin.Context) {
 		Protocol         *string `json:"protocol"`
 		Port             *int    `json:"port"`
 		Transport        *string `json:"transport"`
+		Security         *string `json:"security"` // "" | none | tls | reality
 		TLSEnabled       *bool   `json:"tls_enabled"`
 		TLSCertID        *uint   `json:"cert_id"`
 		StreamSettings   *string `json:"stream_settings"`
@@ -191,6 +209,11 @@ func UpdateInbound(c *gin.Context) {
 		Enabled          *bool   `json:"enabled"`
 		AutoHeal         *bool   `json:"auto_heal"`
 		AutoHealInterval *int    `json:"auto_heal_interval"`
+		RealityDest         *string `json:"reality_dest"`
+		RealityServerNames  *string `json:"reality_server_names"`
+		RealityPrivateKey   *string `json:"reality_private_key"`
+		RealityShortIds     *string `json:"reality_short_ids"`
+		RealitySpiderX      *string `json:"reality_spider_x"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
@@ -230,6 +253,24 @@ func UpdateInbound(c *gin.Context) {
 	if body.AutoHealInterval != nil {
 		updates["auto_heal_interval"] = *body.AutoHealInterval
 	}
+	if body.Security != nil {
+		updates["security"] = *body.Security
+	}
+	if body.RealityDest != nil {
+		updates["reality_dest"] = *body.RealityDest
+	}
+	if body.RealityServerNames != nil {
+		updates["reality_server_names"] = *body.RealityServerNames
+	}
+	if body.RealityPrivateKey != nil {
+		updates["reality_private_key"] = *body.RealityPrivateKey
+	}
+	if body.RealityShortIds != nil {
+		updates["reality_short_ids"] = *body.RealityShortIds
+	}
+	if body.RealitySpiderX != nil {
+		updates["reality_spider_x"] = *body.RealitySpiderX
+	}
 	// 校验更新后的最终状态（trojan 必须 TLS + 证书），防止生成非法配置拖垮节点
 	effProto := in.Protocol
 	if body.Protocol != nil {
@@ -251,9 +292,61 @@ func UpdateInbound(c *gin.Context) {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
+	// 用更新后的生效值归一化安全层 / 补全 REALITY 参数（可能生成私钥/shortId）
+	eff := in
+	if body.Protocol != nil {
+		eff.Protocol = *body.Protocol
+	}
+	if body.Transport != nil {
+		eff.Transport = *body.Transport
+	}
+	if body.TLSEnabled != nil {
+		eff.TLSEnabled = *body.TLSEnabled
+	}
+	if body.TLSCertID != nil {
+		eff.TLSCertID = *body.TLSCertID
+	}
+	if body.Security != nil {
+		eff.Security = *body.Security
+	}
+	if body.RealityDest != nil {
+		eff.RealityDest = *body.RealityDest
+	}
+	if body.RealityServerNames != nil {
+		eff.RealityServerNames = *body.RealityServerNames
+	}
+	if body.RealityPrivateKey != nil {
+		eff.RealityPrivateKey = *body.RealityPrivateKey
+	}
+	if body.RealityShortIds != nil {
+		eff.RealityShortIds = *body.RealityShortIds
+	}
+	if body.RealitySpiderX != nil {
+		eff.RealitySpiderX = *body.RealitySpiderX
+	}
+	if err := configgen.NormalizeReality(&eff); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	// 归一化后的安全层/REALITY 参数回写 updates（确保生成的密钥/shortId/默认值落库）
+	updates["security"] = eff.Security
+	updates["reality_dest"] = eff.RealityDest
+	updates["reality_server_names"] = eff.RealityServerNames
+	updates["reality_private_key"] = eff.RealityPrivateKey
+	updates["reality_short_ids"] = eff.RealityShortIds
+	updates["reality_spider_x"] = eff.RealitySpiderX
+	if eff.Security == "reality" {
+		updates["tls_enabled"] = false
+	}
 	store.DB.Model(&in).Updates(updates)
 	// 用更新后的生效值触发后续动作
-	in.TLSEnabled = effTLS
+	in.Security = eff.Security
+	in.RealityDest = eff.RealityDest
+	in.RealityServerNames = eff.RealityServerNames
+	in.RealityPrivateKey = eff.RealityPrivateKey
+	in.RealityShortIds = eff.RealityShortIds
+	in.RealitySpiderX = eff.RealitySpiderX
+	in.TLSEnabled = eff.TLSEnabled
 	in.TLSCertID = effCert
 	deployment := afterInboundSave(in)
 	slog.Info("audit", "action", "inbound_update", "id", in.ID)
@@ -262,26 +355,46 @@ func UpdateInbound(c *gin.Context) {
 
 // afterInboundSave 入站保存后：若使用 TLS 证书，把证书产物分发到该节点并触发配置下发（保存即生效）。
 // 免去「保存入站 → 证书页手动分发 → 再下发配置」的步骤。
+//
+// 注意：证书分发(agentPut 30s 超时) + 配置同步(syncNode 15s 超时) 是网络往返，先前在保存的 HTTP
+// 请求内同步阻塞，节点 agent 慢/不可达时保存会卡 45s+。改为异步下发：入站落库后立即返回，
+// 下发结果通过 ConfigVersion 记录查看（syncNode 内部会写入），前端可在配置版本页轮询状态。
 func afterInboundSave(in model.Inbound) inboundDeployment {
-	if !in.TLSEnabled || in.TLSCertID == 0 {
+	security := in.Security
+	if security == "" {
+		if in.TLSEnabled {
+			security = "tls"
+		} else {
+			security = "none"
+		}
+	}
+	// 仅 TLS / REALITY 入站由服务端主动下发；其余（如裸 vmess/ws）交由前端 afterConfigSaved 触发同步。
+	if security != "tls" && security != "reality" {
 		return inboundDeployment{}
 	}
-	result := inboundDeployment{Attempted: true}
-	var node model.Node
-	if err := store.DB.First(&node, in.NodeID).Error; err != nil {
-		log.Printf("[inbound] 节点 #%d 不存在，跳过证书分发", in.NodeID)
-		result.Status, result.Error = "failed", "节点不存在"
-		return result
-	}
-	pushCertToNode(node, in.TLSCertID)
-	version, err := syncNode(node)
-	if err != nil {
-		log.Printf("[inbound] 节点 #%d 配置下发失败: %v", node.ID, err)
-		result.Status, result.Error = "failed", err.Error()
-		return result
-	}
-	result.Status, result.Version = "applied", version
-	return result
+	go func(in model.Inbound) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[inbound] 异步下发 panic 恢复: %v", r)
+			}
+		}()
+		var node model.Node
+		if err := store.DB.First(&node, in.NodeID).Error; err != nil {
+			log.Printf("[inbound] 节点 #%d 不存在，跳过配置下发", in.NodeID)
+			return
+		}
+		// TLS 入站才分发证书；REALITY 不使用证书。
+		if security == "tls" && in.TLSCertID > 0 {
+			pushCertToNode(node, in.TLSCertID)
+		}
+		version, err := syncNode(node)
+		if err != nil {
+			log.Printf("[inbound] 节点 #%d 异步配置下发失败: %v", node.ID, err)
+			return
+		}
+		log.Printf("[inbound] 节点 #%d 异步配置下发完成 (version=%d)", node.ID, version)
+	}(in)
+	return inboundDeployment{Attempted: true, Status: "queued"}
 }
 
 // pushCertToNode 把证书签发产物推送到单个节点 agent（幂等；失败仅记录，不阻断保存）。

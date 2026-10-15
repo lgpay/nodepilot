@@ -70,6 +70,8 @@ func NewRouter(webDir string) *gin.Engine {
 
 		// IP 归属查询（自动识别节点区域）
 		authed.GET("/geo", GeoLookup)
+		// 维护：重新识别所有节点地理归属并写回（节点 IP 迁移后缓存/记录失准时）
+		authed.POST("/admin/refresh-node-regions", RefreshNodeRegions)
 
 		// 全局设置
 		authed.GET("/settings", GetSettings)

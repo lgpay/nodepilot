@@ -51,6 +51,7 @@ type Inbound struct {
 	Protocol         string `gorm:"size:16" json:"protocol"` // vmess|vless|trojan|ss|socks|http
 	Port             int    `json:"port"`
 	Transport        string `gorm:"size:16" json:"transport"` // tcp|ws|grpc
+	Security         string `gorm:"size:16" json:"security"`  // "" | none | tls | reality；空则按 TLSEnabled 派生（向后兼容）
 	TLSCertID        uint   `json:"tls_cert_id"`
 	TLSEnabled       bool   `gorm:"default:false" json:"tls_enabled"`
 	StreamSettings   string `gorm:"type:text" json:"stream_settings"` // JSON（高级 streamSettings 覆盖）
@@ -60,6 +61,14 @@ type Inbound struct {
 	AutoHeal         bool   `gorm:"default:true" json:"auto_heal"`        // 端口不通时是否允许自动换端口（已由间隔控制，此字段保留兼容）
 	AutoHealInterval int    `gorm:"default:10" json:"auto_heal_interval"` // 自动修复最小间隔(分钟)，0=不自动修复
 	HealCount        int    `gorm:"default:0" json:"heal_count"`          // 自动修复次数(累计换端口次数)
+
+	// REALITY（security=reality 时生效；仅 VLESS+TCP）。服务端用 privateKey/shortIds，
+	// 客户端链接用由 privateKey 派生的公钥(pbk)与其中一个 shortId。
+	RealityDest         string `gorm:"size:256" json:"reality_dest"`          // 借用握手的目标，如 service.sh.189.cn:443
+	RealityServerNames  string `gorm:"size:512" json:"reality_server_names"`  // SNI 白名（逗号分隔），默认取 dest host
+	RealityPrivateKey   string `gorm:"size:256" json:"reality_private_key"`   // X25519 私钥（base64url 无填充）
+	RealityShortIds     string `gorm:"size:256" json:"reality_short_ids"`     // shortId 列表（逗号分隔）
+	RealitySpiderX      string `gorm:"size:256" json:"reality_spider_x"`      // spiderX，默认 "/"
 
 	// Connectivity 入站端口连通状态(ok/fail/空=未知)，由控制面探测维护，不入库
 	Connectivity string `gorm:"-" json:"connectivity"`

@@ -331,25 +331,59 @@ func aggregate(g model.SubscriptionGroup) ([]subscription.ExportItem, error) {
 		}
 		host := hostOf(node.Address)
 		wsPath := parseWsPath(in.StreamSettings)
+		sec := in.Security
+		if sec == "" {
+			if in.TLSEnabled {
+				sec = "tls"
+			} else {
+				sec = "none"
+			}
+		}
 		sni := ""
 		if in.TLSEnabled {
 			sni = host
+		}
+		// REALITY 客户端链接参数：由私钥派生公钥(pbk)，取首个 shortId 作 sid、
+		// 首个 serverName 作 sni（缺省取 dest host）、spiderX 默认 "/"。
+		var rPub, rSid, rSni, rSpx string
+		if sec == "reality" {
+			rSpx = in.RealitySpiderX
+			if rSpx == "" {
+				rSpx = "/"
+			}
+			if pub, err := configgen.RealityPublicKey(in.RealityPrivateKey); err == nil {
+				rPub = pub
+			}
+			rSid = firstCSV(in.RealityShortIds)
+			if rSni = firstCSV(in.RealityServerNames); rSni == "" {
+				if h, _, err := net.SplitHostPort(in.RealityDest); err == nil {
+					rSni = h
+				} else {
+					rSni = in.RealityDest
+				}
+			}
 		}
 		for _, cl := range clients {
 			if configgen.ClientExpired(cl) {
 				continue // 过期客户端不导出
 			}
 			items = append(items, subscription.ExportItem{
-				Host:       host,
-				Port:       in.Port,
-				Protocol:   in.Protocol,
-				Transport:  transportOf(in.Transport),
-				TLSEnabled: in.TLSEnabled,
-				WsPath:     wsPath,
-				SNI:        sni,
-				UUID:       cl.UUID,
-				Alias:      cl.Alias,
-				Region:     subscription.RegionCode(node.Region), // 订阅对外统一用英文 ISO 码
+				Host:             host,
+				Port:             in.Port,
+				Protocol:         in.Protocol,
+				Transport:        transportOf(in.Transport),
+				TLSEnabled:       in.TLSEnabled,
+				WsPath:           wsPath,
+				SNI:              sni,
+				UUID:             cl.UUID,
+				Alias:            cl.Alias,
+				Region:           subscription.RegionCode(node.Region), // 订阅对外统一用英文 ISO 码
+				TCPHeaderType:    parseTCPHeaderType(in.StreamSettings),
+				Security:         sec,
+				RealityPublicKey: rPub,
+				RealityShortId:   rSid,
+				RealitySni:       rSni,
+				RealitySpiderX:   rSpx,
 			})
 		}
 	}
@@ -389,6 +423,36 @@ func parseWsPath(streamSettings string) string {
 		return s.WsSettings.Path
 	}
 	return s.WsPath
+}
+
+// parseTCPHeaderType 从入站 stream_settings 提取 tcp 传输的 HTTP 伪装类型
+// （xray: tcpSettings.header.type，取值 ""|"none"|"http"）。用于让订阅链接带上
+// headerType=http，保证 tcp+http 伪饰入站生成的 vless 链接能被客户端正确匹配连通。
+func parseTCPHeaderType(streamSettings string) string {
+	if streamSettings == "" {
+		return ""
+	}
+	var s struct {
+		TcpSettings struct {
+			Header struct {
+				Type string `json:"type"`
+			} `json:"header"`
+		} `json:"tcpSettings"`
+	}
+	if err := json.Unmarshal([]byte(streamSettings), &s); err != nil {
+		return ""
+	}
+	return s.TcpSettings.Header.Type
+}
+
+// firstCSV 取逗号分隔字段的第一个非空项（去空白）。
+func firstCSV(s string) string {
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			return p
+		}
+	}
+	return ""
 }
 
 func nodeHasAnyTag(tags string, wanted []string) bool {

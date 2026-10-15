@@ -62,12 +62,26 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		if !in.Enabled {
 			continue
 		}
+		// 生效的安全层：reality / tls / none。security 为空时按 TLSEnabled 派生（向后兼容旧库）。
+		security := in.Security
+		if security == "" {
+			if in.TLSEnabled {
+				security = "tls"
+			} else {
+				security = "none"
+			}
+		}
+		isReality := security == "reality"
 		clientList := []map[string]interface{}{}
+		clientFlow := ""
+		if isReality && in.Protocol == "vless" {
+			clientFlow = "xtls-rprx-vision"
+		}
 		for _, c := range clientsByInbound[in.ID] {
 			if !c.Enabled || ClientExpired(c) {
 				continue
 			}
-			clientList = append(clientList, buildClient(in.Protocol, c.UUID))
+			clientList = append(clientList, buildClient(in.Protocol, c.UUID, clientFlow))
 		}
 
 		network := in.Transport
@@ -100,51 +114,56 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 		if wsPath == "" {
 			wsPath = "/v2ray"
 		}
-		grpcSvc := ss.GrpcSettings.ServiceName
-		if grpcSvc == "" {
-			grpcSvc = "xray"
+	grpcSvc := ss.GrpcSettings.ServiceName
+	if grpcSvc == "" {
+		grpcSvc = "xray"
+	}
+	stream := map[string]interface{}{"network": network}
+	switch network {
+	case "ws":
+		ws := map[string]interface{}{"path": wsPath}
+		if len(ss.WsSettings.Headers) > 0 {
+			ws["headers"] = ss.WsSettings.Headers
 		}
-		stream := map[string]interface{}{"network": network}
-		switch network {
-		case "ws":
-			ws := map[string]interface{}{"path": wsPath}
-			if len(ss.WsSettings.Headers) > 0 {
-				ws["headers"] = ss.WsSettings.Headers
+		stream["wsSettings"] = ws
+	case "tcp":
+		// REALITY 走裸 TCP（TLS 由 reality 层承载），不能再叠加 tcp http 伪饰。
+		if !isReality && ss.TcpSettings.Header.Type != "" && ss.TcpSettings.Header.Type != "none" {
+			tcp := map[string]interface{}{"type": ss.TcpSettings.Header.Type}
+			if len(ss.TcpSettings.Header.Request) > 0 {
+				tcp["request"] = ss.TcpSettings.Header.Request
 			}
-			stream["wsSettings"] = ws
-		case "tcp":
-			if ss.TcpSettings.Header.Type != "" && ss.TcpSettings.Header.Type != "none" {
-				tcp := map[string]interface{}{"type": ss.TcpSettings.Header.Type}
-				if len(ss.TcpSettings.Header.Request) > 0 {
-					tcp["request"] = ss.TcpSettings.Header.Request
-				}
-				stream["tcpSettings"] = map[string]interface{}{"header": tcp}
-			}
-		case "grpc":
-			grpc := map[string]interface{}{"serviceName": grpcSvc}
-			if ss.GrpcSettings.Mode != "" {
-				grpc["mode"] = ss.GrpcSettings.Mode
-			}
-			stream["grpcSettings"] = grpc
+			stream["tcpSettings"] = map[string]interface{}{"header": tcp}
 		}
-		if in.TLSEnabled {
-			stream["security"] = "tls"
-			// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
-			certFile, keyFile := agentCertFile, agentKeyFile
-			if in.TLSCertID > 0 && store.DB != nil {
-				var cert model.Certificate
-				if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
-					certFile, keyFile = cert.CertPath, cert.KeyPath
-				}
-			}
-			stream["tlsSettings"] = map[string]interface{}{
-				"certificates": []map[string]interface{}{
-					{"certificateFile": certFile, "keyFile": keyFile},
-				},
-			}
-		} else {
-			stream["security"] = "none"
+	case "grpc":
+		grpc := map[string]interface{}{"serviceName": grpcSvc}
+		if ss.GrpcSettings.Mode != "" {
+			grpc["mode"] = ss.GrpcSettings.Mode
 		}
+		stream["grpcSettings"] = grpc
+	}
+	switch security {
+	case "reality":
+		stream["security"] = "reality"
+		stream["realitySettings"] = buildRealitySettings(in)
+	case "tls":
+		stream["security"] = "tls"
+		// 默认路径与 agent 实际落盘路径（internal/agent/cert.go 的 ReceiveCert）保持一致
+		certFile, keyFile := agentCertFile, agentKeyFile
+		if in.TLSCertID > 0 && store.DB != nil {
+			var cert model.Certificate
+			if store.DB.First(&cert, in.TLSCertID).Error == nil && cert.CertPath != "" {
+				certFile, keyFile = cert.CertPath, cert.KeyPath
+			}
+		}
+		stream["tlsSettings"] = map[string]interface{}{
+			"certificates": []map[string]interface{}{
+				{"certificateFile": certFile, "keyFile": keyFile},
+			},
+		}
+	default:
+		stream["security"] = "none"
+	}
 
 	// xray 26.x 要求 VLESS 入站 settings 显式声明 decryption（服务端不解密，填 none）。
 	settings := map[string]interface{}{}
@@ -206,8 +225,9 @@ func BuildXrayConfig(node model.Node, inbounds []model.Inbound, clientsByInbound
 
 // buildClient 按协议生成 xray 客户端条目。
 // vmess / vless 用 id（UUID）作为身份标识；trojan 用 password（复用 UUID，随机串即合法口令）。
+// flow（如 xtls-rprx-vision）仅 VLESS+REALITY/TLS 有效，非空时下发。
 // email 统一取 UUID，作为 per-user 流量统计键（见 BuildXrayConfig 注释），改名 alias 不影响历史流量归属。
-func buildClient(protocol, uuid string) map[string]interface{} {
+func buildClient(protocol, uuid, flow string) map[string]interface{} {
 	m := map[string]interface{}{
 		"level": 0,
 		"email": uuid,
@@ -216,6 +236,9 @@ func buildClient(protocol, uuid string) map[string]interface{} {
 		m["password"] = uuid
 	} else {
 		m["id"] = uuid
+	}
+	if flow != "" {
+		m["flow"] = flow
 	}
 	return m
 }
