@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -500,106 +499,6 @@ func removeInboundFromSubscriptionFilters(tx *gorm.DB, inboundID string) error {
 		}
 	}
 	return nil
-}
-
-// ---- 用户/客户端 CRUD ----
-
-func ListClients(c *gin.Context) {
-	id := c.Param("id")
-	var clients []model.Client
-	store.DB.Where("inbound_id = ?", id).Find(&clients)
-	c.JSON(200, clients)
-}
-
-func CreateClient(c *gin.Context) {
-	inboundID := c.Param("id")
-	var body struct {
-		Alias             string `json:"alias"`
-		TrafficLimitBytes int64  `json:"traffic_limit_bytes"` // 0 不限（历史 -1 亦按不限处理）
-		ExpireTime        string `json:"expire_time"`         // RFC3339，可空
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	trafficLimit := body.TrafficLimitBytes
-	if trafficLimit < 0 {
-		trafficLimit = 0 // 0 = 无限制，归一化历史 -1
-	}
-	client := model.Client{
-		InboundID:         uint(atoiSafe(inboundID)),
-		UUID:              configgen.GenUUID(),
-		Alias:             body.Alias,
-		TrafficLimitBytes: trafficLimit,
-		Enabled:           true,
-	}
-	if body.ExpireTime != "" {
-		if t, err := time.Parse(time.RFC3339, body.ExpireTime); err == nil {
-			client.ExpireTime = t
-		}
-	}
-	if err := store.DB.Create(&client).Error; err != nil {
-		c.JSON(500, gin.H{"error": "internal error"})
-		return
-	}
-	slog.Info("audit", "action", "client_create", "id", client.ID, "inbound_id", client.InboundID, "alias", client.Alias)
-	c.JSON(201, gin.H{"id": client.ID, "uuid": client.UUID})
-}
-
-func UpdateClient(c *gin.Context) {
-	id := c.Param("id")
-	var client model.Client
-	if err := store.DB.First(&client, id).Error; err != nil {
-		c.JSON(404, gin.H{"error": "client not found"})
-		return
-	}
-	var body struct {
-		Alias             *string `json:"alias"`
-		TrafficLimitBytes *int64  `json:"traffic_limit_bytes"`
-		Enabled           *bool   `json:"enabled"`
-		ExpireTime        *string `json:"expire_time"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-	updates := map[string]interface{}{}
-	if body.Alias != nil {
-		updates["alias"] = *body.Alias
-	}
-	if body.TrafficLimitBytes != nil {
-		lim := *body.TrafficLimitBytes
-		if lim < 0 {
-			lim = 0 // 0 = 无限制，归一化历史 -1
-		}
-		updates["traffic_limit_bytes"] = lim
-	}
-	if body.Enabled != nil {
-		updates["enabled"] = *body.Enabled
-	}
-	if body.ExpireTime != nil {
-		if *body.ExpireTime == "" {
-			updates["expire_time"] = time.Time{}
-		} else if t, err := time.Parse(time.RFC3339, *body.ExpireTime); err == nil {
-			updates["expire_time"] = t
-		} else {
-			c.JSON(400, gin.H{"error": "客户端到期时间格式不正确"})
-			return
-		}
-	}
-	store.DB.Model(&client).Updates(updates)
-	slog.Info("audit", "action", "client_update", "id", client.ID)
-	c.JSON(200, gin.H{"ok": true})
-}
-
-func DeleteClient(c *gin.Context) {
-	id := c.Param("id")
-	if err := store.DB.Delete(&model.Client{}, id).Error; err != nil {
-		c.JSON(500, gin.H{"error": "internal error"})
-		return
-	}
-	slog.Info("audit", "action", "client_delete", "id", id)
-	c.JSON(200, gin.H{"ok": true})
 }
 
 // atoiSafe 将路径参数转为 uint 前的 int
