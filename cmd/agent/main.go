@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"nodepilot/internal/agent"
@@ -64,8 +68,20 @@ func main() {
 	agent.StartHeartbeat(time.Duration(*heartbeat) * time.Second)
 	agent.StartTrafficCollector(60 * time.Second)
 
-	log.Printf("[agent] NodePilot node-agent listening on %s (node=%s)", *addr, *nodeID)
-	if err := r.Run(*addr); err != nil {
-		log.Fatalf("agent run: %v", err)
+	srv := &http.Server{Addr: *addr, Handler: r, ReadHeaderTimeout: 10 * time.Second}
+	go func() {
+		log.Printf("[agent] NodePilot node-agent listening on %s (node=%s)", *addr, *nodeID)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("agent run: %v", err)
+		}
+	}()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("[agent] graceful shutdown failed: %v", err)
 	}
+	agent.StopBackgroundWorkers()
 }

@@ -24,11 +24,18 @@ type trafficStatItem struct {
 // StartTrafficCollector 周期向本机 xray stats API 查询按用户累计流量并上报控制面。
 // 写法镜像 StartHeartbeat（http.go）。
 func StartTrafficCollector(interval time.Duration) {
+	startBackground()
 	go func() {
+		defer finishBackground()
 		t := time.NewTicker(interval)
 		defer t.Stop()
-		for range t.C {
-			collectTraffic()
+		for {
+			select {
+			case <-t.C:
+				collectTraffic()
+			case <-backgroundStop:
+				return
+			}
 		}
 	}()
 }

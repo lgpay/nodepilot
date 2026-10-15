@@ -167,25 +167,35 @@ func GetStatus(c *gin.Context) {
 // 控制面可在心跳响应中下发新的间隔，这里动态调整，无需重启 agent。
 func StartHeartbeat(interval time.Duration) {
 	setHeartbeatInterval(int(interval / time.Second))
+	startBackground()
 	go func() {
+		defer finishBackground()
 		EnsureXrayRunning()
 		postHeartbeat()
 		for {
-			time.Sleep(time.Duration(getHeartbeatInterval()) * time.Second)
-			EnsureXrayRunning()
-			postHeartbeat()
+			timer := time.NewTimer(time.Duration(getHeartbeatInterval()) * time.Second)
+			select {
+			case <-timer.C:
+				EnsureXrayRunning()
+				postHeartbeat()
+			case <-backgroundStop:
+				if !timer.Stop() {
+					<-timer.C
+				}
+				return
+			}
 		}
 	}()
 }
 
 func postHeartbeat() {
 	body, _ := json.Marshal(map[string]interface{}{
-		"agent_version":       version,
-		"cpu":                 0.0,
-		"mem":                 0.0,
-		"xray_running":        IsXrayRunning(),
-		"heartbeat_interval":  getHeartbeatInterval(),
-		"timestamp":           time.Now().Format(time.RFC3339),
+		"agent_version":      version,
+		"cpu":                0.0,
+		"mem":                0.0,
+		"xray_running":       IsXrayRunning(),
+		"heartbeat_interval": getHeartbeatInterval(),
+		"timestamp":          time.Now().Format(time.RFC3339),
 	})
 	url := strings.TrimRight(cfg.ServerURL, "/") + "/api/v1/nodes/" + cfg.NodeID + "/heartbeat"
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
