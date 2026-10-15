@@ -9,6 +9,7 @@ import (
 	"nodepilot/internal/model"
 	"nodepilot/internal/notify"
 	"nodepilot/internal/store"
+	"nodepilot/internal/taskqueue"
 )
 
 const alertInterval = 15 * time.Minute
@@ -16,8 +17,9 @@ const alertInterval = 15 * time.Minute
 // alerted 去重：key=clientID:reason:YYYY-MM-DD，当天同原因只通知一次，避免扫描器刷屏。
 // 由互斥锁保护，避免定时扫描与潜在并发访问产生 data race。
 var (
-	alertMu sync.Mutex
-	alerted = map[string]bool{}
+	alertMu        sync.Mutex
+	alerted        = map[string]bool{}
+	alertScheduler *taskqueue.Periodic
 )
 
 // markAlerted 若 key 已标记则返回 false（已通知过），否则标记并返回 true。
@@ -33,13 +35,13 @@ func markAlerted(key string) bool {
 
 // StartAlertScheduler 启动流量超额 / 客户端到期 的定时扫描预警
 func StartAlertScheduler() {
-	go func() {
-		ticker := time.NewTicker(alertInterval)
-		scanAlerts()
-		for range ticker.C {
-			scanAlerts()
-		}
-	}()
+	alertScheduler = taskqueue.NewPeriodic(1, 1, alertInterval, true, scanAlerts)
+}
+
+func stopAlertScheduler() {
+	if alertScheduler != nil {
+		alertScheduler.Stop()
+	}
 }
 
 func scanAlerts() {

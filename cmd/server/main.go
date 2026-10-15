@@ -100,6 +100,7 @@ func main() {
 		}
 	}
 	server.StopDeploymentWorker()
+	server.StopBackgroundWorkers()
 	notify.Stop()
 	slog.Info("[server] stopped")
 }

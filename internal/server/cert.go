@@ -16,6 +16,7 @@ import (
 	"nodepilot/internal/model"
 	"nodepilot/internal/secret"
 	"nodepilot/internal/store"
+	"nodepilot/internal/taskqueue"
 )
 
 const (
@@ -25,6 +26,8 @@ const (
 	agentKeyFile  = "/opt/nodepilot-agent/certs/privkey.pem"
 	agentCaFile   = "/opt/nodepilot-agent/certs/ca.pem"
 )
+
+var certScheduler *taskqueue.Periodic
 
 // ListCerts 列出全局证书
 func ListCerts(c *gin.Context) {
@@ -234,13 +237,13 @@ func sanitize(domain string) string {
 
 // StartCertRenewScheduler 定时检查临近过期的证书并自动续签+重分发
 func StartCertRenewScheduler() {
-	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			renewDueCerts()
-		}
-	}()
+	certScheduler = taskqueue.NewPeriodic(1, 1, 24*time.Hour, false, renewDueCerts)
+}
+
+func stopCertRenewScheduler() {
+	if certScheduler != nil {
+		certScheduler.Stop()
+	}
 }
 
 func renewDueCerts() {

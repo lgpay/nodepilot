@@ -13,6 +13,7 @@ import (
 	"nodepilot/internal/model"
 	"nodepilot/internal/notify"
 	"nodepilot/internal/store"
+	"nodepilot/internal/taskqueue"
 )
 
 const (
@@ -32,9 +33,9 @@ type probeState struct {
 	healAttempts map[uint]int
 	lastHeal     map[uint]time.Time
 	wasOffline   map[uint]bool
-	connState    map[uint]string // 入站ID → ok|fail（最近一次端口连通探测结果）
+	connState    map[uint]string    // 入站ID → ok|fail（最近一次端口连通探测结果）
 	lastProbe    map[uint]time.Time // 入站ID → 最近一次探测时间（探测按自动修复间隔调度）
-	hbFailCounts map[uint]int      // 节点ID → 连续未收到心跳次数
+	hbFailCounts map[uint]int       // 节点ID → 连续未收到心跳次数
 	hbLastSeen   map[uint]time.Time // 节点ID → 已计账(已确认收到)的最近心跳时间
 }
 
@@ -48,6 +49,8 @@ var ps = &probeState{
 	hbFailCounts: map[uint]int{},
 	hbLastSeen:   map[uint]time.Time{},
 }
+
+var probeScheduler *taskqueue.Periodic
 
 func (s *probeState) incFail(id uint) {
 	s.mu.Lock()
@@ -164,13 +167,13 @@ func (s *probeState) setHbLastSeen(id uint, t time.Time) {
 
 // StartProbeScheduler 启动节点连通性探测与自愈调度器
 func StartProbeScheduler() {
-	go func() {
-		ticker := time.NewTicker(probeInterval)
-		probeAll()
-		for range ticker.C {
-			probeAll()
-		}
-	}()
+	probeScheduler = taskqueue.NewPeriodic(1, 1, probeInterval, true, probeAll)
+}
+
+func stopProbeScheduler() {
+	if probeScheduler != nil {
+		probeScheduler.Stop()
+	}
 }
 
 func probeAll() {
@@ -370,7 +373,7 @@ func selfHeal(node model.Node, in model.Inbound) {
 		"port_auto_fixed": true,
 		"heal_count":      in.HealCount + 1,
 	})
-	ps.setConn(in.ID, "fail")       // 新端口待下一轮探测确认
+	ps.setConn(in.ID, "fail")           // 新端口待下一轮探测确认
 	ps.setLastProbe(in.ID, time.Time{}) // 重置探测调度，下一轮立即探测新端口
 	log.Printf("[probe] node=%d inbound=%d self-heal: port %d -> %d", node.ID, in.ID, oldPort, newPort)
 
